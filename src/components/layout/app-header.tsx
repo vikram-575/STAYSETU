@@ -100,16 +100,20 @@ export default function AppHeader({ user }: Props) {
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full animate-pulse" />
           </Link>
 
-          {/* User Menu */}
-          <div className="flex items-center gap-2 pl-2 border-l border-gray-200">
-            <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-xs">
+          {/* User Menu / Profile Link */}
+          <Link
+            href="/dashboard/settings"
+            className="flex items-center gap-2 pl-2 border-l border-gray-200 hover:opacity-80 transition active:scale-95"
+            title="Profile & Settings"
+          >
+            <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-xs shadow-xs">
               {user.full_name?.charAt(0)?.toUpperCase() ?? 'U'}
             </div>
             <div className="hidden md:block text-left">
               <p className="text-xs font-bold text-gray-900 leading-tight">{user.full_name}</p>
               <p className="text-[10px] text-gray-500 capitalize leading-tight">{user.role}</p>
             </div>
-          </div>
+          </Link>
         </div>
       </header>
 

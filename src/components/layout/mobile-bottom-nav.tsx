@@ -4,8 +4,9 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard, Users, BedDouble, IndianRupee,
-  Plus, X, UserPlus, CreditCard, Zap, Receipt, Sparkles
+  LayoutDashboard, Users, BedDouble, UserCircle2,
+  Plus, X, UserPlus, CreditCard, Zap, Receipt, Sparkles,
+  Settings, LogOut, ArrowLeftRight, TrendingUp
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -18,7 +19,7 @@ export default function MobileBottomNav() {
     { label: 'Residents', href: '/dashboard/residents', icon: Users, exact: false },
     { label: 'Action', href: '#', icon: Plus, isAction: true },
     { label: 'Rooms', href: '/dashboard/rooms', icon: BedDouble, exact: false },
-    { label: 'Money', href: '/dashboard/money', icon: IndianRupee, exact: false },
+    { label: 'Profile', href: '/dashboard/settings', icon: UserCircle2, exact: false },
   ]
 
   const isActive = (item: typeof navItems[0]) => {
@@ -66,11 +67,11 @@ export default function MobileBottomNav() {
           {/* Backdrop */}
           <div
             onClick={() => setQuickMenuOpen(false)}
-            className="absolute inset-0 bg-black/50 backdrop-blur-xs transition-opacity animate-in fade-in"
+            className="absolute inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in"
           />
 
           {/* Drawer content */}
-          <div className="relative bg-white rounded-t-3xl p-5 shadow-2xl border-t border-gray-100 space-y-4 animate-in slide-in-from-bottom duration-200">
+          <div className="relative bg-white rounded-t-3xl p-5 shadow-2xl border-t border-gray-100 space-y-4 animate-in slide-in-from-bottom duration-200 safe-bottom">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
@@ -132,6 +133,7 @@ export default function MobileBottomNav() {
                   key="quick-fab"
                   onClick={() => setQuickMenuOpen(true)}
                   className="flex flex-col items-center justify-center -mt-5 group active:scale-90 transition-transform"
+                  aria-label="Quick Action"
                 >
                   <div className="w-12 h-12 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-lg shadow-blue-500/40 border-4 border-white">
                     <Plus className="w-6 h-6 stroke-[2.5]" />

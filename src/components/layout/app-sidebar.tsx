@@ -7,8 +7,8 @@ import { UserRole } from '@/lib/types'
 import {
   LayoutDashboard, Users, Building2, BedDouble, FileText,
   CreditCard, Zap, BarChart3, MessageSquare, Settings,
-  DollarSign, BookOpen, PackageSearch, Home, LogOut,
-  AlertCircle, TrendingUp
+  DollarSign, BookOpen, PackageSearch, LogOut,
+  TrendingUp
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -55,11 +55,11 @@ export default function AppSidebar({ role, orgName }: Props) {
   }
 
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 flex flex-col h-full shrink-0">
+    <aside className="hidden md:flex w-64 bg-white border-r border-gray-200 flex-col h-full shrink-0">
       {/* Logo */}
       <div className="p-5 border-b border-gray-100">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center shrink-0">
+          <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center shrink-0 shadow-xs">
             <Building2 className="w-5 h-5 text-white" />
           </div>
           <div className="min-w-0">
@@ -81,7 +81,7 @@ export default function AppSidebar({ role, orgName }: Props) {
               className={cn(
                 'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all',
                 isActive
-                  ? 'bg-blue-50 text-blue-700'
+                  ? 'bg-blue-50 text-blue-700 font-bold shadow-xs'
                   : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
               )}
             >
