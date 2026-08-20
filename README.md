@@ -1,36 +1,117 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🏨 STAYSETU (PG-SETU) — Production PG & Hostel Management System
 
-## Getting Started
+**STAYSETU** is a comprehensive, production-grade PG (Paying Guest) and Hostel Management, Resident CRM, Sub-meter Electricity Billing, and Revenue Control System.
 
-First, run the development server:
+Built with **Next.js 15 (App Router)**, **TypeScript**, **Tailwind CSS**, **Supabase (PostgreSQL + RLS + GoTrue Auth)**, and **Capacitor (Android APK Mobile Runtime)**.
 
+---
+
+## ✨ Core Features & Modules
+
+### 1. 📊 10-Second Owner Dashboard
+- Real-time **Live Occupancy Rate** & Bed Availability Matrix.
+- **Expected vs. Collected Revenue** and collection performance tracking.
+- **Immediate Action Alerts**: Overdue invoice warnings, expiring KYC documents, and maintenance alerts.
+- Monthly revenue trends and category breakdown (Rent, Electricity, Food, Laundry).
+
+### 2. 👥 360° Resident CRM & Lifecycle
+- Unique permanent registration IDs: `PG-YYYY-NNNNNN`.
+- **5-Step Check-In Wizard**: Personal info, emergency contacts, KYC docs, room/bed assignment, and security deposit recording.
+- **Resident Profile**: Integrated KYC, complete ledger balance, invoice history, payment receipts, and stay logs.
+- **Seamless Room/Bed Transfers**: Historical ledger continuity without data loss.
+- **Checkout & Deposit Settlement Wizard**: Prorated exit, final electricity deductions, damage claims, and deposit refund calculations.
+
+### 3. 💳 Invoicing, Payments & Financial Integrity
+- **All monetary calculations stored in exact integer paise** (₹1 = 100 paise) to eliminate floating-point rounding errors.
+- **Automated Billing Engine**: Prorated mid-month check-in/out calculations.
+- **Payments Register**: Multi-channel collection (UPI, Cash, Bank Transfer), idempotent payment handling, and auto-allocation to oldest unpaid dues.
+- **Daily Cash Closing Reconciliation**: Discrepancy tracking with reason logging.
+- **Double-Entry Resident Ledger**: Audit-compliant running balance with debit/credit entries.
+
+### 4. ⚡ Electricity Sub-Metering & Utility Billing
+- Sub-meter configuration by Room, Floor, or Building.
+- Automated consumption delta calculation with rollover protection.
+- Smart splitting: Equal Split among active occupants, Fixed Per Person, or Custom allocations.
+- 1-click invoice item generation from electricity logs.
+
+### 5. 💰 Money Center & Owner Simulator
+- Strict separation between **Operating Revenue** and **Security Deposits Held in Trust**.
+- **What-If Revenue Simulator**: Dynamic projections for rent increases, filling vacant beds, or utility rate changes.
+- Multi-category expense center (Electricity, Staff Salaries, Maintenance, Food Procurement).
+
+### 6. 📱 Mobile-First UI & Android APK Support
+- **5-Tab Mobile Bottom Navigation Bar** with safe-area notch insets.
+- **Elevated Quick Action (+) FAB**: Fast Check-in, Collect Payment, Add Extra Charge, and Meter Reading on phones.
+- **Native Android APK Scaffolding**: Built with Capacitor for 1-command APK compilation.
+- **Direct WhatsApp Automation**: Device-native `wa.me` links for sending invoices, rent reminders, and receipts directly from the owner's phone without requiring paid third-party API keys.
+
+---
+
+## 🏗️ Tech Stack
+
+- **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS, Lucide Icons, Radix UI.
+- **Backend & Database**: Supabase (PostgreSQL 15), Row Level Security (RLS) policies, PostgreSQL Triggers and Functions.
+- **Mobile**: Capacitor 8 (Android native bridge), Progressive Web App (PWA) manifest.
+- **Charts & Data**: Recharts, TanStack React Table.
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 18+ or 20+
+- npm or yarn
+
+### 1. Clone the Repository
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/vikram-575/STAYSETU.git
+cd STAYSETU
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Install Dependencies
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 3. Setup Environment Variables
+Create a `.env.local` file in the root directory:
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_supabase_publishable_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 4. Database Setup
+Execute the SQL migrations located in `supabase/migrations/` in your Supabase SQL editor:
+1. `001_initial_schema.sql` (Tables, views, functions, triggers, and RLS policies)
+2. `seed.sql` (Optional sample data)
 
-## Learn More
+### 5. Run the Development Server
+```bash
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 📱 Building the Android Mobile APK
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+To build the standalone Android APK using Capacitor:
 
-## Deploy on Vercel
+### Option A: Via Command Line (Gradle)
+```powershell
+cd android
+.\gradlew.bat assembleDebug
+```
+*The compiled APK will be generated at:* `android/app/build/outputs/apk/debug/app-debug.apk`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Option B: Open in Android Studio
+```bash
+npm run mobile:open
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## 📄 License
+This project is licensed under the MIT License.

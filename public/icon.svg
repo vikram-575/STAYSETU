@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2563EB;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1D4ED8;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#grad)"/>
+  <!-- Building Icon -->
+  <path d="M140 390 V180 L256 120 L372 180 V390 H140 Z" fill="#FFFFFF" fill-opacity="0.15"/>
+  <path d="M170 390 V210 L256 160 L342 210 V390 H170 Z" fill="#FFFFFF"/>
+  <!-- Windows -->
+  <rect x="200" y="230" width="30" height="30" rx="6" fill="#2563EB"/>
+  <rect x="282" y="230" width="30" height="30" rx="6" fill="#2563EB"/>
+  <rect x="200" y="280" width="30" height="30" rx="6" fill="#2563EB"/>
+  <rect x="282" y="280" width="30" height="30" rx="6" fill="#2563EB"/>
+  <!-- Door -->
+  <path d="M236 390 V335 C236 325 276 325 276 335 V390 H236 Z" fill="#2563EB"/>
+</svg>
