@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { createDoc, COLLECTIONS } from '@/lib/firebase/db'
 
 export async function GET(request: NextRequest) {
   try {
@@ -84,6 +85,16 @@ export async function POST(request: NextRequest) {
     if (profileError && !profile) {
       throw profileError
     }
+
+    // Sync to Firestore
+    createDoc(COLLECTIONS.USERS, {
+      email: cleanEmail,
+      full_name: full_name || cleanEmail.split('@')[0],
+      role,
+      organization_id: organization_id || null,
+      phone: phone || null,
+      is_active: true,
+    }, userId || undefined).catch(() => {})
 
     return NextResponse.json({
       success: true,
