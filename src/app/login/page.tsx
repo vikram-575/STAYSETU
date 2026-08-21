@@ -135,6 +135,20 @@ export default function LoginPage() {
           <LoginForm />
         </Suspense>
 
+        {/* Tenant Self-Service Passbook Portal Link */}
+        <div className="mt-4 p-4 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl text-white shadow-md shadow-blue-200/50 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-black">Living as a Resident / Tenant?</p>
+            <p className="text-[11px] text-blue-100 font-medium mt-0.5">View your bills, receipts & ledger with Phone + DOB</p>
+          </div>
+          <Link
+            href="/portal"
+            className="px-3.5 py-2 bg-white text-blue-700 hover:bg-blue-50 active:scale-95 font-extrabold text-xs rounded-xl shadow-xs shrink-0 transition"
+          >
+            Tenant Portal →
+          </Link>
+        </div>
+
         <p className="text-center text-[11px] text-gray-400 mt-6 font-medium">
           © 2026 PG-SETU. All data encrypted and secured.
         </p>

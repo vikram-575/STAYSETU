@@ -155,6 +155,7 @@ export async function POST(request: NextRequest) {
                 registration_number: regNo,
                 full_name: resData.name,
                 phone: resData.phone,
+                date_of_birth: '1998-05-15',
                 status: 'active',
                 permanent_city: 'Jaipur',
                 id_type: 'aadhaar',

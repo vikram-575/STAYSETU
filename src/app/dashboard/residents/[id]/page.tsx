@@ -84,8 +84,8 @@ export default async function ResidentDetailPage({ params, searchParams }: Props
     .eq('resident_id', residentId)
     .order('created_at', { ascending: false })
 
-  // Pre-filled WhatsApp message
-  const waMsg = `Hello ${resident.full_name}, your PG account balance is ${formatCurrency(resident.total_outstanding_paise)}. Registration Number: ${resident.registration_number}.`
+  // Pre-filled WhatsApp message with Portal Passbook Link
+  const waMsg = `Hello ${resident.full_name}, your PG balance is ${formatCurrency(resident.total_outstanding_paise)} (Reg: ${resident.registration_number}). View your itemized bills, payment receipts & passbook online at: ${typeof window !== 'undefined' ? window.location.origin : ''}/portal (Login with your Phone and Date of Birth).`
   const waLink = buildWhatsAppLink(resident.phone, waMsg)
   const smsLink = buildSmsLink(resident.phone, waMsg)
 
@@ -100,6 +100,13 @@ export default async function ResidentDetailPage({ params, searchParams }: Props
           <ArrowLeft className="w-4 h-4" /> Back to Residents
         </Link>
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+          <Link
+            href="/portal"
+            target="_blank"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 active:scale-95 text-indigo-700 border border-indigo-200 text-xs font-bold px-3 py-2 rounded-xl transition shadow-2xs"
+          >
+            <FileText className="w-4 h-4" /> Tenant Passbook
+          </Link>
           <a
             href={waLink}
             target="_blank"

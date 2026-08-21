@@ -120,7 +120,7 @@ export default async function CommunicationsPage({ searchParams }: Props) {
           <div className="space-y-2.5 sm:space-y-3">
             {overdueResidents && overdueResidents.length > 0 ? (
               overdueResidents.map((r) => {
-                const message = `Hello ${r.full_name}, your PG outstanding balance is ${formatCurrency(r.total_outstanding_paise)}. Registration Number: ${r.registration_number}, Room: ${r.room_number || '—'}. Please clear your dues at the earliest. - ${orgName}`
+                const message = `Hello ${r.full_name}, your PG outstanding balance is ${formatCurrency(r.total_outstanding_paise)} (Room: ${r.room_number || '—'}). View your bills, receipts & pay online at: https://pgsetu.com/portal (Login with Phone: ${r.phone} and DOB). - ${orgName}`
                 const waLink = buildWhatsAppLink(r.phone, message)
                 const smsLink = buildSmsLink(r.phone, message)
 
