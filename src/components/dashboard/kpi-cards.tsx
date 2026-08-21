@@ -40,27 +40,27 @@ interface KPICardProps {
 function KPICard({ label, value, sub, icon: Icon, color, trend, trendLabel, highlight }: KPICardProps) {
   return (
     <div className={cn(
-      'bg-white rounded-xl border p-5 flex flex-col gap-3',
-      highlight ? 'border-blue-200 shadow-sm shadow-blue-100' : 'border-gray-200'
+      'bg-white rounded-xl sm:rounded-2xl border p-3.5 sm:p-5 flex flex-col justify-between gap-2.5 shadow-xs transition-shadow',
+      highlight ? 'border-blue-300 shadow-sm shadow-blue-100 bg-blue-50/10' : 'border-gray-200 hover:border-gray-300'
     )}>
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</span>
-        <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center', color)}>
-          <Icon className="w-4 h-4" />
+      <div className="flex items-center justify-between gap-1.5">
+        <span className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider truncate" title={label}>{label}</span>
+        <div className={cn('w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shrink-0', color)}>
+          <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
         </div>
       </div>
       <div>
-        <p className="text-2xl font-bold text-gray-900 leading-none">{value}</p>
-        {sub && <p className="text-xs text-gray-500 mt-1">{sub}</p>}
+        <p className="text-lg sm:text-2xl font-black text-gray-900 leading-tight tracking-tight truncate" title={value}>{value}</p>
+        {sub && <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 truncate" title={sub}>{sub}</p>}
       </div>
       {trendLabel && (
         <div className={cn(
-          'flex items-center gap-1 text-xs font-medium',
+          'flex items-center gap-1 text-[10px] sm:text-xs font-semibold truncate pt-1 border-t border-gray-100',
           trend === 'up' ? 'text-green-600' : trend === 'down' ? 'text-red-600' : 'text-gray-500'
         )}>
-          {trend === 'up' && <TrendingUp className="w-3 h-3" />}
-          {trend === 'down' && <TrendingDown className="w-3 h-3" />}
-          {trendLabel}
+          {trend === 'up' && <TrendingUp className="w-3 h-3 shrink-0" />}
+          {trend === 'down' && <TrendingDown className="w-3 h-3 shrink-0" />}
+          <span className="truncate">{trendLabel}</span>
         </div>
       )}
     </div>
@@ -69,7 +69,7 @@ function KPICard({ label, value, sub, icon: Icon, color, trend, trendLabel, high
 
 export default function DashboardKPICards({ kpis }: Props) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-4">
       <KPICard
         label="Expected This Month"
         value={formatCurrencyCompact(kpis.monthExpectedPaise)}

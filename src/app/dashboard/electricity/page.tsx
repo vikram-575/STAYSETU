@@ -42,71 +42,71 @@ export default async function ElectricityPage() {
   const totalAmountPaise = readings?.reduce((s, r) => s + (r.total_paise || 0), 0) || 0
 
   return (
-    <div className="space-y-6 max-w-screen-2xl">
+    <div className="space-y-4 sm:space-y-6 max-w-screen-2xl">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Electricity Management</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">Electricity Management</h1>
+          <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
             Per-unit billing · Sub-meter readings · Room-based & equal split allocations
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <Link
             href="/dashboard/electricity/new-meter"
-            className="flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold px-3 py-2 rounded-xl transition"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-gray-100 hover:bg-gray-200 active:scale-95 text-gray-800 text-xs font-bold px-3.5 py-2.5 rounded-xl transition"
           >
-            <Plus className="w-4 h-4" /> Add Sub-Meter
+            <Plus className="w-4 h-4" /> Add Meter
           </Link>
           <Link
             href="/dashboard/electricity/reading"
-            className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-gray-900 text-xs font-bold px-4 py-2 rounded-xl transition shadow-sm"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-yellow-500 hover:bg-yellow-600 active:scale-95 text-gray-950 text-xs font-bold px-4 py-2.5 rounded-xl transition shadow-xs"
           >
-            <Zap className="w-4 h-4" /> Record New Reading
+            <Zap className="w-4 h-4" /> Record Reading
           </Link>
         </div>
       </div>
 
       {/* KPI Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-          <p className="text-[10px] uppercase font-bold text-gray-500">Active Meters</p>
-          <p className="text-xl font-bold text-gray-900 mt-0.5">{meters?.length || 0}</p>
-          <p className="text-[10px] text-gray-400">Room & main sub-meters</p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+        <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-200 shadow-2xs">
+          <p className="text-[10px] uppercase font-bold text-gray-500 truncate">Active Meters</p>
+          <p className="text-lg sm:text-xl font-black text-gray-900 mt-0.5 truncate">{meters?.length || 0}</p>
+          <p className="text-[10px] text-gray-400">Room & sub-meters</p>
         </div>
-        <div className="bg-white p-4 rounded-xl border border-yellow-200 shadow-sm bg-yellow-50/20">
-          <p className="text-[10px] uppercase font-bold text-yellow-700">Units Recorded</p>
-          <p className="text-xl font-extrabold text-yellow-800 mt-0.5">{totalUnits.toLocaleString('en-IN')} kWh</p>
-          <p className="text-[10px] text-yellow-600">Total consumption</p>
+        <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-yellow-200 shadow-2xs bg-yellow-50/20">
+          <p className="text-[10px] uppercase font-bold text-yellow-700 truncate">Units Recorded</p>
+          <p className="text-lg sm:text-xl font-black text-yellow-800 mt-0.5 truncate">{totalUnits.toLocaleString('en-IN')} kWh</p>
+          <p className="text-[10px] text-yellow-600">Total units</p>
         </div>
-        <div className="bg-white p-4 rounded-xl border border-green-200 shadow-sm bg-green-50/20">
-          <p className="text-[10px] uppercase font-bold text-green-700">Total Electricity Value</p>
-          <p className="text-xl font-extrabold text-green-800 mt-0.5">{formatCurrency(totalAmountPaise)}</p>
-          <p className="text-[10px] text-green-600">Calculated billings</p>
+        <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-green-200 shadow-2xs bg-green-50/20">
+          <p className="text-[10px] uppercase font-bold text-green-700 truncate">Total Value</p>
+          <p className="text-lg sm:text-xl font-black text-green-800 mt-0.5 truncate">{formatCurrency(totalAmountPaise)}</p>
+          <p className="text-[10px] text-green-600">Calculated amount</p>
         </div>
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-          <p className="text-[10px] uppercase font-bold text-gray-500">Default Allocation</p>
-          <p className="text-base font-bold text-gray-900 mt-1">Equal Split</p>
-          <p className="text-[10px] text-gray-400">Per room residents</p>
+        <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-200 shadow-2xs">
+          <p className="text-[10px] uppercase font-bold text-gray-500 truncate">Allocation</p>
+          <p className="text-sm sm:text-base font-bold text-gray-900 mt-1 truncate">Equal Split</p>
+          <p className="text-[10px] text-gray-400">Among room beds</p>
         </div>
       </div>
 
       {/* Meters List */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-4">
+      <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-3.5 sm:p-6 shadow-xs space-y-3 sm:space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-gray-900">Configured Electricity Meters</h2>
+          <h2 className="text-sm sm:text-base font-bold text-gray-900">Configured Electricity Meters</h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {meters && meters.length > 0 ? (
             meters.map((meter: any) => (
-              <div key={meter.id} className="p-4 rounded-xl border border-gray-200 bg-gray-50/50 space-y-3">
+              <div key={meter.id} className="p-3.5 sm:p-4 rounded-2xl border border-gray-200 bg-gray-50/50 space-y-2.5 shadow-2xs">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Gauge className="w-5 h-5 text-yellow-500" />
+                    <Gauge className="w-5 h-5 text-yellow-500 shrink-0" />
                     <div>
-                      <h3 className="font-bold text-sm text-gray-900">Meter {meter.meter_number}</h3>
-                      <p className="text-[11px] text-gray-500 uppercase">{meter.meter_type} meter</p>
+                      <h3 className="font-bold text-xs sm:text-sm text-gray-900 font-mono">Meter {meter.meter_number}</h3>
+                      <p className="text-[10px] text-gray-500 uppercase font-semibold">{meter.meter_type} meter</p>
                     </div>
                   </div>
                   <span className="px-2 py-0.5 bg-green-100 text-green-800 text-[10px] font-bold rounded-full uppercase">
@@ -114,10 +114,10 @@ export default async function ElectricityPage() {
                   </span>
                 </div>
 
-                <div className="text-xs space-y-1 text-gray-600 border-t pt-2">
+                <div className="text-xs space-y-1 text-gray-600 border-t border-gray-200/60 pt-2">
                   <p>
                     Location:{' '}
-                    <span className="font-semibold text-gray-900">
+                    <span className="font-bold text-gray-900">
                       {meter.rooms ? `Room ${meter.rooms.room_number}` : 'Common / Main Area'}
                     </span>
                   </p>
@@ -129,10 +129,10 @@ export default async function ElectricityPage() {
                   </p>
                 </div>
 
-                <div className="pt-2 border-t flex justify-end">
+                <div className="pt-2 border-t border-gray-200/60 flex justify-end">
                   <Link
                     href={`/dashboard/electricity/reading?meter=${meter.id}`}
-                    className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                    className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 active:scale-95"
                   >
                     Enter Reading →
                   </Link>
@@ -147,10 +147,55 @@ export default async function ElectricityPage() {
         </div>
       </div>
 
-      {/* Reading History Table */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-4">
-        <h2 className="text-base font-bold text-gray-900">Reading History & Allocation Log</h2>
-        <div className="overflow-x-auto">
+      {/* Reading History */}
+      <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-3.5 sm:p-6 shadow-xs space-y-4">
+        <h2 className="text-sm sm:text-base font-bold text-gray-900">Reading History & Allocation Log</h2>
+
+        {/* 1. Mobile Cards View */}
+        <div className="block md:hidden space-y-2.5">
+          {readings && readings.length > 0 ? (
+            readings.map((r: any) => (
+              <div key={r.id} className="bg-white p-3.5 rounded-2xl border border-gray-200 shadow-2xs space-y-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="font-mono font-bold text-xs text-yellow-600 block">
+                      Meter {r.electricity_meters?.meter_number ?? '—'}
+                    </span>
+                    <p className="font-bold text-xs text-gray-900 mt-0.5">
+                      {r.electricity_meters?.rooms?.room_number ? `Room ${r.electricity_meters.rooms.room_number}` : 'Common Meter'}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-base font-black text-green-600">{formatCurrency(r.total_paise)}</span>
+                    <span className="text-[10px] text-gray-400 block">{formatDate(r.reading_date)}</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-xs bg-gray-50 p-2 rounded-xl border border-gray-100 text-center">
+                  <div>
+                    <span className="text-[10px] text-gray-400 block font-semibold">Prev → Curr</span>
+                    <span className="font-mono text-gray-700 font-bold">{r.previous_reading} → {r.current_reading}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-gray-400 block font-semibold">Consumed</span>
+                    <span className="font-extrabold text-yellow-700">{r.units_consumed} kWh</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-gray-400 block font-semibold">Rate / Unit</span>
+                    <span className="font-semibold text-gray-700">₹{(r.rate_per_unit_paise / 100).toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="py-12 text-center text-gray-400 text-xs bg-gray-50 rounded-2xl border border-gray-200">
+              No electricity readings logged yet.
+            </div>
+          )}
+        </div>
+
+        {/* 2. Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="border-b border-gray-200 text-gray-500 bg-gray-50 uppercase">

@@ -48,25 +48,25 @@ export default async function RoomDetailPage({ params }: Props) {
   const occupiedBeds = bedsList.filter((b: any) => b.status === 'occupied').length
 
   return (
-    <div className="space-y-6 max-w-screen-2xl">
+    <div className="space-y-4 sm:space-y-6 max-w-screen-2xl">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <Link
             href="/dashboard/rooms"
-            className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-900 mb-1"
+            className="flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-gray-900 mb-1 transition"
           >
             <ArrowLeft className="w-4 h-4" /> Back to Rooms Matrix
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Room {room.room_number}</h1>
-          <p className="text-xs text-gray-500">
+          <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">Room {room.room_number}</h1>
+          <p className="text-xs text-gray-500 font-medium">
             {room.floors?.buildings?.name} · {room.floors?.name} · Capacity: {room.capacity} Beds
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div>
           <Link
             href="/dashboard/residents/new"
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
+            className="flex items-center justify-center px-4 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold transition shadow-xs"
           >
             + Check In to This Room
           </Link>
@@ -74,31 +74,31 @@ export default async function RoomDetailPage({ params }: Props) {
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white p-4 rounded-xl border border-gray-200">
-          <p className="text-[10px] uppercase font-bold text-gray-400">Total Beds</p>
-          <p className="text-xl font-bold text-gray-900 mt-0.5">{bedsList.length}</p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+        <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-200 shadow-2xs">
+          <p className="text-[10px] uppercase font-bold text-gray-400 truncate">Total Beds</p>
+          <p className="text-lg sm:text-xl font-black text-gray-900 mt-0.5 truncate">{bedsList.length}</p>
         </div>
-        <div className="bg-white p-4 rounded-xl border border-gray-200">
-          <p className="text-[10px] uppercase font-bold text-green-600">Occupied</p>
-          <p className="text-xl font-bold text-green-700 mt-0.5">{occupiedBeds}</p>
+        <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-200 shadow-2xs">
+          <p className="text-[10px] uppercase font-bold text-green-600 truncate">Occupied</p>
+          <p className="text-lg sm:text-xl font-black text-green-700 mt-0.5 truncate">{occupiedBeds}</p>
         </div>
-        <div className="bg-white p-4 rounded-xl border border-gray-200">
-          <p className="text-[10px] uppercase font-bold text-blue-600">Vacant Available</p>
-          <p className="text-xl font-bold text-blue-700 mt-0.5">{bedsList.length - occupiedBeds}</p>
+        <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-200 shadow-2xs">
+          <p className="text-[10px] uppercase font-bold text-blue-600 truncate">Vacant Available</p>
+          <p className="text-lg sm:text-xl font-black text-blue-700 mt-0.5 truncate">{bedsList.length - occupiedBeds}</p>
         </div>
-        <div className="bg-white p-4 rounded-xl border border-gray-200">
-          <p className="text-[10px] uppercase font-bold text-gray-500">Base Bed Rent</p>
-          <p className="text-xl font-bold text-gray-900 mt-0.5">
+        <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-200 shadow-2xs">
+          <p className="text-[10px] uppercase font-bold text-gray-500 truncate">Base Bed Rent</p>
+          <p className="text-lg sm:text-xl font-black text-gray-900 mt-0.5 truncate">
             {room.base_rent_paise ? formatCurrency(room.base_rent_paise) : '—'}
           </p>
         </div>
       </div>
 
       {/* Beds Detailed List */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-4">
-        <h2 className="text-base font-bold text-gray-900">Bed Assignments in Room {room.room_number}</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-3.5 sm:p-6 shadow-xs space-y-4">
+        <h2 className="text-sm sm:text-base font-bold text-gray-900">Bed Assignments in Room {room.room_number}</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {bedsList.map((bed: any) => {
             const activeAssign = bed.resident_assignments?.find((a: any) => !a.check_out_date)
             const resident = activeAssign?.residents
@@ -107,7 +107,7 @@ export default async function RoomDetailPage({ params }: Props) {
               <div
                 key={bed.id}
                 className={cn(
-                  'p-4 rounded-xl border flex flex-col justify-between space-y-3',
+                  'p-3.5 sm:p-4 rounded-2xl border flex flex-col justify-between space-y-3 shadow-2xs',
                   bed.status === 'occupied'
                     ? 'bg-green-50/50 border-green-200'
                     : 'bg-gray-50/60 border-gray-200'
@@ -115,7 +115,7 @@ export default async function RoomDetailPage({ params }: Props) {
               >
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="font-extrabold text-sm text-gray-900">Bed {bed.bed_label}</span>
+                    <span className="font-black text-sm text-gray-900">Bed {bed.bed_label}</span>
                     <span
                       className={cn(
                         'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase',
@@ -129,17 +129,17 @@ export default async function RoomDetailPage({ params }: Props) {
                   </div>
 
                   {resident ? (
-                    <div className="mt-3 space-y-1 text-xs">
-                      <p className="font-bold text-gray-900 text-sm">{resident.full_name}</p>
-                      <p className="font-mono text-[11px] text-blue-600">{resident.registration_number}</p>
-                      <p className="text-gray-500">{resident.phone}</p>
-                      <p className="text-gray-500">Check-in: {formatDate(activeAssign.check_in_date)}</p>
-                      <p className="font-semibold text-gray-900">
+                    <div className="mt-2.5 space-y-1 text-xs">
+                      <p className="font-black text-gray-900 text-sm">{resident.full_name}</p>
+                      <p className="font-mono text-[11px] text-blue-600 font-bold">{resident.registration_number}</p>
+                      <p className="text-gray-500 font-medium">{resident.phone}</p>
+                      <p className="text-gray-400 text-[10px]">Check-in: {formatDate(activeAssign.check_in_date)}</p>
+                      <p className="font-bold text-gray-900 pt-1">
                         Rent: {formatCurrency(activeAssign.monthly_rent_paise)}/mo
                       </p>
                     </div>
                   ) : (
-                    <div className="mt-3 text-xs text-gray-400 py-4 text-center">
+                    <div className="mt-3 text-xs text-gray-400 py-4 text-center font-medium">
                       Vacant bed. Ready for check-in.
                     </div>
                   )}
@@ -149,14 +149,14 @@ export default async function RoomDetailPage({ params }: Props) {
                   {resident ? (
                     <Link
                       href={`/dashboard/residents/${resident.id}`}
-                      className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                      className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 active:scale-95"
                     >
                       Resident Profile →
                     </Link>
                   ) : (
                     <Link
                       href="/dashboard/residents/new"
-                      className="text-xs font-bold text-blue-600 hover:text-blue-700"
+                      className="text-xs font-bold text-blue-600 hover:text-blue-700 active:scale-95"
                     >
                       + Assign Resident
                     </Link>
@@ -169,28 +169,28 @@ export default async function RoomDetailPage({ params }: Props) {
       </div>
 
       {/* Electricity Meter Information */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-4">
+      <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-3.5 sm:p-6 shadow-xs space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Zap className="w-5 h-5 text-yellow-500" />
-            <h2 className="text-base font-bold text-gray-900">Electricity Sub-Meter</h2>
+            <Zap className="w-5 h-5 text-yellow-500 shrink-0" />
+            <h2 className="text-sm sm:text-base font-bold text-gray-900">Electricity Sub-Meter</h2>
           </div>
           <Link
             href="/dashboard/electricity/reading"
-            className="text-xs font-semibold px-3 py-1.5 bg-yellow-50 hover:bg-yellow-100 text-yellow-800 border border-yellow-200 rounded-lg transition"
+            className="text-xs font-bold px-3 py-1.5 bg-yellow-50 hover:bg-yellow-100 text-yellow-900 border border-yellow-200 rounded-xl transition active:scale-95"
           >
             + Record Reading
           </Link>
         </div>
 
         {meter ? (
-          <div className="p-4 bg-yellow-50/40 border border-yellow-200 rounded-xl flex items-center justify-between text-xs">
+          <div className="p-3.5 sm:p-4 bg-yellow-50/40 border border-yellow-200 rounded-2xl flex items-center justify-between text-xs shadow-2xs">
             <div>
               <p className="font-bold text-gray-900">Meter Number: {meter.meter_number}</p>
-              <p className="text-gray-500">Allocation Strategy: {meter.allocation_method.replace('_', ' ')}</p>
+              <p className="text-gray-500 text-[11px] mt-0.5">Allocation: {meter.allocation_method.replace('_', ' ')}</p>
             </div>
             <span className="font-bold text-green-700 bg-green-100 px-2.5 py-1 rounded-full text-[10px] uppercase">
-              Active Meter
+              Active
             </span>
           </div>
         ) : (

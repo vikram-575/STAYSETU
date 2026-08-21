@@ -176,46 +176,46 @@ export default function TransferResidentPage({ params }: Props) {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-4 sm:space-y-6">
       <div>
         <Link
           href={`/dashboard/residents/${residentId}`}
-          className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-900 mb-1"
+          className="flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-gray-900 mb-1 transition"
         >
           <ArrowLeft className="w-4 h-4" /> Cancel & Return to Profile
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Room / Bed Transfer</h1>
-        <p className="text-xs text-gray-500">
+        <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">Room / Bed Transfer</h1>
+        <p className="text-xs text-gray-500 font-medium">
           Move resident to a new room or bed without erasing historical occupancy or financial records.
         </p>
       </div>
 
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium">
+        <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium">
           {error}
         </div>
       )}
 
       {/* Current Assignment Box */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between text-xs">
+      <div className="bg-blue-50 border border-blue-200 rounded-xl sm:rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs shadow-2xs">
         <div>
           <span className="text-[10px] uppercase font-bold text-blue-600">Current Assignment</span>
-          <p className="font-bold text-gray-900 text-sm mt-0.5">{resident.full_name} ({resident.registration_number})</p>
-          <p className="text-gray-600">
+          <p className="font-black text-gray-900 text-sm mt-0.5">{resident.full_name} ({resident.registration_number})</p>
+          <p className="text-gray-600 font-medium mt-0.5">
             {resident.building_name} · Room {resident.room_number} · Bed {resident.bed_label}
           </p>
         </div>
-        <div className="text-right">
+        <div className="text-left sm:text-right pt-2 sm:pt-0 border-t sm:border-t-0 border-blue-100">
           <span className="text-[10px] uppercase font-bold text-gray-500">Current Rent</span>
-          <p className="font-bold text-gray-900 text-sm mt-0.5">
+          <p className="font-black text-gray-900 text-sm mt-0.5">
             {resident.monthly_rent_paise ? formatCurrency(resident.monthly_rent_paise) : '—'}
           </p>
         </div>
       </div>
 
       {/* Transfer Form */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-5">
-        <h3 className="text-sm font-bold text-gray-900 border-b pb-2">Select New Room & Bed</h3>
+      <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-5">
+        <h3 className="text-sm font-bold text-gray-900 border-b border-gray-100 pb-2">Select New Room & Bed</h3>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
@@ -223,7 +223,7 @@ export default function TransferResidentPage({ params }: Props) {
             <select
               value={selectedBuilding}
               onChange={(e) => setSelectedBuilding(e.target.value)}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-semibold"
             >
               {buildings.map((b) => (
                 <option key={b.id} value={b.id}>{b.name}</option>
@@ -235,7 +235,7 @@ export default function TransferResidentPage({ params }: Props) {
             <select
               value={selectedFloor}
               onChange={(e) => setSelectedFloor(e.target.value)}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-semibold"
             >
               {floors.map((fl) => (
                 <option key={fl.id} value={fl.id}>{fl.name}</option>
@@ -247,7 +247,7 @@ export default function TransferResidentPage({ params }: Props) {
             <select
               value={selectedRoom}
               onChange={(e) => setSelectedRoom(e.target.value)}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-semibold"
             >
               {rooms.map((rm) => (
                 <option key={rm.id} value={rm.id}>Room {rm.room_number}</option>
@@ -258,17 +258,17 @@ export default function TransferResidentPage({ params }: Props) {
 
         {/* Beds */}
         <div>
-          <label className="block text-xs font-bold text-gray-700 mb-1">Select New Available Bed *</label>
+          <label className="block text-xs font-bold text-gray-700 mb-1.5">Select New Available Bed *</label>
           {beds.length > 0 ? (
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
               {beds.map((b) => (
                 <button
                   type="button"
                   key={b.id}
                   onClick={() => setSelectedBed(b.id)}
-                  className={`p-3 rounded-xl border text-center transition ${
+                  className={`p-3 rounded-2xl border text-center transition active:scale-95 ${
                     selectedBed === b.id
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
                       : 'bg-gray-50 border-gray-200 text-gray-800 hover:bg-gray-100'
                   }`}
                 >
@@ -278,13 +278,13 @@ export default function TransferResidentPage({ params }: Props) {
               ))}
             </div>
           ) : (
-            <p className="text-xs text-red-500 p-3 bg-red-50 rounded-lg">
+            <p className="text-xs text-red-500 p-3 bg-red-50 border border-red-200 rounded-xl">
               No beds available in this room. Please select another room.
             </p>
           )}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-gray-100">
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1">Effective Transfer Date *</label>
             <input
@@ -292,7 +292,7 @@ export default function TransferResidentPage({ params }: Props) {
               required
               value={transferDate}
               onChange={(e) => setTransferDate(e.target.value)}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium"
             />
           </div>
           <div>
@@ -303,7 +303,7 @@ export default function TransferResidentPage({ params }: Props) {
               required
               value={newRentRupees}
               onChange={(e) => setNewRentRupees(Number(e.target.value))}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold"
             />
           </div>
           <div>
@@ -311,7 +311,7 @@ export default function TransferResidentPage({ params }: Props) {
             <select
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-semibold"
             >
               <option value="resident_request">Resident Request</option>
               <option value="room_upgrade">Room Upgrade</option>
@@ -328,18 +328,18 @@ export default function TransferResidentPage({ params }: Props) {
               placeholder="e.g. Switched to single room on 2nd floor"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
         </div>
 
         {/* Submit */}
-        <div className="pt-4 border-t flex justify-end">
+        <div className="pt-4 border-t border-gray-100 flex justify-end">
           <button
             type="button"
             disabled={submitting}
             onClick={handleTransfer}
-            className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl text-xs font-bold transition shadow-sm"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 disabled:bg-blue-400 text-white rounded-xl text-xs font-bold transition shadow-xs"
           >
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRightLeft className="w-4 h-4" />}
             {submitting ? 'Transferring...' : 'Execute Bed Transfer'}

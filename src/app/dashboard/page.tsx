@@ -171,16 +171,16 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-screen-2xl">
+    <div className="space-y-4 sm:space-y-6 max-w-screen-2xl">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{formatDate(today)} · Live data</p>
+          <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">Executive Dashboard</h1>
+          <p className="text-xs sm:text-sm text-gray-500 mt-0.5">{formatDate(today)} · Real-time PG telemetry</p>
         </div>
-        <div className="flex items-center gap-2 text-xs text-gray-500 bg-green-50 border border-green-200 rounded-full px-3 py-1.5">
-          <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-          All systems live
+        <div className="flex items-center gap-1.5 text-xs text-green-700 bg-green-50 border border-green-200 rounded-full px-3 py-1 w-fit font-semibold">
+          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+          Live Cloud Synced
         </div>
       </div>
 
@@ -206,8 +206,8 @@ export default async function DashboardPage() {
         collectionRate={collectionRate}
       />
 
-      {/* Charts + Outstanding */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      {/* Charts + Breakdown */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
         <div className="xl:col-span-2">
           <RevenueTrendChart payments={monthlyPayments ?? []} />
         </div>
@@ -215,7 +215,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Outstanding + Recent Payments */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
         <OutstandingResidentsList residents={outstandingResidents ?? []} />
         <RecentPaymentsFeed payments={recentPayments ?? []} todayPaise={todayCollectedPaise} />
       </div>

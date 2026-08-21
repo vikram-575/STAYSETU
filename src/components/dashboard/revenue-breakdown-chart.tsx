@@ -40,47 +40,49 @@ export default function RevenueBreakdownChart({ breakdown }: Props) {
 
   if (data.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 p-6 flex items-center justify-center">
-        <p className="text-sm text-gray-400">No revenue data yet</p>
+      <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-4 sm:p-6 h-48 sm:h-64 flex items-center justify-center shadow-xs">
+        <p className="text-xs sm:text-sm text-gray-400">No revenue data yet</p>
       </div>
     )
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6">
-      <h2 className="text-base font-semibold text-gray-900 mb-1">Revenue Sources</h2>
-      <p className="text-xs text-gray-500 mb-4">This month · {formatCurrency(total)} total</p>
+    <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-4 sm:p-6 shadow-xs">
+      <h2 className="text-sm sm:text-base font-bold text-gray-900 mb-0.5">Revenue Sources</h2>
+      <p className="text-[11px] sm:text-xs text-gray-500 mb-3 sm:mb-4">This month · {formatCurrency(total)} total</p>
 
-      <ResponsiveContainer width="100%" height={200}>
-        <PieChart>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="50%"
-            innerRadius={55}
-            outerRadius={80}
-            paddingAngle={2}
-            dataKey="value"
-          >
-            {data.map((entry, index) => (
-              <Cell key={index} fill={entry.color} />
-            ))}
-          </Pie>
-          <Tooltip
-            formatter={(value: any) => [formatCurrency(Number(value) || 0), '']}
-            contentStyle={{ fontSize: 12, borderRadius: 8 }}
-          />
-        </PieChart>
-      </ResponsiveContainer>
+      <div className="w-full h-[180px] sm:h-[200px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              innerRadius={50}
+              outerRadius={75}
+              paddingAngle={2}
+              dataKey="value"
+            >
+              {data.map((entry, index) => (
+                <Cell key={index} fill={entry.color} />
+              ))}
+            </Pie>
+            <Tooltip
+              formatter={(value: any) => [formatCurrency(Number(value) || 0), '']}
+              contentStyle={{ fontSize: 12, borderRadius: 8 }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
 
       {/* Legend as table */}
-      <div className="space-y-2 mt-2">
+      <div className="space-y-1.5 mt-2">
         {data.map((item) => (
-          <div key={item.name} className="flex items-center gap-2">
+          <div key={item.name} className="flex items-center gap-2 text-[11px] sm:text-xs">
             <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: item.color }} />
-            <span className="text-xs text-gray-600 flex-1">{item.name}</span>
-            <span className="text-xs font-semibold text-gray-900">{formatCurrency(item.value)}</span>
-            <span className="text-xs text-gray-400 w-10 text-right">
+            <span className="text-gray-600 flex-1 truncate">{item.name}</span>
+            <span className="font-bold text-gray-900">{formatCurrency(item.value)}</span>
+            <span className="text-gray-400 w-8 text-right font-mono">
               {total > 0 ? Math.round((item.value / total) * 100) : 0}%
             </span>
           </div>

@@ -137,46 +137,46 @@ export default function CheckoutResidentPage({ params }: Props) {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-4 sm:space-y-6">
       <div>
         <Link
           href={`/dashboard/residents/${residentId}`}
-          className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-900 mb-1"
+          className="flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-gray-900 mb-1 transition"
         >
           <ArrowLeft className="w-4 h-4" /> Cancel & Return to Profile
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Resident Check-Out Workflow</h1>
-        <p className="text-xs text-gray-500">
+        <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">Resident Check-Out Workflow</h1>
+        <p className="text-xs text-gray-500 font-medium">
           Final electricity reading · Deposit adjustment · Outstanding clearance · Bed vacancy
         </p>
       </div>
 
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium">
+        <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium">
           {error}
         </div>
       )}
 
       {/* Resident Info Box */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between">
+      <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
         <div>
-          <h2 className="font-bold text-gray-900 text-sm">{resident.full_name}</h2>
+          <h2 className="font-black text-gray-900 text-sm">{resident.full_name}</h2>
           <p className="text-xs text-gray-500 font-mono">{resident.registration_number}</p>
-          <p className="text-xs text-blue-600 font-semibold mt-0.5">
+          <p className="text-xs text-blue-600 font-bold mt-0.5">
             Room {resident.room_number || '—'} · Bed {resident.bed_label || '—'}
           </p>
         </div>
-        <div className="text-right">
+        <div className="text-left sm:text-right pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
           <p className="text-[10px] text-gray-400 uppercase font-bold">Security Deposit Held</p>
-          <p className="text-base font-extrabold text-purple-700">{formatCurrency(depositHeldPaise)}</p>
+          <p className="text-base font-black text-purple-700">{formatCurrency(depositHeldPaise)}</p>
         </div>
       </div>
 
       {/* Settlement Form */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-5">
-        <h3 className="text-sm font-bold text-gray-900 border-b pb-2">Final Settlement Calculation</h3>
+      <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-5">
+        <h3 className="text-sm font-bold text-gray-900 border-b border-gray-100 pb-2">Final Settlement Calculation</h3>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1">Exit / Departure Date *</label>
             <input
@@ -184,7 +184,7 @@ export default function CheckoutResidentPage({ params }: Props) {
               required
               value={exitDate}
               onChange={(e) => setExitDate(e.target.value)}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium"
             />
           </div>
 
@@ -194,7 +194,7 @@ export default function CheckoutResidentPage({ params }: Props) {
               type="text"
               disabled
               value={formatCurrency(outstandingPaise)}
-              className="w-full px-3 py-2 text-xs border rounded-lg bg-gray-50 font-bold text-red-600"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl bg-gray-50 font-bold text-red-600"
             />
           </div>
 
@@ -206,7 +206,7 @@ export default function CheckoutResidentPage({ params }: Props) {
               placeholder="0"
               value={damageChargesRupees}
               onChange={(e) => setDamageChargesRupees(Number(e.target.value))}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold"
             />
           </div>
 
@@ -217,7 +217,7 @@ export default function CheckoutResidentPage({ params }: Props) {
               placeholder="e.g. Wall paint, broken switch"
               value={damageReason}
               onChange={(e) => setDamageReason(e.target.value)}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
 
@@ -229,7 +229,7 @@ export default function CheckoutResidentPage({ params }: Props) {
               placeholder="0"
               value={otherChargesRupees}
               onChange={(e) => setOtherChargesRupees(Number(e.target.value))}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold"
             />
           </div>
 
@@ -240,13 +240,13 @@ export default function CheckoutResidentPage({ params }: Props) {
               placeholder="Key returned, AC remote handed over, room inspection clear..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
         </div>
 
         {/* Breakdown Card */}
-        <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl space-y-2 text-xs">
+        <div className="p-3.5 sm:p-4 bg-gray-50 border border-gray-200 rounded-xl sm:rounded-2xl space-y-2 text-xs">
           <h4 className="font-bold text-gray-900 mb-2">Final Settlement Breakdown:</h4>
           <div className="flex justify-between py-1 border-b border-gray-200/60">
             <span className="text-gray-600">Total Unpaid Dues (Rent + Extra):</span>
@@ -262,20 +262,20 @@ export default function CheckoutResidentPage({ params }: Props) {
           </div>
           <div className="flex justify-between py-1 border-b border-gray-200/60">
             <span className="text-gray-600 font-semibold">Total Payable Charges:</span>
-            <span className="font-extrabold text-gray-900">{formatCurrency(totalDuesPaise)}</span>
+            <span className="font-black text-gray-900">{formatCurrency(totalDuesPaise)}</span>
           </div>
           <div className="flex justify-between py-1 border-b border-gray-200/60">
             <span className="text-purple-700 font-semibold">Security Deposit Available:</span>
-            <span className="font-extrabold text-purple-700">{formatCurrency(depositHeldPaise)}</span>
+            <span className="font-black text-purple-700">{formatCurrency(depositHeldPaise)}</span>
           </div>
 
           {/* Result */}
-          <div className="pt-2 flex justify-between items-center text-sm">
-            <span className="font-extrabold text-gray-900">
+          <div className="pt-2 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 text-sm">
+            <span className="font-black text-gray-900">
               {isRefund ? 'Refund to Resident:' : 'Additional Due from Resident:'}
             </span>
             <span
-              className={`font-black text-base px-3 py-1 rounded-lg ${
+              className={`font-black text-base px-3 py-1 rounded-xl text-center ${
                 isRefund ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
               }`}
             >
@@ -285,12 +285,12 @@ export default function CheckoutResidentPage({ params }: Props) {
         </div>
 
         {/* Submit */}
-        <div className="pt-4 border-t flex justify-end">
+        <div className="pt-4 border-t border-gray-100 flex justify-end">
           <button
             type="button"
             disabled={submitting}
             onClick={handleCheckout}
-            className="flex items-center gap-2 px-6 py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white rounded-xl text-xs font-bold transition shadow-sm"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-red-600 hover:bg-red-700 active:scale-95 disabled:bg-red-400 text-white rounded-xl text-xs font-bold transition shadow-xs"
           >
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
             {submitting ? 'Processing Checkout...' : 'Confirm Final Settlement & Checkout'}

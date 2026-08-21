@@ -55,27 +55,27 @@ export default function NewMeterPage() {
   }
 
   return (
-    <div className="max-w-xl mx-auto space-y-6">
+    <div className="max-w-xl mx-auto space-y-4 sm:space-y-6">
       <div>
         <Link
           href="/dashboard/electricity"
-          className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-900 mb-1"
+          className="flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-gray-900 mb-1 transition"
         >
           <ArrowLeft className="w-4 h-4" /> Cancel & Return
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Add Electricity Sub-Meter</h1>
-        <p className="text-xs text-gray-500">
+        <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">Add Electricity Sub-Meter</h1>
+        <p className="text-xs text-gray-500 font-medium">
           Configure a digital or physical sub-meter linked to a specific room or common floor.
         </p>
       </div>
 
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium">
+        <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-4">
+      <form onSubmit={handleSubmit} className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-4 sm:p-6 shadow-xs space-y-4">
         <div>
           <label className="block text-xs font-bold text-gray-700 mb-1">Meter Serial / Identifier Number *</label>
           <input
@@ -84,17 +84,17 @@ export default function NewMeterPage() {
             placeholder="e.g. MTR-204 or 83921829"
             value={form.meter_number}
             onChange={(e) => setForm({ ...form, meter_number: e.target.value })}
-            className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono font-bold"
+            className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-mono font-bold"
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1">Linked Room (Optional)</label>
             <select
               value={form.room_id}
               onChange={(e) => setForm({ ...form, room_id: e.target.value })}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-semibold"
             >
               <option value="">Common / Building Main Meter</option>
               {rooms.map((rm) => (
@@ -109,7 +109,7 @@ export default function NewMeterPage() {
             <select
               value={form.meter_type}
               onChange={(e) => setForm({ ...form, meter_type: e.target.value })}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase font-semibold"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none uppercase font-semibold"
             >
               <option value="sub">Sub-Meter (Room Dedicated)</option>
               <option value="main">Main Grid Meter</option>
@@ -123,7 +123,7 @@ export default function NewMeterPage() {
           <select
             value={form.allocation_method}
             onChange={(e) => setForm({ ...form, allocation_method: e.target.value })}
-            className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium"
+            className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium"
           >
             <option value="equal_split">Equal Split Among Room Residents (Default)</option>
             <option value="per_resident">Per Resident Consumption Units</option>
@@ -138,15 +138,15 @@ export default function NewMeterPage() {
             placeholder="e.g. 2nd Floor Room 204 AC sub-meter"
             value={form.notes}
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+            className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
           />
         </div>
 
-        <div className="pt-3 border-t flex justify-end">
+        <div className="pt-3 border-t border-gray-100 flex justify-end">
           <button
             type="submit"
             disabled={loading}
-            className="flex items-center gap-2 px-6 py-2.5 bg-yellow-500 hover:bg-yellow-600 disabled:bg-yellow-300 text-gray-950 rounded-xl text-xs font-bold transition shadow-sm"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-yellow-500 hover:bg-yellow-600 active:scale-95 disabled:bg-yellow-300 text-gray-950 rounded-xl text-xs font-bold transition shadow-xs"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
             {loading ? 'Creating...' : 'Register Electricity Meter'}

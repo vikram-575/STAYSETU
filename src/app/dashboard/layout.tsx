@@ -57,7 +57,7 @@ export default async function DashboardLayout({
       <AppSidebar role={profile.role} orgName={profile.organizations?.name ?? 'Sai Executive PG'} />
       <div className="flex-1 flex flex-col min-w-0 w-full overflow-hidden">
         <AppHeader user={profile} />
-        <main className="flex-1 overflow-auto p-3.5 sm:p-4 md:p-6 pb-20 md:pb-6">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 pb-28 md:pb-6">
           {children}
         </main>
         <MobileBottomNav />

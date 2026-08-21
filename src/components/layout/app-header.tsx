@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import {
   Search, Bell, Plus, Menu, X, LogOut,
@@ -26,6 +26,8 @@ export default function AppHeader({ user }: Props) {
   const router = useRouter()
   const supabase = createClient()
 
+  const pathname = usePathname()
+
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     router.push('/login')
@@ -33,7 +35,7 @@ export default function AppHeader({ user }: Props) {
   }
 
   const allNavItems = [
-    { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, exact: true },
     { label: 'Residents CRM', href: '/dashboard/residents', icon: Users },
     { label: 'Rooms & Beds', href: '/dashboard/rooms', icon: BedDouble },
     { label: 'Billing & Invoices', href: '/dashboard/billing', icon: FileText },
@@ -48,6 +50,11 @@ export default function AppHeader({ user }: Props) {
     { label: 'Reports Engine', href: '/dashboard/reports', icon: FileBarChart },
     { label: 'System Settings', href: '/dashboard/settings', icon: Settings },
   ]
+
+  const isRouteActive = (href: string, exact?: boolean) => {
+    if (exact) return pathname === href
+    return pathname.startsWith(href)
+  }
 
   return (
     <>
@@ -149,17 +156,25 @@ export default function AppHeader({ user }: Props) {
 
             {/* Nav list */}
             <div className="flex-1 overflow-y-auto p-3 space-y-1">
-              {allNavItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-100 active:bg-blue-50 active:text-blue-700 transition"
-                >
-                  <item.icon className="w-4 h-4 text-gray-500" />
-                  <span>{item.label}</span>
-                </Link>
-              ))}
+              {allNavItems.map((item) => {
+                const active = isRouteActive(item.href, item.exact)
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={cn(
+                      'flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition',
+                      active
+                        ? 'bg-blue-50 text-blue-700 font-bold shadow-xs'
+                        : 'text-gray-700 hover:bg-gray-100 active:bg-blue-50 active:text-blue-700'
+                    )}
+                  >
+                    <item.icon className={cn('w-4 h-4', active ? 'text-blue-600' : 'text-gray-500')} />
+                    <span>{item.label}</span>
+                  </Link>
+                )
+              })}
             </div>
 
             {/* User & Sign Out Footer */}

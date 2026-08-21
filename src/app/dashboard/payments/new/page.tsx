@@ -131,34 +131,34 @@ export default function NewPaymentPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-4 sm:space-y-6">
       <div>
         <Link
           href="/dashboard/payments"
-          className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-900 mb-1"
+          className="flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-gray-900 mb-1 transition"
         >
           <ArrowLeft className="w-4 h-4" /> Cancel & Return
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Record Payment Collection</h1>
-        <p className="text-xs text-gray-500">
+        <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">Record Payment Collection</h1>
+        <p className="text-xs text-gray-500 font-medium">
           Accept cash, UPI, or bank transfer payments. Automatically allocated to oldest unpaid invoices.
         </p>
       </div>
 
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium">
+        <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-5">
+      <form onSubmit={handleSubmit} className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-5">
         {/* Resident Select */}
         <div>
           <label className="block text-xs font-bold text-gray-700 mb-1">Select Resident *</label>
           <select
             value={selectedResidentId}
             onChange={(e) => handleResidentChange(e.target.value)}
-            className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+            className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold"
           >
             {residents.map((r) => (
               <option key={r.resident_id} value={r.resident_id}>
@@ -170,17 +170,17 @@ export default function NewPaymentPage() {
 
         {/* Selected resident due info */}
         {selectedResident && (
-          <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between text-xs">
+          <div className="p-3.5 sm:p-4 bg-blue-50 border border-blue-200 rounded-xl sm:rounded-2xl flex items-center justify-between text-xs shadow-2xs">
             <div>
               <span className="text-[10px] uppercase font-bold text-blue-600">Current Outstanding Due</span>
-              <p className="font-extrabold text-gray-900 text-sm mt-0.5">
+              <p className="font-black text-gray-900 text-sm mt-0.5">
                 {formatCurrency(selectedResident.total_outstanding_paise)}
               </p>
             </div>
             <button
               type="button"
               onClick={() => setAmountRupees(selectedResident.total_outstanding_paise / 100)}
-              className="px-3 py-1 bg-blue-600 text-white rounded-lg text-[11px] font-bold hover:bg-blue-700"
+              className="px-3 py-1.5 bg-blue-600 active:scale-95 text-white rounded-xl text-[11px] font-bold hover:bg-blue-700 transition"
             >
               Fill Full Due
             </button>
@@ -188,7 +188,7 @@ export default function NewPaymentPage() {
         )}
 
         {/* Amount & Method */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1">Amount Collected (₹) *</label>
             <input
@@ -197,7 +197,7 @@ export default function NewPaymentPage() {
               required
               value={amountRupees}
               onChange={(e) => setAmountRupees(Number(e.target.value))}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-extrabold text-green-700 text-base"
+              className="w-full px-3.5 py-2.5 text-base border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-black text-green-700"
             />
           </div>
           <div>
@@ -205,7 +205,7 @@ export default function NewPaymentPage() {
             <select
               value={paymentMethod}
               onChange={(e) => setPaymentMethod(e.target.value)}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold uppercase"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold uppercase"
             >
               <option value="upi">UPI (Google Pay / PhonePe / Paytm)</option>
               <option value="cash">Cash</option>
@@ -217,7 +217,7 @@ export default function NewPaymentPage() {
         </div>
 
         {/* Date & Transaction ID */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1">Payment Date *</label>
             <input
@@ -225,7 +225,7 @@ export default function NewPaymentPage() {
               required
               value={paymentDate}
               onChange={(e) => setPaymentDate(e.target.value)}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium"
             />
           </div>
           <div>
@@ -235,7 +235,7 @@ export default function NewPaymentPage() {
               placeholder="e.g. UPI/123456789 or Cheque #"
               value={transactionId}
               onChange={(e) => setTransactionId(e.target.value)}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-mono font-bold"
             />
           </div>
         </div>
@@ -247,15 +247,15 @@ export default function NewPaymentPage() {
             placeholder="e.g. Paid in full for August month"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+            className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
           />
         </div>
 
-        <div className="pt-4 border-t flex justify-end">
+        <div className="pt-3 border-t border-gray-100 flex justify-end">
           <button
             type="submit"
             disabled={loading}
-            className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-xl text-xs font-bold transition shadow-sm"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 disabled:bg-emerald-400 text-white rounded-xl text-xs font-bold transition shadow-xs"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
             {loading ? 'Recording...' : 'Confirm & Collect Payment'}

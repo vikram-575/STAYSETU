@@ -49,34 +49,34 @@ export default function NewExpensePage() {
   }
 
   return (
-    <div className="max-w-xl mx-auto space-y-6">
+    <div className="max-w-xl mx-auto space-y-4 sm:space-y-6">
       <div>
         <Link
           href="/dashboard/expenses"
-          className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-900 mb-1"
+          className="flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-gray-900 mb-1 transition"
         >
           <ArrowLeft className="w-4 h-4" /> Cancel & Return
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Record Operational Expense</h1>
-        <p className="text-xs text-gray-500">
+        <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">Record Operational Expense</h1>
+        <p className="text-xs text-gray-500 font-medium">
           Track PG expenditures to calculate accurate Net Operating Results.
         </p>
       </div>
 
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium">
+        <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+      <form onSubmit={handleSubmit} className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-4 sm:p-6 shadow-xs space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1">Expense Category *</label>
             <select
               value={form.category}
               onChange={(e) => setForm({ ...form, category: e.target.value })}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none capitalize font-semibold"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none capitalize font-semibold"
             >
               <option value="electricity">Electricity Bill</option>
               <option value="water">Water Supply / Tanker</option>
@@ -98,7 +98,7 @@ export default function NewExpensePage() {
               required
               value={form.amount_rupees}
               onChange={(e) => setForm({ ...form, amount_rupees: Number(e.target.value) })}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold text-red-600 text-sm"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-red-600 text-sm"
             />
           </div>
         </div>
@@ -111,11 +111,11 @@ export default function NewExpensePage() {
             placeholder="e.g. Electricity bill for July / Cook Monthly Salary"
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
-            className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-semibold"
+            className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-semibold"
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1">Expense Date *</label>
             <input
@@ -123,7 +123,7 @@ export default function NewExpensePage() {
               required
               value={form.expense_date}
               onChange={(e) => setForm({ ...form, expense_date: e.target.value })}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium"
             />
           </div>
           <div>
@@ -131,7 +131,7 @@ export default function NewExpensePage() {
             <select
               value={form.payment_method}
               onChange={(e) => setForm({ ...form, payment_method: e.target.value })}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase font-semibold"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none uppercase font-semibold"
             >
               <option value="upi">UPI</option>
               <option value="cash">Cash</option>
@@ -141,7 +141,7 @@ export default function NewExpensePage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1">Vendor / Payee</label>
             <input
@@ -149,7 +149,7 @@ export default function NewExpensePage() {
               placeholder="e.g. MSEB / Ramesh Caretaker"
               value={form.vendor}
               onChange={(e) => setForm({ ...form, vendor: e.target.value })}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
           <div>
@@ -159,7 +159,7 @@ export default function NewExpensePage() {
               placeholder="e.g. Bill # 928372"
               value={form.reference_no}
               onChange={(e) => setForm({ ...form, reference_no: e.target.value })}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-mono font-bold"
             />
           </div>
         </div>
@@ -171,15 +171,15 @@ export default function NewExpensePage() {
             placeholder="Additional details..."
             value={form.notes}
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+            className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
           />
         </div>
 
-        <div className="pt-3 border-t flex justify-end">
+        <div className="pt-3 border-t border-gray-100 flex justify-end">
           <button
             type="submit"
             disabled={loading}
-            className="flex items-center gap-2 px-6 py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white rounded-xl text-xs font-bold transition shadow-sm"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-red-600 hover:bg-red-700 active:scale-95 disabled:bg-red-400 text-white rounded-xl text-xs font-bold transition shadow-xs"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
             {loading ? 'Recording...' : 'Record Expense'}

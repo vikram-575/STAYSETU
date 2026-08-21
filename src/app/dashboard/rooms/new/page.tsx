@@ -82,34 +82,34 @@ export default function NewRoomPage() {
   }
 
   return (
-    <div className="max-w-xl mx-auto space-y-6">
+    <div className="max-w-xl mx-auto space-y-4 sm:space-y-6">
       <div>
         <Link
           href="/dashboard/rooms"
-          className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-900 mb-1"
+          className="flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-gray-900 mb-1 transition"
         >
           <ArrowLeft className="w-4 h-4" /> Cancel & Return
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Add New Room & Beds</h1>
-        <p className="text-xs text-gray-500">
+        <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">Add New Room & Beds</h1>
+        <p className="text-xs text-gray-500 font-medium">
           Configure room number, floor, capacity, and bed identifiers.
         </p>
       </div>
 
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium">
+        <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+      <form onSubmit={handleSubmit} className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-4 sm:p-6 shadow-xs space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1">Building *</label>
             <select
               value={form.building_id}
               onChange={(e) => setForm({ ...form, building_id: e.target.value })}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-semibold"
             >
               {buildings.map((b) => (
                 <option key={b.id} value={b.id}>{b.name}</option>
@@ -121,7 +121,7 @@ export default function NewRoomPage() {
             <select
               value={form.floor_id}
               onChange={(e) => setForm({ ...form, floor_id: e.target.value })}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-semibold"
             >
               {floors.map((fl) => (
                 <option key={fl.id} value={fl.id}>{fl.name}</option>
@@ -130,7 +130,7 @@ export default function NewRoomPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1">Room Number *</label>
             <input
@@ -139,7 +139,7 @@ export default function NewRoomPage() {
               placeholder="e.g. 204"
               value={form.room_number}
               onChange={(e) => setForm({ ...form, room_number: e.target.value })}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold"
             />
           </div>
           <div>
@@ -150,18 +150,18 @@ export default function NewRoomPage() {
               required
               value={form.base_rent_rupees}
               onChange={(e) => setForm({ ...form, base_rent_rupees: Number(e.target.value) })}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold"
             />
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1">Room Capacity (Beds)</label>
             <select
               value={form.capacity}
               onChange={(e) => handleCapacityChange(Number(e.target.value))}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold"
             >
               <option value={1}>1 Bed (Single)</option>
               <option value={2}>2 Beds (Double Sharing)</option>
@@ -175,7 +175,7 @@ export default function NewRoomPage() {
             <select
               value={form.room_type}
               onChange={(e) => setForm({ ...form, room_type: e.target.value })}
-              className="w-full px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-semibold"
             >
               <option value="single">Single Room</option>
               <option value="double">Double Sharing</option>
@@ -186,13 +186,13 @@ export default function NewRoomPage() {
         </div>
 
         {/* Bed Identifiers Preview */}
-        <div className="pt-2 border-t">
+        <div className="pt-2 border-t border-gray-100">
           <label className="block text-xs font-bold text-gray-700 mb-2">Bed Identifiers to be created:</label>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {form.bed_labels.map((lbl, idx) => (
               <span
                 key={idx}
-                className="px-3 py-1.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg text-xs font-bold"
+                className="px-3 py-1.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-xl text-xs font-black shadow-2xs"
               >
                 Bed {lbl}
               </span>
@@ -200,11 +200,11 @@ export default function NewRoomPage() {
           </div>
         </div>
 
-        <div className="pt-4 border-t flex justify-end">
+        <div className="pt-4 border-t border-gray-100 flex justify-end">
           <button
             type="submit"
             disabled={loading}
-            className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl text-xs font-bold transition shadow-sm"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 disabled:bg-blue-400 text-white rounded-xl text-xs font-bold transition shadow-xs"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
             {loading ? 'Creating...' : 'Create Room & Beds'}
