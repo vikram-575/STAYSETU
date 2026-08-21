@@ -129,9 +129,9 @@ export async function POST(request: NextRequest) {
                 floor_id: floor.id,
                 room_number: roomNo,
                 name: `Room ${roomNo}`,
-                sharing_type: sharingType,
+                room_type: sharingType,
                 base_rent_paise: baseRentPaise,
-                total_beds: Number(beds_per_room) || 2,
+                capacity: Number(beds_per_room) || 2,
               })
               .select()
               .single()
