@@ -15,7 +15,7 @@ export default function SettingsPage() {
   const [seedSuccess, setSeedSuccess] = useState('')
   const [error, setError] = useState('')
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'catalog' | 'dev'>('profile')
+  const [activeTab, setActiveTab] = useState<'profile' | 'catalog' | 'data'>('profile')
 
   const [org, setOrg] = useState<any>({
     name: '',
@@ -124,12 +124,12 @@ export default function SettingsPage() {
             PG Profile & GST
           </button>
           <button
-            onClick={() => setActiveTab('dev')}
+            onClick={() => setActiveTab('data')}
             className={`px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'dev' ? 'bg-white text-blue-700 shadow-xs' : 'text-gray-600 hover:text-gray-900'
+              activeTab === 'data' ? 'bg-white text-red-700 shadow-xs' : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <Database className="w-3.5 h-3.5" /> Demo Seed Data
+            <Database className="w-3.5 h-3.5" /> Data & Production Clean
           </button>
         </div>
       </div>
@@ -240,15 +240,15 @@ export default function SettingsPage() {
         </form>
       )}
 
-      {/* Demo Seed Tab */}
-      {activeTab === 'dev' && (
+      {/* Data Management & Purge Tab */}
+      {activeTab === 'data' && (
         <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-5">
           <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-            <Database className="w-5 h-5 text-blue-600 shrink-0" />
+            <Database className="w-5 h-5 text-red-600 shrink-0" />
             <div>
-              <h2 className="text-sm sm:text-base font-bold text-gray-900">Developer Demo Data Seeder</h2>
+              <h2 className="text-sm sm:text-base font-bold text-gray-900">Data Management & Production Reset</h2>
               <p className="text-[11px] sm:text-xs text-gray-500">
-                Populate realistic PG data for testing (Rooms, Beds, Active Residents, Invoices, Payments, Electricity).
+                Purge mock/test transactions or reset your organization to clean production mode.
               </p>
             </div>
           </div>
@@ -260,28 +260,81 @@ export default function SettingsPage() {
             </div>
           )}
 
-          <div className="p-3.5 sm:p-4 bg-blue-50/50 border border-blue-200 rounded-xl sm:rounded-2xl space-y-2 text-xs text-blue-900">
-            <p className="font-bold">What will be generated:</p>
-            <ul className="list-disc pl-5 space-y-1 text-[11px] sm:text-xs">
-              <li>1 Property (&quot;Main Campus PG&quot;) with 2 Buildings & 3 Floors</li>
-              <li>10 Rooms with 30 Beds (Single, Double, Triple sharing)</li>
-              <li>15 Active Residents with Permanent Registration IDs (PG-2026-XXXXXX)</li>
-              <li>Monthly Invoices with Rent, Electricity, Food, and Laundry items</li>
-              <li>Payment collections via UPI, Cash, and Bank Transfer</li>
-              <li>Sub-meters and live electricity consumption readings</li>
-            </ul>
+          <div className="p-4 bg-red-50 border border-red-200 rounded-xl sm:rounded-2xl space-y-2 text-xs text-red-950">
+            <p className="font-black text-red-700">⚠️ Production Launch & Data Purge Options</p>
+            <p className="text-red-800 text-[11px] sm:text-xs">
+              When transitioning to live production, you can wipe test records so you start with 0 residents, 0 dummy invoices, and accurate financial reporting.
+            </p>
           </div>
 
-          <div className="pt-2">
-            <button
-              type="button"
-              disabled={seeding}
-              onClick={handleSeedDemoData}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 disabled:bg-blue-400 text-white rounded-xl text-xs font-bold transition shadow-xs"
-            >
-              {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-              {seeding ? 'Generating Sample PG Data...' : 'Seed Sample PG Data'}
-            </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            <div className="p-4 border border-gray-200 rounded-xl space-y-2">
+              <h3 className="font-bold text-xs text-gray-900">1. Purge Test Transactions & Residents</h3>
+              <p className="text-[11px] text-gray-500">
+                Wipes all test residents, invoices, payments, and ledger logs. Keeps your rooms and beds intact and marks them 100% available for live check-ins.
+              </p>
+              <button
+                type="button"
+                disabled={seeding}
+                onClick={async () => {
+                  if (!confirm('Are you sure you want to purge all test residents, invoices, and payments? This cannot be undone.')) return
+                  setSeeding(true)
+                  setSeedSuccess('')
+                  setError('')
+                  try {
+                    const res = await fetch('/api/admin/purge-data', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ wipe_all: false }),
+                    })
+                    const data = await res.json()
+                    if (!res.ok) throw new Error(data.error || 'Failed to purge data')
+                    setSeedSuccess(data.message)
+                  } catch (err: any) {
+                    setError(err.message)
+                  } finally {
+                    setSeeding(false)
+                  }
+                }}
+                className="w-full mt-2 py-2.5 px-3 bg-red-600 hover:bg-red-700 active:scale-95 disabled:bg-red-300 text-white rounded-xl text-xs font-bold transition shadow-xs"
+              >
+                {seeding ? 'Purging...' : 'Purge Test Transactions'}
+              </button>
+            </div>
+
+            <div className="p-4 border border-gray-200 rounded-xl space-y-2">
+              <h3 className="font-bold text-xs text-gray-900">2. Complete Organization Reset</h3>
+              <p className="text-[11px] text-gray-500">
+                Wipes everything including properties, rooms, beds, and records, giving you a completely blank organization ready for custom onboarding.
+              </p>
+              <button
+                type="button"
+                disabled={seeding}
+                onClick={async () => {
+                  if (!confirm('WARNING: This will completely delete ALL properties, rooms, beds, residents, and financial records for this organization. Proceed?')) return
+                  setSeeding(true)
+                  setSeedSuccess('')
+                  setError('')
+                  try {
+                    const res = await fetch('/api/admin/purge-data', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ wipe_all: true }),
+                    })
+                    const data = await res.json()
+                    if (!res.ok) throw new Error(data.error || 'Failed to purge data')
+                    setSeedSuccess(data.message)
+                  } catch (err: any) {
+                    setError(err.message)
+                  } finally {
+                    setSeeding(false)
+                  }
+                }}
+                className="w-full mt-2 py-2.5 px-3 bg-gray-900 hover:bg-black active:scale-95 disabled:bg-gray-400 text-white rounded-xl text-xs font-bold transition shadow-xs"
+              >
+                {seeding ? 'Resetting...' : 'Complete Reset to Blank'}
+              </button>
+            </div>
           </div>
         </div>
       )}

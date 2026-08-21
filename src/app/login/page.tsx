@@ -37,23 +37,11 @@ function LoginForm() {
     router.refresh()
   }
 
-  const fillDemo = () => {
-    setEmail('admin@pgsetu.com')
-    setPassword('password123')
-    setError('')
-  }
-
   return (
     <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">Sign in to your account</h2>
-        <button
-          type="button"
-          onClick={fillDemo}
-          className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-2.5 py-1 rounded-md border border-blue-200 flex items-center gap-1 transition"
-        >
-          <Sparkles className="w-3 h-3" /> Auto-fill Demo
-        </button>
+      <div className="mb-6">
+        <h2 className="text-xl font-bold text-gray-900">Sign in to your account</h2>
+        <p className="text-xs text-gray-500 mt-1">Enter your registered email and password to access the portal</p>
       </div>
 
       {error && (

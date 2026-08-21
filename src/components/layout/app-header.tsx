@@ -89,6 +89,17 @@ export default function AppHeader({ user }: Props) {
         </button>
 
         <div className="flex items-center gap-2 ml-auto">
+          {/* Platform Super Admin switch */}
+          {['owner', 'superadmin'].includes(user.role) && (
+            <Link
+              href="/admin"
+              className="hidden lg:flex items-center gap-1.5 bg-slate-900 hover:bg-black text-white text-xs font-black px-3 py-1.5 rounded-xl transition shadow-xs active:scale-95 border border-slate-800"
+            >
+              <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+              <span>Platform Admin</span>
+            </Link>
+          )}
+
           {/* Quick Actions (Desktop) */}
           <button
             onClick={() => setShowQuickActions(true)}

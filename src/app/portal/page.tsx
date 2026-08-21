@@ -135,15 +135,9 @@ export default function ResidentPortalPage() {
 
           {/* Form Card */}
           <div className="bg-white rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5 border border-white/20">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Tenant Self-Service</span>
-              <button
-                type="button"
-                onClick={handleAutofillDemo}
-                className="text-[11px] bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-2.5 py-1 rounded-lg border border-blue-200 flex items-center gap-1 transition active:scale-95"
-              >
-                <Sparkles className="w-3 h-3 text-blue-600" /> Auto-fill Demo
-              </button>
+            <div className="border-b border-gray-100 pb-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-blue-600 block">Resident Self-Service Login</span>
+              <p className="text-[11px] text-gray-500 mt-0.5">Enter your check-in phone number and date of birth</p>
             </div>
 
             {loginError && (
