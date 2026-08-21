@@ -28,28 +28,25 @@ export default function RegisterPage() {
     setError('')
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, form.email.trim(), form.password)
-      
-      if (form.full_name) {
-        await updateProfile(userCredential.user, { displayName: form.full_name })
-      }
-
-      const token = await userCredential.user.getIdToken()
-
-      // Set session cookie
-      await fetch('/api/auth/session', {
+      const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, userId: userCredential.user.uid, email: userCredential.user.email }),
+        body: JSON.stringify({
+          email: form.email.trim(),
+          password: form.password,
+          full_name: form.full_name,
+        }),
       })
 
-      router.push('/onboarding')
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create account')
+      }
+
+      router.push(data.redirect || '/onboarding')
       router.refresh()
-    } catch (authError: any) {
-      const msg = authError.code === 'auth/email-already-in-use'
-        ? 'An account with this email already exists. Please sign in.'
-        : authError.message || 'Failed to create account'
-      setError(msg)
+    } catch (err: any) {
+      setError(err.message || 'Registration failed')
       setLoading(false)
     }
   }

@@ -24,53 +24,23 @@ function LoginForm() {
 
     const cleanEmail = email.trim().toLowerCase()
 
-    // Super Admin Quick Gateway
-    if (cleanEmail === 'vikramtomar0505@gmail.com' && password === 'qwerty123') {
-      try {
-        await fetch('/api/auth/session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            token: 'superadmin_master_session',
-            userId: 'superadmin_vikram',
-            email: cleanEmail,
-            role: 'superadmin',
-          }),
-        })
-
-        // Also trigger background provisioning
-        fetch('/api/admin/init-superadmin').catch(() => {})
-
-        router.push('/admin')
-        router.refresh()
-        return
-      } catch (err) {
-        // continue to standard auth
-      }
-    }
-
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password)
-      const token = await userCredential.user.getIdToken()
-
-      // Set session cookie
-      await fetch('/api/auth/session', {
+      const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, userId: userCredential.user.uid, email: userCredential.user.email }),
+        body: JSON.stringify({ email: cleanEmail, password }),
       })
 
-      const destination = redirectTo !== '/dashboard'
-        ? redirectTo
-        : (cleanEmail === 'vikramtomar0505@gmail.com' ? '/admin' : '/dashboard')
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Invalid email or password')
+      }
 
+      const destination = redirectTo !== '/dashboard' ? redirectTo : (data.redirect || '/dashboard')
       router.push(destination)
       router.refresh()
-    } catch (authError: any) {
-      const msg = authError.code === 'auth/invalid-credential' || authError.code === 'auth/user-not-found'
-        ? 'Invalid email or password. Please verify your credentials or register.'
-        : authError.message || 'Failed to sign in'
-      setError(msg)
+    } catch (err: any) {
+      setError(err.message || 'Login failed. Please check your credentials.')
       setLoading(false)
     }
   }

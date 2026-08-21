@@ -14,23 +14,23 @@ interface Props {
   }>
 }
 
+import { getAuthenticatedUser } from '@/lib/auth-session'
+import { createServiceClient } from '@/lib/supabase/server'
+
 export default async function CommunicationsPage({ searchParams }: Props) {
   const params = await searchParams
   const activeTab = params.tab || 'send'
 
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthenticatedUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('organization_id, organizations(name)')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile) redirect('/login')
-  const orgId = profile.organization_id
-  const orgName = (profile.organizations as any)?.name || 'PG Management'
+  const supabase = await createServiceClient()
+  let orgId = user.organization_id
+  if (!orgId) {
+    const { data: defaultOrg } = await supabase.from('organizations').select('id, name').limit(1).single()
+    orgId = defaultOrg?.id || 'primary'
+  }
+  const orgName = user.organizations?.name || 'PG Management'
 
   // Outstanding residents for bulk reminders
   const { data: overdueResidents } = await supabase

@@ -14,22 +14,22 @@ interface Props {
   searchParams: Promise<{ tab?: string }>
 }
 
+import { getAuthenticatedUser } from '@/lib/auth-session'
+import { createServiceClient } from '@/lib/supabase/server'
+
 export default async function ResidentDetailPage({ params, searchParams }: Props) {
   const { id: residentId } = await params
   const { tab: activeTab = 'overview' } = await searchParams
 
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthenticatedUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('organization_id, role')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile) redirect('/login')
-  const orgId = profile.organization_id
+  const supabase = await createServiceClient()
+  let orgId = user.organization_id
+  if (!orgId) {
+    const { data: defaultOrg } = await supabase.from('organizations').select('id').limit(1).single()
+    orgId = defaultOrg?.id || 'primary'
+  }
 
   // Fetch resident with view info
   const { data: resident } = await supabase

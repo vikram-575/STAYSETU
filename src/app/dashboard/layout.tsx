@@ -1,5 +1,6 @@
-import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { getAuthenticatedUser } from '@/lib/auth-session'
+import { createServiceClient } from '@/lib/supabase/server'
 import AppSidebar from '@/components/layout/app-sidebar'
 import AppHeader from '@/components/layout/app-header'
 import MobileBottomNav from '@/components/layout/mobile-bottom-nav'
@@ -9,54 +10,40 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthenticatedUser()
 
-  if (!user) redirect('/login')
+  if (!user) {
+    redirect('/login')
+  }
 
-  // Get user profile
-  let { data: profile } = await supabase
-    .from('users')
-    .select('*, organizations(*)')
-    .eq('id', user.id)
-    .single()
+  // If user is superadmin, ensure default org context is provided
+  let profile = user
 
-  if (!profile || !profile.organization_id) {
-    // Auto-link to default organization if available
-    const { data: defaultOrg } = await supabase
+  if (!profile.organization_id) {
+    const serviceClient = await createServiceClient()
+    const { data: defaultOrg } = await serviceClient
       .from('organizations')
-      .select('id, name')
+      .select('id, name, gst_enabled')
       .order('created_at', { ascending: true })
       .limit(1)
       .single()
 
     if (defaultOrg) {
-      const { data: newProfile } = await supabase
-        .from('users')
-        .upsert({
-          id: user.id,
-          organization_id: defaultOrg.id,
-          email: user.email || 'owner@saipg.com',
-          full_name: user.user_metadata?.full_name || 'PG Owner',
-          role: 'owner',
-          is_active: true,
-        })
-        .select('*, organizations(*)')
-        .single()
-
-      profile = newProfile
+      profile = {
+        ...profile,
+        organization_id: defaultOrg.id,
+        organizations: defaultOrg,
+      }
+    } else if (profile.role !== 'superadmin') {
+      redirect('/onboarding')
     }
-  }
-
-  if (!profile || !profile.organization_id) {
-    redirect('/onboarding')
   }
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
-      <AppSidebar role={profile.role} orgName={profile.organizations?.name ?? 'Sai Executive PG'} />
+      <AppSidebar role={profile.role} orgName={profile.organizations?.name ?? 'PG-SETU Management'} />
       <div className="flex-1 flex flex-col min-w-0 w-full overflow-hidden">
-        <AppHeader user={profile} />
+        <AppHeader user={profile as any} />
         <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 pb-28 md:pb-6">
           {children}
         </main>

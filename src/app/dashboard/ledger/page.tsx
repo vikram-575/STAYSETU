@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { getAuthenticatedUser } from '@/lib/auth-session'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { formatCurrency } from '@/lib/money'
@@ -20,18 +21,15 @@ export default async function DigitalLedgerPage({ searchParams }: Props) {
   const selectedResidentId = params.resident || ''
   const selectedCategory = params.category || 'all'
 
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthenticatedUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('organization_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile) redirect('/login')
-  const orgId = profile.organization_id
+  const supabase = await createServiceClient()
+  let orgId = user.organization_id
+  if (!orgId) {
+    const { data: defaultOrg } = await supabase.from('organizations').select('id').limit(1).single()
+    orgId = defaultOrg?.id || 'primary'
+  }
 
   // Active residents list for picker
   const { data: residents } = await supabase

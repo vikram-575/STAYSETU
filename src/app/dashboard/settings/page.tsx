@@ -30,18 +30,29 @@ export default function SettingsPage() {
 
   useEffect(() => {
     async function loadOrg() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: profile } = await supabase
+            .from('users')
+            .select('*, organizations(*)')
+            .eq('id', user.id)
+            .single()
 
-      const { data: profile } = await supabase
-        .from('users')
-        .select('*, organizations(*)')
-        .eq('id', user.id)
-        .single()
+          if (profile?.organizations) {
+            setOrg(profile.organizations)
+            setLoading(false)
+            return
+          }
+        }
 
-      if (profile?.organizations) {
-        setOrg(profile.organizations)
-      }
+        // Fallback fetch from organizations endpoint
+        const res = await fetch('/api/admin/organizations')
+        const data = await res.json()
+        if (data?.organizations && data.organizations.length > 0) {
+          setOrg(data.organizations[0])
+        }
+      } catch {}
       setLoading(false)
     }
     loadOrg()

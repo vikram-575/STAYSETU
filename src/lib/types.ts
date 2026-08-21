@@ -1,4 +1,4 @@
-export type UserRole = 'owner' | 'manager' | 'accountant' | 'staff' | 'resident'
+export type UserRole = 'superadmin' | 'owner' | 'manager' | 'accountant' | 'staff' | 'resident'
 export type BedStatus = 'available' | 'occupied' | 'reserved' | 'maintenance' | 'blocked'
 export type ResidentStatus = 'active' | 'checked_out' | 'temporarily_absent'
 export type PaymentMethod = 'cash' | 'upi' | 'bank_transfer' | 'card' | 'other'

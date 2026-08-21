@@ -29,7 +29,10 @@ export default function AppHeader({ user }: Props) {
   const pathname = usePathname()
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+      await supabase.auth.signOut()
+    } catch {}
     router.push('/login')
     router.refresh()
   }

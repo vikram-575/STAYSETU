@@ -11,19 +11,17 @@ import { formatDate } from '@/lib/utils'
 
 export const metadata = { title: 'Dashboard — PG-SETU' }
 
+import { getAuthenticatedUser } from '@/lib/auth-session'
+import { createServiceClient } from '@/lib/supabase/server'
+
 export default async function DashboardPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthenticatedUser()
   if (!user) redirect('/login')
 
-  // Get org context
-  let { data: profile } = await supabase
-    .from('users')
-    .select('organization_id, role, full_name, organizations(name, gst_enabled)')
-    .eq('id', user.id)
-    .single()
+  const serviceClient = await createServiceClient()
+  const supabase = serviceClient
 
-  let orgId = profile?.organization_id
+  let orgId = user.organization_id
 
   if (!orgId) {
     const { data: defaultOrg } = await supabase
@@ -36,7 +34,8 @@ export default async function DashboardPage() {
     orgId = defaultOrg?.id
   }
 
-  if (!orgId) redirect('/onboarding')
+  if (!orgId && user.role !== 'superadmin') redirect('/onboarding')
+  if (!orgId) orgId = 'primary'
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
