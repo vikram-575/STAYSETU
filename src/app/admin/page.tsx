@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
-  Building2, Users, CreditCard, DollarSign, PlusCircle,
+  Building2, Users, CreditCard, DollarSign, PlusCircle, Plus,
   TrendingUp, ShieldCheck, CheckCircle2, AlertCircle,
   Loader2, Sparkles, Database, Layers, ArrowUpRight,
   ExternalLink, Search, RefreshCw, X, Check, Edit2, KeyRound
@@ -27,6 +27,20 @@ export default function AdminDashboardPage() {
   const [onboardLoading, setOnboardLoading] = useState(false)
   const [onboardError, setOnboardError] = useState('')
   const [onboardSuccess, setOnboardSuccess] = useState('')
+
+  // Create User Modal State
+  const [showCreateUserModal, setShowCreateUserModal] = useState(false)
+  const [createUserLoading, setCreateUserLoading] = useState(false)
+  const [createUserError, setCreateUserError] = useState('')
+  const [createUserSuccess, setCreateUserSuccess] = useState('')
+  const [userForm, setUserForm] = useState({
+    email: '',
+    password: '',
+    full_name: '',
+    phone: '',
+    role: 'owner',
+    organization_id: '',
+  })
 
   // Edit Plan Modal
   const [selectedOrgForPlan, setSelectedOrgForPlan] = useState<any>(null)
@@ -131,6 +145,44 @@ export default function AdminDashboardPage() {
       setOnboardError(err.message)
     } finally {
       setOnboardLoading(false)
+    }
+  }
+
+  // Handle Create User & Password
+  const handleCreateUserSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setCreateUserLoading(true)
+    setCreateUserError('')
+    setCreateUserSuccess('')
+
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userForm),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to create user')
+
+      setCreateUserSuccess(`User ${userForm.email} created successfully!`)
+      await loadData()
+
+      setTimeout(() => {
+        setShowCreateUserModal(false)
+        setUserForm({
+          email: '',
+          password: '',
+          full_name: '',
+          phone: '',
+          role: 'owner',
+          organization_id: '',
+        })
+      }, 1200)
+    } catch (err: any) {
+      setCreateUserError(err.message)
+    } finally {
+      setCreateUserLoading(false)
     }
   }
 
@@ -516,7 +568,20 @@ export default function AdminDashboardPage() {
       {/* ----------------------------------------------------------- */}
       {activeTab === 'users' && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-          <h3 className="text-base font-black text-white">All Platform Users & Roles</h3>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-800">
+            <div>
+              <h3 className="text-base font-black text-white">All Platform Users & Roles</h3>
+              <p className="text-xs text-slate-400">Manage owner, manager, staff, and super admin accounts</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowCreateUserModal(true)}
+              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-500/20 flex items-center justify-center gap-1.5 transition"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create User & Password</span>
+            </button>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
               <thead className="text-[10px] text-slate-400 uppercase bg-slate-950/60 border-b border-slate-800">
@@ -884,6 +949,145 @@ export default function AdminDashboardPage() {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ----------------------------------------------------------- */}
+      {/* MODAL 3: CREATE USER & PASSWORD */}
+      {/* ----------------------------------------------------------- */}
+      {showCreateUserModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl relative">
+            <button
+              type="button"
+              onClick={() => setShowCreateUserModal(false)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-white rounded-lg"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div>
+              <h3 className="text-base font-black text-white">Create Platform User</h3>
+              <p className="text-xs text-slate-400 mt-0.5">Assign credentials, system role, and PG Organization</p>
+            </div>
+
+            {createUserError && (
+              <div className="p-3 bg-red-950/60 border border-red-800 rounded-xl text-xs text-red-300">
+                {createUserError}
+              </div>
+            )}
+
+            {createUserSuccess && (
+              <div className="p-3 bg-green-950/60 border border-green-800 rounded-xl text-xs text-green-300 font-bold">
+                {createUserSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleCreateUserSubmit} className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  value={userForm.full_name}
+                  onChange={(e) => setUserForm({ ...userForm, full_name: e.target.value })}
+                  placeholder="e.g. Ramesh Kumar"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-blue-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">Email Address (Username)</label>
+                <input
+                  type="email"
+                  required
+                  value={userForm.email}
+                  onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
+                  placeholder="owner@mypropertypg.com"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-blue-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">Password</label>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={userForm.password}
+                  onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
+                  placeholder="•••••••• (Min 6 chars)"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-blue-500 outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">Role</label>
+                  <select
+                    value={userForm.role}
+                    onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-blue-500 outline-none"
+                  >
+                    <option value="owner">PG Owner</option>
+                    <option value="manager">Property Manager</option>
+                    <option value="accountant">Accountant</option>
+                    <option value="staff">Staff / Caretaker</option>
+                    <option value="superadmin">Super Admin</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">Mobile Phone</label>
+                  <input
+                    type="tel"
+                    value={userForm.phone}
+                    onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })}
+                    placeholder="9876543210"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-blue-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">PG Organization</label>
+                <select
+                  value={userForm.organization_id}
+                  onChange={(e) => setUserForm({ ...userForm, organization_id: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-blue-500 outline-none"
+                >
+                  <option value="">Platform / All Organizations</option>
+                  {organizations.map((org) => (
+                    <option key={org.id} value={org.id}>{org.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="pt-2 border-t border-slate-800 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateUserModal(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={createUserLoading}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-500/20 transition flex items-center gap-1.5"
+                >
+                  {createUserLoading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Creating...</span>
+                    </>
+                  ) : (
+                    <span>Create User</span>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
