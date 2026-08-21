@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
       address,
       gst_enabled,
       gstin,
-      plan = 'starter',
+      plan = 'per_bed',
       subscription_status = 'active',
       num_buildings = 1,
       floors_per_building = 3,

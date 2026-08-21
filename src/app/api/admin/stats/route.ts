@@ -48,18 +48,8 @@ export async function GET() {
     const totalCollectedPaise = invoices?.reduce((s, i) => s + (i.paid_paise || 0), 0) || 0
     const totalOutstandingPaise = invoices?.reduce((s, i) => s + Math.max(0, i.balance_paise || 0), 0) || 0
 
-    // 5. SaaS Subscriptions
-    const { data: orgs } = await supabase
-      .from('organizations')
-      .select('id, name, settings, created_at')
-
-    let saasMrrPaise = 0
-    orgs?.forEach((org) => {
-      const plan = org.settings?.plan || 'starter'
-      if (plan === 'growth') saasMrrPaise += 249900 // ₹2,499
-      else if (plan === 'enterprise') saasMrrPaise += 499900 // ₹4,999
-      else saasMrrPaise += 99900 // ₹999
-    })
+    // 5. SaaS Subscriptions: ₹10 / Managed Bed / Month
+    const saasMrrPaise = totalBeds * 1000 // ₹10 per bed/month (1000 paise)
 
     return NextResponse.json({
       success: true,

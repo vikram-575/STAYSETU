@@ -769,12 +769,12 @@ export default function AdminDashboardPage() {
 
               {/* Plan Selection */}
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5">SaaS Subscription Plan</label>
+                <label className="block text-xs font-bold text-slate-300 mb-1.5">SaaS Subscription Pricing</label>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { id: 'starter', name: 'Starter (₹999/mo)' },
-                    { id: 'growth', name: 'Growth (₹2,499/mo)' },
-                    { id: 'enterprise', name: 'Enterprise (₹4,999/mo)' },
+                    { id: 'per_bed', name: 'Standard (₹10/Bed/mo)' },
+                    { id: 'standard_100', name: '100 Beds (₹1,000/mo)' },
+                    { id: 'enterprise_500', name: '500 Beds (₹5,000/mo)' },
                   ].map((p) => (
                     <button
                       type="button"
@@ -830,48 +830,48 @@ export default function AdminDashboardPage() {
             </button>
 
             <div>
-              <h3 className="text-base font-black text-white">Modify SaaS Plan for {selectedOrgForPlan.name || selectedOrgForPlan.org_name}</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Change subscription tier or update billing status</p>
+              <h3 className="text-base font-black text-white">SaaS Plan: {selectedOrgForPlan.name || selectedOrgForPlan.org_name}</h3>
+              <p className="text-xs text-slate-400 mt-0.5">₹10 per Managed Bed / Month Billing</p>
             </div>
 
             <div className="space-y-2 pt-2">
               <button
                 type="button"
                 disabled={planLoading}
-                onClick={() => handleUpdatePlan('starter', 'active')}
+                onClick={() => handleUpdatePlan('per_bed', 'active')}
                 className="w-full p-3 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-left flex justify-between items-center transition"
               >
                 <div>
-                  <strong className="text-white text-xs block">Starter Plan</strong>
-                  <span className="text-[10px] text-slate-400">Up to 25 Beds · ₹999/month</span>
+                  <strong className="text-white text-xs block">Standard Pay-Per-Bed</strong>
+                  <span className="text-[10px] text-slate-400">₹10 per Bed / month based on capacity</span>
                 </div>
-                <span className="text-xs font-black text-blue-400">₹999/mo</span>
+                <span className="text-xs font-black text-blue-400">₹10/bed/mo</span>
               </button>
 
               <button
                 type="button"
                 disabled={planLoading}
-                onClick={() => handleUpdatePlan('growth', 'active')}
+                onClick={() => handleUpdatePlan('standard_100', 'active')}
                 className="w-full p-3 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-left flex justify-between items-center transition"
               >
                 <div>
-                  <strong className="text-white text-xs block">Growth Plan</strong>
-                  <span className="text-[10px] text-slate-400">Up to 100 Beds · ₹2,499/month</span>
+                  <strong className="text-white text-xs block">100-Bed Fixed Tier</strong>
+                  <span className="text-[10px] text-slate-400">Up to 100 Beds (@ ₹10/bed)</span>
                 </div>
-                <span className="text-xs font-black text-purple-400">₹2,499/mo</span>
+                <span className="text-xs font-black text-purple-400">₹1,000/mo</span>
               </button>
 
               <button
                 type="button"
                 disabled={planLoading}
-                onClick={() => handleUpdatePlan('enterprise', 'active')}
+                onClick={() => handleUpdatePlan('enterprise_500', 'active')}
                 className="w-full p-3 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-left flex justify-between items-center transition"
               >
                 <div>
-                  <strong className="text-white text-xs block">Enterprise Plan</strong>
-                  <span className="text-[10px] text-slate-400">Unlimited Beds · ₹4,999/month</span>
+                  <strong className="text-white text-xs block">500-Bed Campus Tier</strong>
+                  <span className="text-[10px] text-slate-400">Up to 500 Beds (@ ₹10/bed)</span>
                 </div>
-                <span className="text-xs font-black text-emerald-400">₹4,999/mo</span>
+                <span className="text-xs font-black text-emerald-400">₹5,000/mo</span>
               </button>
             </div>
 

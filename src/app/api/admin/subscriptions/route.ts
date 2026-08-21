@@ -12,12 +12,20 @@ export async function GET() {
 
     if (error) throw error
 
+    // Fetch bed counts per org
+    const { data: beds } = await supabase
+      .from('beds')
+      .select('id, organization_id')
+
     const subscriptions = orgs.map((org) => {
       const settings = org.settings || {}
-      const plan = settings.plan || 'starter'
+      const orgBeds = beds?.filter((b) => b.organization_id === org.id) || []
+      const bedCount = orgBeds.length
+      const ratePerBedPaise = 1000 // ₹10.00 per bed / month (1000 paise)
+      const monthlyFeePaise = Math.max(bedCount * ratePerBedPaise, 1000) // minimum ₹10
+      const plan = settings.plan || 'per_bed'
       const status = settings.subscription_status || 'active'
       const validUntil = settings.subscription_valid_until || null
-      const monthlyFeePaise = plan === 'enterprise' ? 499900 : plan === 'growth' ? 249900 : 99900
 
       return {
         org_id: org.id,
@@ -25,7 +33,9 @@ export async function GET() {
         slug: org.slug,
         contact_email: org.email,
         contact_phone: org.phone,
-        plan,
+        plan: `₹10/Bed (${bedCount} Beds)`,
+        total_beds: bedCount,
+        rate_per_bed_rupees: 10,
         status,
         valid_until: validUntil,
         monthly_fee_paise: monthlyFeePaise,
@@ -40,9 +50,10 @@ export async function GET() {
       mrr_paise: totalMrr,
       subscriptions,
       plan_tiers: [
-        { id: 'starter', name: 'Starter Plan', price_paise: 99900, max_beds: 25, features: ['Up to 25 Beds', '1 Property', 'WhatsApp Automation', 'Digital Ledger'] },
-        { id: 'growth', name: 'Growth Plan', price_paise: 249900, max_beds: 100, features: ['Up to 100 Beds', '3 Properties', 'Sub-Meter Electricity', 'Full Analytics'] },
-        { id: 'enterprise', name: 'Enterprise Plan', price_paise: 499900, max_beds: 9999, features: ['Unlimited Beds & Properties', 'Dedicated Manager', 'Custom GST Billing', 'Priority 24/7 Support'] },
+        { id: 'per_bed', name: 'Standard SaaS', price_paise: 1000, unit: '₹10 / bed / month', features: ['₹10 per Managed Bed / Month', 'Unlimited Properties & Floors', '100% Real-time WhatsApp Invoicing', 'Sub-Meter Electricity Splitting', 'Resident KYC & Digital Passbook'] },
+        { id: 'starter_25', name: '25-Bed PG', price_paise: 25000, unit: '₹250 / month', features: ['Up to 25 Beds (@ ₹10/bed)', '1 Campus', 'Full Digital Ledger'] },
+        { id: 'standard_100', name: '100-Bed PG', price_paise: 100000, unit: '₹1,000 / month', features: ['Up to 100 Beds (@ ₹10/bed)', 'Multi-Building Support', 'Automated Daily Closing'] },
+        { id: 'enterprise_500', name: '500-Bed Campus', price_paise: 500000, unit: '₹5,000 / month', features: ['Up to 500 Beds (@ ₹10/bed)', 'Unlimited Properties', 'Priority 24/7 Dedicated Support'] },
       ],
     })
   } catch (err: any) {
