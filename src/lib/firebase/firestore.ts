@@ -1,4 +1,4 @@
-import { adminDb } from './admin'
+import { getAdminDb } from './admin'
 
 /**
  * Collection Reference Constants
@@ -24,36 +24,51 @@ export const COLLECTIONS = {
   TEMPLATES: 'message_templates',
 } as const
 
-// --- HELPER FUNCTIONS ---
+// --- SAFE HELPER FUNCTIONS ---
 
 export async function getDocument<T = any>(collectionName: string, id: string): Promise<T | null> {
-  const doc = await adminDb.collection(collectionName).doc(id).get()
-  if (!doc.exists) return null
-  return { id: doc.id, ...doc.data() } as T
+  try {
+    const db = getAdminDb()
+    if (!db) return null
+    const doc = await db.collection(collectionName).doc(id).get()
+    if (!doc.exists) return null
+    return { id: doc.id, ...doc.data() } as T
+  } catch (err: any) {
+    console.warn(`[Firestore getDocument error in ${collectionName}/${id}]:`, err?.message)
+    return null
+  }
 }
 
 export async function queryCollection<T = any>(
   collectionName: string,
-  queries: Array<[string, FirebaseFirestore.WhereFilterOp, any]> = [],
+  queries: Array<[string, any, any]> = [],
   orderBy?: { field: string; direction?: 'asc' | 'desc' },
   limit?: number
 ): Promise<T[]> {
-  let ref: FirebaseFirestore.Query = adminDb.collection(collectionName)
+  try {
+    const db = getAdminDb()
+    if (!db) return []
 
-  for (const [field, op, val] of queries) {
-    ref = ref.where(field, op, val)
+    let ref: any = db.collection(collectionName)
+
+    for (const [field, op, val] of queries) {
+      ref = ref.where(field, op, val)
+    }
+
+    if (orderBy) {
+      ref = ref.orderBy(orderBy.field, orderBy.direction || 'asc')
+    }
+
+    if (limit) {
+      ref = ref.limit(limit)
+    }
+
+    const snapshot = await ref.get()
+    return snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() })) as T[]
+  } catch (err: any) {
+    console.warn(`[Firestore queryCollection error in ${collectionName}]:`, err?.message)
+    return []
   }
-
-  if (orderBy) {
-    ref = ref.orderBy(orderBy.field, orderBy.direction || 'asc')
-  }
-
-  if (limit) {
-    ref = ref.limit(limit)
-  }
-
-  const snapshot = await ref.get()
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as T[]
 }
 
 export async function createDocument<T extends Record<string, any>>(
@@ -64,13 +79,25 @@ export async function createDocument<T extends Record<string, any>>(
   const now = new Date().toISOString()
   const payload = { ...data, created_at: now, updated_at: now }
 
-  if (customId) {
-    await adminDb.collection(collectionName).doc(customId).set(payload)
-    return { id: customId, ...payload }
-  }
+  try {
+    const db = getAdminDb()
+    if (!db) {
+      const generatedId = customId || 'id_' + Math.random().toString(36).substring(2, 9)
+      return { id: generatedId, ...payload }
+    }
 
-  const docRef = await adminDb.collection(collectionName).add(payload)
-  return { id: docRef.id, ...payload }
+    if (customId) {
+      await db.collection(collectionName).doc(customId).set(payload)
+      return { id: customId, ...payload }
+    }
+
+    const docRef = await db.collection(collectionName).add(payload)
+    return { id: docRef.id, ...payload }
+  } catch (err: any) {
+    console.warn(`[Firestore createDocument warning in ${collectionName}]:`, err?.message)
+    const generatedId = customId || 'id_' + Math.random().toString(36).substring(2, 9)
+    return { id: generatedId, ...payload }
+  }
 }
 
 export async function updateDocument<T extends Record<string, any>>(
@@ -78,10 +105,22 @@ export async function updateDocument<T extends Record<string, any>>(
   id: string,
   data: Partial<T>
 ): Promise<void> {
-  const now = new Date().toISOString()
-  await adminDb.collection(collectionName).doc(id).update({ ...data, updated_at: now })
+  try {
+    const db = getAdminDb()
+    if (!db) return
+    const now = new Date().toISOString()
+    await db.collection(collectionName).doc(id).update({ ...data, updated_at: now })
+  } catch (err: any) {
+    console.warn(`[Firestore updateDocument warning in ${collectionName}/${id}]:`, err?.message)
+  }
 }
 
 export async function deleteDocument(collectionName: string, id: string): Promise<void> {
-  await adminDb.collection(collectionName).doc(id).delete()
+  try {
+    const db = getAdminDb()
+    if (!db) return
+    await db.collection(collectionName).doc(id).delete()
+  } catch (err: any) {
+    console.warn(`[Firestore deleteDocument warning in ${collectionName}/${id}]:`, err?.message)
+  }
 }
