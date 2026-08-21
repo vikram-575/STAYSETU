@@ -28,8 +28,8 @@ export default function RegisterPage() {
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.signUp({
-      email: form.email,
+    const { data: authData, error } = await supabase.auth.signUp({
+      email: form.email.trim(),
       password: form.password,
       options: {
         data: { full_name: form.full_name },
@@ -40,6 +40,11 @@ export default function RegisterPage() {
     if (error) {
       setError(error.message)
       setLoading(false)
+      return
+    }
+
+    if (authData?.session) {
+      router.push('/onboarding')
       return
     }
 
