@@ -3,8 +3,9 @@
 import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
-import { Building2, Eye, EyeOff, Loader2, KeyRound, Sparkles } from 'lucide-react'
+import { signInWithEmailAndPassword } from 'firebase/auth'
+import { auth } from '@/lib/firebase/client'
+import { Building2, Eye, EyeOff, Loader2, KeyRound } from 'lucide-react'
 
 function LoginForm() {
   const [email, setEmail] = useState('')
@@ -15,26 +16,32 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirectTo') || '/dashboard'
-  const supabase = createClient()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    })
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password)
+      const token = await userCredential.user.getIdToken()
 
-    if (authError) {
-      setError(authError.message)
+      // Set session cookie
+      await fetch('/api/auth/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, userId: userCredential.user.uid, email: userCredential.user.email }),
+      })
+
+      router.push(redirectTo)
+      router.refresh()
+    } catch (authError: any) {
+      const msg = authError.code === 'auth/invalid-credential' || authError.code === 'auth/user-not-found'
+        ? 'Invalid email or password. Please verify your credentials or register.'
+        : authError.message || 'Failed to sign in'
+      setError(msg)
       setLoading(false)
-      return
     }
-
-    router.push(redirectTo)
-    router.refresh()
   }
 
   return (

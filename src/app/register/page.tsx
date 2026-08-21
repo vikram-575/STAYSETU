@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
+import { auth } from '@/lib/firebase/client'
 import { Building2, Eye, EyeOff, Loader2 } from 'lucide-react'
 
 export default function RegisterPage() {
@@ -11,9 +12,7 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -28,44 +27,31 @@ export default function RegisterPage() {
     setLoading(true)
     setError('')
 
-    const { data: authData, error } = await supabase.auth.signUp({
-      email: form.email.trim(),
-      password: form.password,
-      options: {
-        data: { full_name: form.full_name },
-        emailRedirectTo: `${window.location.origin}/onboarding`,
-      },
-    })
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, form.email.trim(), form.password)
+      
+      if (form.full_name) {
+        await updateProfile(userCredential.user, { displayName: form.full_name })
+      }
 
-    if (error) {
-      setError(error.message)
-      setLoading(false)
-      return
-    }
+      const token = await userCredential.user.getIdToken()
 
-    if (authData?.session) {
+      // Set session cookie
+      await fetch('/api/auth/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, userId: userCredential.user.uid, email: userCredential.user.email }),
+      })
+
       router.push('/onboarding')
-      return
+      router.refresh()
+    } catch (authError: any) {
+      const msg = authError.code === 'auth/email-already-in-use'
+        ? 'An account with this email already exists. Please sign in.'
+        : authError.message || 'Failed to create account'
+      setError(msg)
+      setLoading(false)
     }
-
-    setSuccess(true)
-  }
-
-  if (success) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 max-w-md w-full text-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-2xl">✉️</span>
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Check your email</h2>
-          <p className="text-gray-500 text-sm">
-            We&apos;ve sent a confirmation link to <strong>{form.email}</strong>. Click the link to activate your account.
-          </p>
-          <Link href="/login" className="mt-6 inline-block text-blue-600 text-sm hover:underline">Back to login</Link>
-        </div>
-      </div>
-    )
   }
 
   return (
