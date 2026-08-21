@@ -1,8 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
-import { adminAuth, adminDb } from '@/lib/firebase/admin'
-import { COLLECTIONS } from '@/lib/firebase/firestore'
 
 export async function POST(request: NextRequest) {
   try {
@@ -75,16 +73,6 @@ export async function POST(request: NextRequest) {
         is_active: true,
       }, { onConflict: 'id' })
     }
-
-    // 4. Also register in Firebase if available
-    try {
-      await adminAuth.createUser({
-        email: cleanEmail,
-        password,
-        displayName: full_name || cleanEmail.split('@')[0],
-        emailVerified: true,
-      })
-    } catch {}
 
     return NextResponse.json({
       success: true,

@@ -1,6 +1,4 @@
 import { NextResponse } from 'next/server'
-import { adminAuth, adminDb } from '@/lib/firebase/admin'
-import { COLLECTIONS } from '@/lib/firebase/firestore'
 import { createServiceClient } from '@/lib/supabase/server'
 
 /**
@@ -20,53 +18,6 @@ async function handleInitSuperAdmin() {
   const superAdminPass = 'qwerty123'
   const superAdminName = 'Vikram Tomar'
 
-  let firebaseUser: any = null
-  let firebaseCreated = false
-
-  // 1. Provision in Firebase Auth
-  try {
-    try {
-      firebaseUser = await adminAuth.getUserByEmail(superAdminEmail)
-      // Update password and name
-      await adminAuth.updateUser(firebaseUser.uid, {
-        password: superAdminPass,
-        displayName: superAdminName,
-      })
-    } catch (e: any) {
-      if (e.code === 'auth/user-not-found') {
-        firebaseUser = await adminAuth.createUser({
-          email: superAdminEmail,
-          password: superAdminPass,
-          displayName: superAdminName,
-          emailVerified: true,
-        })
-        firebaseCreated = true
-      } else {
-        throw e
-      }
-    }
-
-    // Set Custom Claims for Super Admin
-    if (firebaseUser) {
-      await adminAuth.setCustomUserClaims(firebaseUser.uid, {
-        superadmin: true,
-        role: 'superadmin',
-      })
-
-      // Update Firestore Users Collection
-      await adminDb.collection(COLLECTIONS.USERS).doc(firebaseUser.uid).set({
-        email: superAdminEmail,
-        full_name: superAdminName,
-        role: 'superadmin',
-        is_active: true,
-        updated_at: new Date().toISOString(),
-      }, { merge: true })
-    }
-  } catch (err: any) {
-    console.error('Firebase Super Admin setup warning:', err.message)
-  }
-
-  // 2. Provision in Supabase Auth & Database (dual-sync)
   let supabaseCreated = false
   try {
     const supabase = await createServiceClient()
@@ -128,7 +79,7 @@ async function handleInitSuperAdmin() {
       })
     }
   } catch (err: any) {
-    console.error('Supabase Super Admin setup warning:', err.message)
+    console.error('Super Admin setup warning:', err?.message)
   }
 
   return NextResponse.json({
@@ -137,8 +88,6 @@ async function handleInitSuperAdmin() {
     credentials: {
       email: superAdminEmail,
       role: 'superadmin',
-      firebase_synced: !!firebaseUser,
-      supabase_synced: true,
       login_url: '/login',
       admin_panel_url: '/admin',
     },

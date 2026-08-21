@@ -1,7 +1,5 @@
 import { cookies } from 'next/headers'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
-import { adminDb } from '@/lib/firebase/admin'
-import { COLLECTIONS } from '@/lib/firebase/firestore'
 
 export interface AuthSessionUser {
   id: string
@@ -19,7 +17,7 @@ export interface AuthSessionUser {
 }
 
 /**
- * Server-side helper to retrieve current authenticated user from cookies, Supabase, or Firebase
+ * Server-side helper to retrieve current authenticated user from cookies & database
  */
 export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
   try {
@@ -41,7 +39,6 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
 
     // Special Super Admin Fast-Path
     if (effectiveEmail === 'vikramtomar0505@gmail.com' || authRole === 'superadmin') {
-      // Ensure superadmin profile exists in DB
       const { data: adminProfile } = await serviceClient
         .from('users')
         .select('*, organizations(*)')
@@ -88,30 +85,6 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
         .eq('email', effectiveEmail)
         .single()
       profile = data
-    }
-
-    // 3. Look up in Firestore if not found in SQL
-    if (!profile && effectiveEmail) {
-      try {
-        const snap = await adminDb
-          .collection(COLLECTIONS.USERS)
-          .where('email', '==', effectiveEmail)
-          .limit(1)
-          .get()
-
-        if (!snap.empty) {
-          const docData = snap.docs[0].data()
-          return {
-            id: snap.docs[0].id,
-            email: effectiveEmail,
-            full_name: docData.full_name || effectiveEmail.split('@')[0],
-            role: docData.role || 'owner',
-            organization_id: docData.organization_id || null,
-            phone: docData.phone || null,
-            organizations: docData.organization_id ? { id: docData.organization_id, name: 'My PG' } : null,
-          }
-        }
-      } catch {}
     }
 
     if (profile) {

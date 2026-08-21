@@ -3,8 +3,6 @@
 import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { signInWithEmailAndPassword } from 'firebase/auth'
-import { auth } from '@/lib/firebase/client'
 import { Building2, Eye, EyeOff, Loader2, KeyRound } from 'lucide-react'
 
 function LoginForm() {

@@ -3,8 +3,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
-import { auth } from '@/lib/firebase/client'
 import { Building2, Eye, EyeOff, Loader2 } from 'lucide-react'
 
 export default function RegisterPage() {

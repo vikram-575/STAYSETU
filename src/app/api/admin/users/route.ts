@@ -1,7 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { adminAuth, adminDb } from '@/lib/firebase/admin'
-import { COLLECTIONS } from '@/lib/firebase/firestore'
 
 export async function GET(request: NextRequest) {
   try {
@@ -86,21 +84,6 @@ export async function POST(request: NextRequest) {
     if (profileError && !profile) {
       throw profileError
     }
-
-    // 3. Sync to Firebase
-    try {
-      if (userId) {
-        await adminDb.collection(COLLECTIONS.USERS).doc(userId).set({
-          email: cleanEmail,
-          full_name: full_name || cleanEmail.split('@')[0],
-          role,
-          organization_id: organization_id || null,
-          phone: phone || null,
-          is_active: true,
-          updated_at: new Date().toISOString(),
-        }, { merge: true })
-      }
-    } catch {}
 
     return NextResponse.json({
       success: true,
