@@ -32,7 +32,9 @@ export default async function PaymentsPage({ searchParams }: Props) {
 
   if (!profile) redirect('/login')
   const orgId = profile.organization_id
-  const today = new Date().toISOString().split('T')[0]
+  const now = new Date()
+  const today = now.toISOString().split('T')[0]
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
 
   // Payments Query
   let query = supabase
@@ -48,18 +50,11 @@ export default async function PaymentsPage({ searchParams }: Props) {
     query = query.eq('payment_date', selectedDate)
   }
 
-  const { data: payments } = await query
-
-  // Collection Stats by Method for current month
-  const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-
-  const { data: allMonthPayments } = await supabase
-    .from('payments')
-    .select('amount_paise, payment_method, payment_date')
-    .eq('organization_id', orgId)
-    .gte('payment_date', monthStart)
-    .eq('status', 'completed')
+  // Parallel Fetch Payments and Monthly Summary
+  const [{ data: payments }, { data: allMonthPayments }] = await Promise.all([
+    query,
+    supabase.from('payments').select('amount_paise, payment_method, payment_date').eq('organization_id', orgId).gte('payment_date', monthStart).eq('status', 'completed'),
+  ])
 
   let upiTotal = 0
   let cashTotal = 0

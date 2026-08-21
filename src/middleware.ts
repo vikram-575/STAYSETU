@@ -2,7 +2,24 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
+
+  // Fast-path bypass for static files, public routes, and tenant portal to eliminate latency
+  const isPublicRoute =
+    pathname === '/' ||
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/register') ||
+    pathname.startsWith('/portal') ||
+    pathname.startsWith('/forgot-password') ||
+    pathname.startsWith('/reset-password') ||
+    pathname.startsWith('/api/portal') ||
+    pathname.startsWith('/api/admin')
+
   let supabaseResponse = NextResponse.next({ request })
+
+  if (isPublicRoute) {
+    return supabaseResponse
+  }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://rygtyzwkhcuiwxzqmmlo.supabase.co'
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || ''
@@ -27,22 +44,11 @@ export async function middleware(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
-  const pathname = request.nextUrl.pathname
 
-  // Public routes
-  const publicRoutes = ['/login', '/register', '/forgot-password', '/reset-password', '/api/']
-  const isPublicRoute = publicRoutes.some((r) => pathname.startsWith(r))
-
-  if (!user && !isPublicRoute) {
+  if (!user && !pathname.startsWith('/api/')) {
     const redirectUrl = request.nextUrl.clone()
     redirectUrl.pathname = '/login'
     redirectUrl.searchParams.set('redirectTo', pathname)
-    return NextResponse.redirect(redirectUrl)
-  }
-
-  if (user && (pathname === '/login' || pathname === '/register')) {
-    const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = '/dashboard'
     return NextResponse.redirect(redirectUrl)
   }
 

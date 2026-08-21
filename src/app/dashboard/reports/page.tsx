@@ -31,30 +31,18 @@ export default async function ReportsPage({ searchParams }: Props) {
   if (!profile) redirect('/login')
   const orgId = profile.organization_id
 
-  // Data fetching based on report type
-  const { data: invoices } = await supabase
-    .from('invoices')
-    .select('*, residents(*)')
-    .eq('organization_id', orgId)
-    .order('created_at', { ascending: false })
-
-  const { data: payments } = await supabase
-    .from('payments')
-    .select('*, residents(*)')
-    .eq('organization_id', orgId)
-    .order('payment_date', { ascending: false })
-
-  const { data: expenses } = await supabase
-    .from('expenses')
-    .select('*')
-    .eq('organization_id', orgId)
-    .order('expense_date', { ascending: false })
-
-  const { data: residents } = await supabase
-    .from('v_resident_current')
-    .select('*')
-    .eq('organization_id', orgId)
-    .order('full_name')
+  // Parallel Data Fetching
+  const [
+    { data: invoices },
+    { data: payments },
+    { data: expenses },
+    { data: residents },
+  ] = await Promise.all([
+    supabase.from('invoices').select('*, residents(*)').eq('organization_id', orgId).order('created_at', { ascending: false }),
+    supabase.from('payments').select('*, residents(*)').eq('organization_id', orgId).order('payment_date', { ascending: false }),
+    supabase.from('expenses').select('*').eq('organization_id', orgId).order('expense_date', { ascending: false }),
+    supabase.from('v_resident_current').select('*').eq('organization_id', orgId).order('full_name'),
+  ])
 
   return (
     <div className="space-y-4 sm:space-y-6 max-w-screen-2xl">

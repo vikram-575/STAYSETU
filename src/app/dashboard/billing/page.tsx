@@ -34,21 +34,7 @@ export default async function BillingPage({ searchParams }: Props) {
   const orgId = profile.organization_id
   const today = new Date().toISOString().split('T')[0]
 
-  // Stats
-  const { data: monthInvoices } = await supabase
-    .from('invoices')
-    .select('total_paise, paid_paise, balance_paise, status, due_date')
-    .eq('organization_id', orgId)
-    .not('status', 'in', '(cancelled,draft)')
-
-  const totalBilledPaise = monthInvoices?.reduce((s, i) => s + i.total_paise, 0) ?? 0
-  const totalCollectedPaise = monthInvoices?.reduce((s, i) => s + i.paid_paise, 0) ?? 0
-  const totalOutstandingPaise = monthInvoices?.reduce((s, i) => s + Math.max(i.balance_paise, 0), 0) ?? 0
-  const totalOverduePaise = monthInvoices
-    ?.filter((i) => i.status === 'overdue' || (i.due_date < today && i.balance_paise > 0))
-    .reduce((s, i) => s + Math.max(i.balance_paise, 0), 0) ?? 0
-
-  // Invoices list
+  // Build query
   let invoicesQuery = supabase
     .from('invoices')
     .select('*, residents(*, resident_assignments(*, beds(*, rooms(*))))')
@@ -61,16 +47,23 @@ export default async function BillingPage({ searchParams }: Props) {
     invoicesQuery = invoicesQuery.gt('balance_paise', 0)
   }
 
-  const { data: invoices } = await invoicesQuery
+  // Parallel Fetch Stats, Invoices, and Outstanding Residents
+  const [
+    { data: monthInvoices },
+    { data: invoices },
+    { data: outstandingResidents },
+  ] = await Promise.all([
+    supabase.from('invoices').select('total_paise, paid_paise, balance_paise, status, due_date').eq('organization_id', orgId).not('status', 'in', '(cancelled,draft)'),
+    invoicesQuery,
+    supabase.from('v_resident_current').select('*').eq('organization_id', orgId).gt('total_outstanding_paise', 0).order('total_outstanding_paise', { ascending: false }),
+  ])
 
-  // Outstanding residents view
-  const { data: outstandingResidents } = await supabase
-    .from('v_resident_current')
-    .select('*')
-    .eq('organization_id', orgId)
-    .gt('total_outstanding_paise', 0)
-    .eq('status', 'active')
-    .order('total_outstanding_paise', { ascending: false })
+  const totalBilledPaise = monthInvoices?.reduce((s, i) => s + i.total_paise, 0) ?? 0
+  const totalCollectedPaise = monthInvoices?.reduce((s, i) => s + i.paid_paise, 0) ?? 0
+  const totalOutstandingPaise = monthInvoices?.reduce((s, i) => s + Math.max(i.balance_paise, 0), 0) ?? 0
+  const totalOverduePaise = monthInvoices
+    ?.filter((i) => i.status === 'overdue' || (i.due_date < today && i.balance_paise > 0))
+    .reduce((s, i) => s + Math.max(i.balance_paise, 0), 0) ?? 0
 
   return (
     <div className="space-y-4 sm:space-y-6 max-w-screen-2xl">

@@ -60,25 +60,18 @@ export default async function ResidentsPage({ searchParams }: Props) {
     query = query.order('full_name', { ascending: true })
   }
 
-  const { data: residents } = await query
-
-  // Counts for tabs
-  const { count: totalCount } = await supabase
-    .from('residents')
-    .select('*', { count: 'exact', head: true })
-    .eq('organization_id', orgId)
-
-  const { count: activeCount } = await supabase
-    .from('residents')
-    .select('*', { count: 'exact', head: true })
-    .eq('organization_id', orgId)
-    .eq('status', 'active')
-
-  const { count: checkedOutCount } = await supabase
-    .from('residents')
-    .select('*', { count: 'exact', head: true })
-    .eq('organization_id', orgId)
-    .eq('status', 'checked_out')
+  // Parallel Fetch Residents and Tab Counters
+  const [
+    { data: residents },
+    { count: totalCount },
+    { count: activeCount },
+    { count: checkedOutCount },
+  ] = await Promise.all([
+    query,
+    supabase.from('residents').select('*', { count: 'exact', head: true }).eq('organization_id', orgId),
+    supabase.from('residents').select('*', { count: 'exact', head: true }).eq('organization_id', orgId).eq('status', 'active'),
+    supabase.from('residents').select('*', { count: 'exact', head: true }).eq('organization_id', orgId).eq('status', 'checked_out'),
+  ])
 
   return (
     <div className="space-y-4 sm:space-y-6 max-w-screen-2xl">

@@ -22,20 +22,11 @@ export default async function ElectricityPage() {
   if (!profile) redirect('/login')
   const orgId = profile.organization_id
 
-  // Meters list with linked rooms
-  const { data: meters } = await supabase
-    .from('electricity_meters')
-    .select('*, rooms(*, floors(*, buildings(*)))')
-    .eq('organization_id', orgId)
-    .order('meter_number')
-
-  // Readings history
-  const { data: readings } = await supabase
-    .from('electricity_readings')
-    .select('*, electricity_meters(*, rooms(*))')
-    .eq('organization_id', orgId)
-    .order('reading_date', { ascending: false })
-    .limit(20)
+  // Parallel Fetch Meters and Readings History
+  const [{ data: meters }, { data: readings }] = await Promise.all([
+    supabase.from('electricity_meters').select('*, rooms(*, floors(*, buildings(*)))').eq('organization_id', orgId).order('meter_number'),
+    supabase.from('electricity_readings').select('*, electricity_meters(*, rooms(*))').eq('organization_id', orgId).order('reading_date', { ascending: false }).limit(20),
+  ])
 
   // Total consumption this month
   const totalUnits = readings?.reduce((s, r) => s + (r.units_consumed || 0), 0) || 0

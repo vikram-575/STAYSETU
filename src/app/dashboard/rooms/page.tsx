@@ -35,25 +35,14 @@ export default async function RoomsPage({ searchParams }: Props) {
   if (!profile) redirect('/login')
   const orgId = profile.organization_id
 
-  // Buildings list
-  const { data: buildings } = await supabase
-    .from('buildings')
-    .select('*, floors(*)')
-    .eq('organization_id', orgId)
-    .order('name')
-
-  // Rooms with beds and active residents
-  let roomsQuery = supabase
-    .from('rooms')
-    .select('*, floors(*, buildings(*)), beds(*, resident_assignments(*, residents(*)))')
-    .eq('organization_id', orgId)
-    .order('room_number')
-
-  if (selectedFloor) {
-    roomsQuery = roomsQuery.eq('floor_id', selectedFloor)
-  }
-
-  const { data: rooms } = await roomsQuery
+  // Parallel Fetch Buildings & Rooms
+  const [{ data: buildings }, { data: rooms }] = await Promise.all([
+    supabase.from('buildings').select('*, floors(*)').eq('organization_id', orgId).order('name'),
+    (selectedFloor
+      ? supabase.from('rooms').select('*, floors(*, buildings(*)), beds(*, resident_assignments(*, residents(*)))').eq('organization_id', orgId).eq('floor_id', selectedFloor).order('room_number')
+      : supabase.from('rooms').select('*, floors(*, buildings(*)), beds(*, resident_assignments(*, residents(*)))').eq('organization_id', orgId).order('room_number')
+    ),
+  ])
 
   // Total summary calculation
   let totalRooms = rooms?.length || 0

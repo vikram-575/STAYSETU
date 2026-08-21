@@ -27,12 +27,18 @@ export default async function MoneyCenterPage() {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
   const today = now.toISOString().split('T')[0]
 
-  // Invoices (Expected & Outstanding)
-  const { data: invoices } = await supabase
-    .from('invoices')
-    .select('total_paise, paid_paise, balance_paise, status, due_date')
-    .eq('organization_id', orgId)
-    .not('status', 'in', '(cancelled,draft)')
+  // High-performance parallel fetch
+  const [
+    { data: invoices },
+    { data: deposits },
+    { data: expenses },
+    { data: invoiceItems },
+  ] = await Promise.all([
+    supabase.from('invoices').select('total_paise, paid_paise, balance_paise, status, due_date').eq('organization_id', orgId).not('status', 'in', '(cancelled,draft)'),
+    supabase.from('deposits').select('amount_paise').eq('organization_id', orgId).eq('is_refunded', false),
+    supabase.from('expenses').select('*').eq('organization_id', orgId),
+    supabase.from('invoice_items').select('category, total_paise, invoices!inner(organization_id, status)').eq('invoices.organization_id', orgId).not('invoices.status', 'in', '(cancelled,draft)'),
+  ])
 
   const totalExpectedPaise = invoices?.reduce((s, i) => s + i.total_paise, 0) || 0
   const totalCollectedPaise = invoices?.reduce((s, i) => s + i.paid_paise, 0) || 0
@@ -41,32 +47,9 @@ export default async function MoneyCenterPage() {
     ?.filter((i) => i.status === 'overdue' || (i.due_date < today && i.balance_paise > 0))
     .reduce((s, i) => s + Math.max(0, i.balance_paise), 0) || 0
 
-  // Deposits Held (tracked separately from revenue)
-  const { data: deposits } = await supabase
-    .from('deposits')
-    .select('amount_paise')
-    .eq('organization_id', orgId)
-    .eq('is_refunded', false)
-
   const depositsHeldPaise = deposits?.reduce((s, d) => s + d.amount_paise, 0) || 0
-
-  // Expenses
-  const { data: expenses } = await supabase
-    .from('expenses')
-    .select('*')
-    .eq('organization_id', orgId)
-
   const totalExpensesPaise = expenses?.reduce((s, e) => s + e.amount_paise, 0) || 0
-
-  // Operating Result = Collected Cash - Expenses
   const operatingResultPaise = totalCollectedPaise - totalExpensesPaise
-
-  // Revenue Breakdown items
-  const { data: invoiceItems } = await supabase
-    .from('invoice_items')
-    .select('category, total_paise, invoices!inner(organization_id, status)')
-    .eq('invoices.organization_id', orgId)
-    .not('invoices.status', 'in', '(cancelled,draft)')
 
   const revenueByCategory: Record<string, number> = {
     rent: 0, electricity: 0, food: 0, beverage: 0, laundry: 0, other: 0
