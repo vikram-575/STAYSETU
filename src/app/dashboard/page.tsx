@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import DashboardKPICards from '@/components/dashboard/kpi-cards'
 import RevenueBreakdownChart from '@/components/dashboard/revenue-breakdown-chart'
@@ -8,25 +7,25 @@ import DashboardAlerts from '@/components/dashboard/alerts'
 import RevenueTrendChart from '@/components/dashboard/revenue-trend-chart'
 import ExpectedVsCollected from '@/components/dashboard/expected-vs-collected'
 import { formatDate } from '@/lib/utils'
-
-export const metadata = { title: 'Dashboard — PG-SETU' }
-
 import { getAuthenticatedUser } from '@/lib/auth-session'
 import { createServiceClient } from '@/lib/supabase/server'
+import { Sparkles, ArrowUpRight, Plus, Users, BedDouble, Zap, CreditCard } from 'lucide-react'
+import Link from 'next/link'
+
+export const metadata = { title: 'Executive Dashboard — PG-SETU' }
 
 export default async function DashboardPage() {
   const user = await getAuthenticatedUser()
   if (!user) redirect('/login')
 
-  const serviceClient = await createServiceClient()
-  const supabase = serviceClient
+  const supabase = await createServiceClient()
 
   let orgId = user.organization_id
 
   if (!orgId) {
     const { data: defaultOrg } = await supabase
       .from('organizations')
-      .select('id')
+      .select('id, name')
       .order('created_at', { ascending: true })
       .limit(1)
       .single()
@@ -36,6 +35,7 @@ export default async function DashboardPage() {
 
   if (!orgId && user.role !== 'superadmin') redirect('/onboarding')
   if (!orgId) orgId = 'primary'
+
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
@@ -119,19 +119,41 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6 max-w-screen-2xl">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+      {/* Executive Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1 border-b border-slate-200/60">
         <div>
-          <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">Executive Dashboard</h1>
-          <p className="text-xs sm:text-sm text-gray-500 mt-0.5">{formatDate(today)} · Real-time PG telemetry</p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Executive Dashboard</h1>
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 rounded-full px-2.5 py-0.5 shadow-2xs">
+              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+              Live Connected
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 font-medium mt-0.5">
+            {formatDate(today)} · Real-time PG financial & operational telemetry
+          </p>
         </div>
-        <div className="flex items-center gap-1.5 text-xs text-green-700 bg-green-50 border border-green-200 rounded-full px-3 py-1 w-fit font-semibold">
-          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-          Live Cloud Synced
+
+        {/* Action Shortcuts */}
+        <div className="flex items-center gap-2">
+          <Link
+            href="/dashboard/residents/new"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-xs transition"
+          >
+            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>Check In Resident</span>
+          </Link>
+          <Link
+            href="/dashboard/payments/new"
+            className="hidden sm:flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition"
+          >
+            <CreditCard className="w-3.5 h-3.5" />
+            <span>Collect Rent</span>
+          </Link>
         </div>
       </div>
 
-      {/* Alerts */}
+      {/* Actionable Alerts Bar */}
       <DashboardAlerts
         overdueCount={overdueCount}
         overdueAmountPaise={totalOverduePaise}
@@ -141,10 +163,10 @@ export default async function DashboardPage() {
         availableBeds={availableBeds}
       />
 
-      {/* KPI Cards */}
+      {/* 10 Executive KPI Cards */}
       <DashboardKPICards kpis={kpis} />
 
-      {/* Expected vs Collected */}
+      {/* Expected vs Collected Progress */}
       <ExpectedVsCollected
         expectedPaise={monthExpectedPaise}
         collectedPaise={monthCollectedPaise}
