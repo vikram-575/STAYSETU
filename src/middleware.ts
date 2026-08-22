@@ -1,6 +1,13 @@
 import { NextResponse, type NextRequest } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
 
 export async function middleware(request: NextRequest) {
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  })
+
   const pathname = request.nextUrl.pathname
 
   // Fast-path bypass for static files, favicon, manifest, etc.
@@ -9,16 +16,39 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/static') ||
     pathname.includes('.')
   ) {
-    return NextResponse.next({ request })
+    return response
   }
 
-  // Session cookies
-  const authEmail = request.cookies.get('auth_email')?.value?.toLowerCase()
+  // Create Supabase client for session verification and token refresh
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          response = NextResponse.next({
+            request,
+          })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
+
+  const { data: { user } } = await supabase.auth.getUser()
+
+  // Session cookies fallback
+  const authEmail = (request.cookies.get('auth_email')?.value || user?.email)?.toLowerCase()
   const authRole = request.cookies.get('auth_role')?.value
   const authToken = request.cookies.get('auth_token')?.value
-  const firebaseUserId = request.cookies.get('firebase_user_id')?.value
 
-  const isAuthenticated = Boolean(authEmail || authToken || firebaseUserId)
+  const isAuthenticated = Boolean(user || authEmail || authToken)
   const isSuperAdmin = authRole === 'superadmin' || authEmail === 'vikramtomar0505@gmail.com'
 
   // If already logged in and visiting login/register, redirect to appropriate home
@@ -39,7 +69,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/')
 
   if (isPublicRoute) {
-    return NextResponse.next({ request })
+    return response
   }
 
   // Protect /admin routes (Super Admin only)
@@ -55,7 +85,7 @@ export async function middleware(request: NextRequest) {
       redirectUrl.pathname = '/dashboard'
       return NextResponse.redirect(redirectUrl)
     }
-    return NextResponse.next({ request })
+    return response
   }
 
   // Protect /dashboard routes (All authenticated staff/owners)
@@ -66,10 +96,10 @@ export async function middleware(request: NextRequest) {
       redirectUrl.searchParams.set('redirectTo', pathname)
       return NextResponse.redirect(redirectUrl)
     }
-    return NextResponse.next({ request })
+    return response
   }
 
-  return NextResponse.next({ request })
+  return response
 }
 
 export const config = {

@@ -1,6 +1,8 @@
-// Pure Firebase Firestore Browser Client (Supabase completely removed)
-import { firebaseDb, FirebaseFirestoreClient } from '@/lib/firebase/firestore-client'
+import { createBrowserClient } from '@supabase/ssr'
 
-export function createClient(): FirebaseFirestoreClient {
-  return firebaseDb
+export function createClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 }
