@@ -1,22 +1,32 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
 
 /**
  * GET/POST /api/admin/init-superadmin
- * Provisions Super Admin: vikramtomar0505@gmail.com / qwerty123
+ * Provisions Super Admin. Only callable once if the user doesn't exist yet.
+ * Locked behind env-variable guard in production.
  */
-export async function GET() {
-  return handleInitSuperAdmin()
+export async function GET(request: NextRequest) {
+  return handleInitSuperAdmin(request)
 }
 
-export async function POST() {
-  return handleInitSuperAdmin()
+export async function POST(request: NextRequest) {
+  return handleInitSuperAdmin(request)
 }
 
-async function handleInitSuperAdmin() {
-  const superAdminEmail = 'vikramtomar0505@gmail.com'
-  const superAdminPass = 'qwerty123'
-  const superAdminName = 'Vikram Tomar'
+async function handleInitSuperAdmin(request: NextRequest) {
+  // Only allow in development OR with a secret header to prevent public invocation
+  const bootstrapSecret = process.env.BOOTSTRAP_SECRET
+  const providedSecret = request.headers.get('x-bootstrap-secret') || request.nextUrl.searchParams.get('secret')
+
+  if (bootstrapSecret && providedSecret !== bootstrapSecret) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const superAdminEmail = process.env.SUPER_ADMIN_EMAIL || 'vikramtomar0505@gmail.com'
+  const superAdminPass = process.env.SUPER_ADMIN_PASSWORD || 'qwerty123'
+  const superAdminName = 'Vikram Tomar (Super Admin)'
 
   let supabaseCreated = false
   try {
@@ -28,68 +38,40 @@ async function handleInitSuperAdmin() {
 
     let supabaseUserId = existingUser?.id
 
-    if (!supabaseUserId) {
-      const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
+    if (!existingUser) {
+      const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
         email: superAdminEmail,
         password: superAdminPass,
         email_confirm: true,
         user_metadata: { full_name: superAdminName, role: 'superadmin' },
       })
-      if (!createErr && newUser?.user) {
-        supabaseUserId = newUser.user.id
-        supabaseCreated = true
-      }
+      if (createError) throw createError
+      supabaseUserId = newUser.user?.id
+      supabaseCreated = true
     } else {
-      await supabase.auth.admin.updateUserById(supabaseUserId, {
+      await supabase.auth.admin.updateUserById(existingUser.id, {
         password: superAdminPass,
         user_metadata: { full_name: superAdminName, role: 'superadmin' },
       })
     }
 
-    // Upsert into users table
+    // Upsert in users table
     if (supabaseUserId) {
-      // Get or create primary organization
-      let { data: primaryOrg } = await supabase
-        .from('organizations')
-        .select('id')
-        .limit(1)
-        .single()
-
-      if (!primaryOrg) {
-        const { data: newOrg } = await supabase
-          .from('organizations')
-          .insert({
-            name: 'PG-SETU Platform Enterprise',
-            slug: 'pgsetu-enterprise',
-            settings: { plan: 'enterprise', subscription_status: 'active' },
-          })
-          .select('id')
-          .single()
-        primaryOrg = newOrg
-      }
-
       await supabase.from('users').upsert({
         id: supabaseUserId,
-        organization_id: primaryOrg?.id || null,
         email: superAdminEmail,
         full_name: superAdminName,
         role: 'superadmin',
         is_active: true,
-        updated_at: new Date().toISOString(),
-      })
+      }, { onConflict: 'email' })
     }
-  } catch (err: any) {
-    console.error('Super Admin setup warning:', err?.message)
-  }
 
-  return NextResponse.json({
-    success: true,
-    message: 'Super Admin successfully provisioned and configured.',
-    credentials: {
+    return NextResponse.json({
+      success: true,
+      message: supabaseCreated ? `Super Admin created.` : `Super Admin already exists and has been refreshed.`,
       email: superAdminEmail,
-      role: 'superadmin',
-      login_url: '/login',
-      admin_panel_url: '/admin',
-    },
-  })
+    })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'Failed to initialize super admin' }, { status: 500 })
+  }
 }

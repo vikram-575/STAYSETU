@@ -1,44 +1,41 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 
-export async function GET() {
+async function requireSuperAdmin(request: NextRequest) {
+  const { createServerClient } = await import('@supabase/ssr')
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => request.cookies.getAll(), setAll: () => {} } }
+  )
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+  const service = await createServiceClient()
+  const { data: profile } = await service.from('users').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'superadmin') return null
+  return user
+}
+
+export async function GET(request: NextRequest) {
   try {
+    const adminUser = await requireSuperAdmin(request)
+    if (!adminUser) return NextResponse.json({ error: 'Super Admin access required.' }, { status: 403 })
+
     const supabase = await createServiceClient()
 
-    // 1. Organizations count
-    const { count: totalOrgs } = await supabase
-      .from('organizations')
-      .select('*', { count: 'exact', head: true })
+    const { count: totalOrgs } = await supabase.from('organizations').select('*', { count: 'exact', head: true })
+    const { count: totalProps } = await supabase.from('properties').select('*', { count: 'exact', head: true })
+    const { count: totalBuildings } = await supabase.from('buildings').select('*', { count: 'exact', head: true })
+    const { count: totalRooms } = await supabase.from('rooms').select('*', { count: 'exact', head: true })
 
-    // 2. Properties, Buildings, Rooms, Beds
-    const { count: totalProps } = await supabase
-      .from('properties')
-      .select('*', { count: 'exact', head: true })
-
-    const { count: totalBuildings } = await supabase
-      .from('buildings')
-      .select('*', { count: 'exact', head: true })
-
-    const { count: totalRooms } = await supabase
-      .from('rooms')
-      .select('*', { count: 'exact', head: true })
-
-    const { data: beds } = await supabase
-      .from('beds')
-      .select('status')
-
+    const { data: beds } = await supabase.from('beds').select('status')
     const totalBeds = beds?.length || 0
     const occupiedBeds = beds?.filter((b) => b.status === 'occupied').length || 0
     const availableBeds = beds?.filter((b) => b.status === 'available').length || 0
     const occupancyRate = totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0
 
-    // 3. Active Residents
-    const { count: activeResidents } = await supabase
-      .from('residents')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'active')
+    const { count: activeResidents } = await supabase.from('residents').select('*', { count: 'exact', head: true }).eq('status', 'active')
 
-    // 4. Financial totals (GTV, Collections, Outstanding)
     const { data: invoices } = await supabase
       .from('invoices')
       .select('total_paise, paid_paise, balance_paise, status')
@@ -47,9 +44,7 @@ export async function GET() {
     const totalGtvPaise = invoices?.reduce((s, i) => s + (i.total_paise || 0), 0) || 0
     const totalCollectedPaise = invoices?.reduce((s, i) => s + (i.paid_paise || 0), 0) || 0
     const totalOutstandingPaise = invoices?.reduce((s, i) => s + Math.max(0, i.balance_paise || 0), 0) || 0
-
-    // 5. SaaS Subscriptions: ₹10 / Managed Bed / Month
-    const saasMrrPaise = totalBeds * 1000 // ₹10 per bed/month (1000 paise)
+    const saasMrrPaise = totalBeds * 1000
 
     return NextResponse.json({
       success: true,

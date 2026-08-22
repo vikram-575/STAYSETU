@@ -1,12 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { createDoc, COLLECTIONS } from '@/lib/firebase/db'
 import { rupeesToPaise } from '@/lib/money'
 import { cookies } from 'next/headers'
 
 /**
  * POST /api/onboarding
- * Unified Onboarding: Creates organization, property, building, floors, rooms, beds & meters in Firestore & DB
+ * Unified Onboarding: Creates organization, property, building, floors, rooms, beds & meters in Supabase
+ * (Firebase sync removed — Supabase is single source of truth)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -63,30 +63,12 @@ export async function POST(request: NextRequest) {
 
     const orgId = org.id
 
-    // Sync to Firestore
-    createDoc(COLLECTIONS.ORGANIZATIONS, {
-      name: org_name,
-      slug,
-      phone: phone || null,
-      email: authEmail || null,
-      city: property_city || null,
-      address: property_address || null,
-      settings: initialSettings,
-    }, orgId).catch(() => {})
-
     // 2. Link user if email present
     if (authEmail) {
       await serviceClient.from('users').update({
         organization_id: orgId,
         phone: phone || null,
       }).eq('email', authEmail)
-
-      createDoc(COLLECTIONS.USERS, {
-        organization_id: orgId,
-        email: authEmail,
-        phone: phone || null,
-        role: 'owner',
-      }).catch(() => {})
     }
 
     // 3. Create Property
@@ -104,16 +86,6 @@ export async function POST(request: NextRequest) {
 
     const propId = property?.id
 
-    if (propId) {
-      createDoc(COLLECTIONS.PROPERTIES, {
-        organization_id: orgId,
-        name: property_name,
-        address: property_address || null,
-        city: property_city || null,
-        phone: phone || null,
-      }, propId).catch(() => {})
-    }
-
     // 4. Create Building
     const { data: building } = await serviceClient
       .from('buildings')
@@ -127,15 +99,6 @@ export async function POST(request: NextRequest) {
       .single()
 
     const bldgId = building?.id
-
-    if (bldgId) {
-      createDoc(COLLECTIONS.BUILDINGS, {
-        organization_id: orgId,
-        property_id: propId,
-        name: 'Main Building',
-        total_floors: Number(num_floors) || 2,
-      }, bldgId).catch(() => {})
-    }
 
     // 5. Generate Floors, Rooms, Beds & Sub-Meters
     const baseRentPaise = rupeesToPaise(Number(default_rent_rupees) || 6000)
@@ -156,13 +119,6 @@ export async function POST(request: NextRequest) {
           .single()
 
         if (floor) {
-          createDoc(COLLECTIONS.FLOORS, {
-            organization_id: orgId,
-            building_id: bldgId,
-            floor_number: f,
-            name: floorName,
-          }, floor.id).catch(() => {})
-
           for (let r = 1; r <= (Number(rooms_per_floor) || 4); r++) {
             const roomNo = `${f}${String(r).padStart(2, '0')}`
             const sharingType = beds_per_room === 1 ? 'single' : beds_per_room === 2 ? 'double' : beds_per_room === 3 ? 'triple' : 'four'
@@ -182,16 +138,6 @@ export async function POST(request: NextRequest) {
               .single()
 
             if (room) {
-              createDoc(COLLECTIONS.ROOMS, {
-                organization_id: orgId,
-                floor_id: floor.id,
-                room_number: roomNo,
-                name: `Room ${roomNo}`,
-                room_type: sharingType,
-                base_rent_paise: baseRentPaise,
-                capacity: Number(beds_per_room) || 2,
-              }, room.id).catch(() => {})
-
               const { data: meter } = await serviceClient
                 .from('electricity_meters')
                 .insert({
@@ -220,7 +166,7 @@ export async function POST(request: NextRequest) {
 
               for (let bIdx = 0; bIdx < (Number(beds_per_room) || 2); bIdx++) {
                 const bedLabel = bedLabels[bIdx] || String(bIdx + 1)
-                const { data: bed } = await serviceClient
+                await serviceClient
                   .from('beds')
                   .insert({
                     organization_id: orgId,
@@ -231,16 +177,6 @@ export async function POST(request: NextRequest) {
                   })
                   .select()
                   .single()
-
-                if (bed) {
-                  createDoc(COLLECTIONS.BEDS, {
-                    organization_id: orgId,
-                    room_id: room.id,
-                    bed_label: bedLabel,
-                    status: 'available',
-                    base_rent_paise: baseRentPaise,
-                  }, bed.id).catch(() => {})
-                }
               }
             }
           }

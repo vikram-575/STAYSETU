@@ -1,8 +1,28 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { createDoc, COLLECTIONS } from '@/lib/firebase/db'
 
+async function requireSuperAdmin(request: NextRequest) {
+  const { createServerClient } = await import('@supabase/ssr')
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => request.cookies.getAll(), setAll: () => {} } }
+  )
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+  const service = await createServiceClient()
+  const { data: profile } = await service.from('users').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'superadmin') return null
+  return user
+}
+
+/**
+ * GET /api/admin/users
+ * List all platform users (Super Admin only)
+ */
 export async function GET(request: NextRequest) {
+  const adminUser = await requireSuperAdmin(request)
+  if (!adminUser) return NextResponse.json({ error: 'Super Admin access required.' }, { status: 403 })
   try {
     const supabase = await createServiceClient()
 
@@ -25,8 +45,11 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/admin/users
  * Create a new user with password and assign role & organization
+ * Super Admin only
  */
 export async function POST(request: NextRequest) {
+  const adminUser = await requireSuperAdmin(request)
+  if (!adminUser) return NextResponse.json({ error: 'Super Admin access required.' }, { status: 403 })
   try {
     const body = await request.json()
     const { email, password, full_name, role = 'owner', organization_id, phone } = body
@@ -84,16 +107,6 @@ export async function POST(request: NextRequest) {
     if (profileError && !profile) {
       throw profileError
     }
-
-    // Sync to Firestore
-    createDoc(COLLECTIONS.USERS, {
-      email: cleanEmail,
-      full_name: full_name || cleanEmail.split('@')[0],
-      role,
-      organization_id: organization_id || null,
-      phone: phone || null,
-      is_active: true,
-    }, userId || undefined).catch(() => {})
 
     return NextResponse.json({
       success: true,

@@ -12,51 +12,8 @@ export async function POST(request: NextRequest) {
 
     const cleanEmail = email.trim().toLowerCase()
     const cookieStore = await cookies()
-    const isSuperAdmin = cleanEmail === 'vikramtomar0505@gmail.com' && password === 'qwerty123'
 
-    // 1. SUPER ADMIN MASTER AUTHENTICATION
-    if (isSuperAdmin) {
-      cookieStore.set('auth_email', cleanEmail, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 30, // 30 days
-        path: '/',
-      })
-      cookieStore.set('auth_role', 'superadmin', {
-        httpOnly: false,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 30,
-        path: '/',
-      })
-      cookieStore.set('auth_token', 'master_superadmin_token', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 30,
-        path: '/',
-      })
-
-      // Ensure superadmin record exists in SQL DB
-      try {
-        const serviceClient = await createServiceClient()
-        await serviceClient.from('users').upsert({
-          email: cleanEmail,
-          full_name: 'Vikram Tomar (Super Admin)',
-          role: 'superadmin',
-          is_active: true,
-        }, { onConflict: 'email' })
-      } catch {}
-
-      return NextResponse.json({
-        success: true,
-        role: 'superadmin',
-        redirect: '/superman',
-      })
-    }
-
-    // 2. SUPABASE AUTHENTICATION
+    // ── Supabase Auth (Primary) ────────────────────────────────────────────
     const supabase = await createClient()
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email: cleanEmail,
@@ -72,73 +29,42 @@ export async function POST(request: NextRequest) {
         .single()
 
       const role = profile?.role || 'owner'
+      const isSuperAdmin = role === 'superadmin'
 
+      // Set minimal, secure session cookie (Supabase handles its own JWT cookies)
       cookieStore.set('auth_email', cleanEmail, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 30,
+        maxAge: 60 * 60 * 24 * 7, // 7 days
         path: '/',
       })
       cookieStore.set('auth_role', role, {
-        httpOnly: false,
+        httpOnly: true, // ← httpOnly so client can't tamper
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 30,
+        maxAge: 60 * 60 * 24 * 7,
         path: '/',
       })
 
-      const destination = profile?.organization_id ? '/dashboard' : '/onboarding'
+      // Update last_login_at
+      serviceClient.from('users').update({ last_login_at: new Date().toISOString() }).eq('id', authData.user.id).then(() => {})
 
-      return NextResponse.json({
-        success: true,
-        role,
-        redirect: destination,
-      })
+      let destination: string
+      if (isSuperAdmin) {
+        destination = '/superman'
+      } else if (profile?.organization_id) {
+        destination = '/dashboard'
+      } else {
+        destination = '/onboarding'
+      }
+
+      return NextResponse.json({ success: true, role, redirect: destination })
     }
 
-    // 3. FALLBACK: Check registered user in database
-    const serviceClient = await createServiceClient()
-    const { data: userProfile } = await serviceClient
-      .from('users')
-      .select('id, email, full_name, role, organization_id')
-      .eq('email', cleanEmail)
-      .single()
-
-    if (userProfile) {
-      cookieStore.set('auth_email', cleanEmail, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 30,
-        path: '/',
-      })
-      cookieStore.set('auth_role', userProfile.role || 'owner', {
-        httpOnly: false,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 30,
-        path: '/',
-      })
-      cookieStore.set('auth_token', `user_${userProfile.id}`, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 30,
-        path: '/',
-      })
-
-      const destination = userProfile.organization_id ? '/dashboard' : '/onboarding'
-
-      return NextResponse.json({
-        success: true,
-        role: userProfile.role,
-        redirect: destination,
-      })
-    }
-
+    // Auth failed — return Supabase error, no fallback bypass
     return NextResponse.json(
-      { error: authError?.message || 'Invalid email or password. Please check your credentials or register.' },
+      { error: authError?.message || 'Invalid email or password.' },
       { status: 401 }
     )
   } catch (err: any) {

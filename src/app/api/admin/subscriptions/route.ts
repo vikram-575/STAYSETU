@@ -1,8 +1,26 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 
-export async function GET() {
+async function requireSuperAdmin(request: NextRequest) {
+  const { createServerClient } = await import('@supabase/ssr')
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => request.cookies.getAll(), setAll: () => {} } }
+  )
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+  const service = await createServiceClient()
+  const { data: profile } = await service.from('users').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'superadmin') return null
+  return user
+}
+
+export async function GET(request: NextRequest) {
   try {
+    const adminUser = await requireSuperAdmin(request)
+    if (!adminUser) return NextResponse.json({ error: 'Super Admin access required.' }, { status: 403 })
+
     const supabase = await createServiceClient()
 
     const { data: orgs, error } = await supabase
@@ -12,17 +30,14 @@ export async function GET() {
 
     if (error) throw error
 
-    // Fetch bed counts per org
-    const { data: beds } = await supabase
-      .from('beds')
-      .select('id, organization_id')
+    const { data: beds } = await supabase.from('beds').select('id, organization_id')
 
-    const subscriptions = orgs.map((org) => {
+    const subscriptions = (orgs || []).map((org) => {
       const settings = org.settings || {}
       const orgBeds = beds?.filter((b) => b.organization_id === org.id) || []
       const bedCount = orgBeds.length
-      const ratePerBedPaise = 1000 // ₹10.00 per bed / month (1000 paise)
-      const monthlyFeePaise = Math.max(bedCount * ratePerBedPaise, 1000) // minimum ₹10
+      const ratePerBedPaise = 1000
+      const monthlyFeePaise = Math.max(bedCount * ratePerBedPaise, 1000)
       const plan = settings.plan || 'per_bed'
       const status = settings.subscription_status || 'active'
       const validUntil = settings.subscription_valid_until || null
@@ -63,6 +78,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const adminUser = await requireSuperAdmin(request)
+    if (!adminUser) return NextResponse.json({ error: 'Super Admin access required.' }, { status: 403 })
+
     const body = await request.json()
     const { org_id, plan, subscription_status, valid_until_months = 12 } = body
 

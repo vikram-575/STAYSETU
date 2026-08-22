@@ -1,4 +1,3 @@
-import { cookies } from 'next/headers'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 export interface AuthSessionUser {
@@ -17,74 +16,38 @@ export interface AuthSessionUser {
 }
 
 /**
- * Server-side helper to retrieve current authenticated user from cookies & database
+ * Server-side helper to retrieve current authenticated user.
+ * Auth is strictly via Supabase JWT — no cookie fallback to prevent spoofing.
  */
 export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
   try {
-    const cookieStore = await cookies()
-    const authEmail = cookieStore.get('auth_email')?.value?.toLowerCase()
-    const authRole = cookieStore.get('auth_role')?.value as any
-    const firebaseUserId = cookieStore.get('firebase_user_id')?.value
-
     const supabase = await createClient()
-    const serviceClient = await createServiceClient()
-
-    // 1. Try Supabase session
     const { data: { user: sbUser } } = await supabase.auth.getUser()
-    const effectiveEmail = sbUser?.email?.toLowerCase() || authEmail
 
-    if (!effectiveEmail && !sbUser && !firebaseUserId) {
+    if (!sbUser) {
       return null
     }
 
-    // Special Super Admin Fast-Path
-    if (effectiveEmail === 'vikramtomar0505@gmail.com' || authRole === 'superadmin') {
-      const { data: adminProfile } = await serviceClient
-        .from('users')
-        .select('*, organizations(*)')
-        .eq('email', 'vikramtomar0505@gmail.com')
-        .single()
+    const serviceClient = await createServiceClient()
 
-      if (adminProfile) {
-        return {
-          id: adminProfile.id,
-          email: 'vikramtomar0505@gmail.com',
-          full_name: adminProfile.full_name || 'Vikram Tomar (Super Admin)',
-          role: 'superadmin',
-          organization_id: adminProfile.organization_id,
-          organizations: adminProfile.organizations || { id: 'primary', name: 'PG-SETU Platform' },
-        }
-      }
-
-      return {
-        id: sbUser?.id || firebaseUserId || 'superadmin_vikram',
-        email: 'vikramtomar0505@gmail.com',
-        full_name: 'Vikram Tomar (Super Admin)',
-        role: 'superadmin',
-        organization_id: null,
-        organizations: { id: 'platform', name: 'PG-SETU Platform Enterprise' },
-      }
-    }
-
-    // 2. Look up user by Supabase ID or Email
+    // Look up user profile by Supabase user ID (primary) or email (fallback for newly created users)
     let profile: any = null
 
-    if (sbUser?.id) {
-      const { data } = await serviceClient
-        .from('users')
-        .select('*, organizations(*)')
-        .eq('id', sbUser.id)
-        .single()
-      profile = data
-    }
+    const { data: byId } = await serviceClient
+      .from('users')
+      .select('*, organizations(*)')
+      .eq('id', sbUser.id)
+      .single()
 
-    if (!profile && effectiveEmail) {
-      const { data } = await serviceClient
+    if (byId) {
+      profile = byId
+    } else if (sbUser.email) {
+      const { data: byEmail } = await serviceClient
         .from('users')
         .select('*, organizations(*)')
-        .eq('email', effectiveEmail)
+        .eq('email', sbUser.email.toLowerCase())
         .single()
-      profile = data
+      profile = byEmail
     }
 
     if (profile) {
@@ -99,12 +62,12 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
       }
     }
 
-    // User is authenticated but hasn't created profile yet
+    // User authenticated but profile not yet created (just registered)
     return {
-      id: sbUser?.id || firebaseUserId || effectiveEmail || 'user',
-      email: effectiveEmail || 'user@pgsetu.com',
-      full_name: sbUser?.user_metadata?.full_name || effectiveEmail?.split('@')[0] || 'User',
-      role: 'owner',
+      id: sbUser.id,
+      email: sbUser.email || '',
+      full_name: sbUser.user_metadata?.full_name || sbUser.email?.split('@')[0] || 'User',
+      role: (sbUser.user_metadata?.role as AuthSessionUser['role']) || 'owner',
       organization_id: null,
       organizations: null,
     }

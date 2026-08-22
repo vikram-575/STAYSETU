@@ -56,8 +56,9 @@ export async function POST(request: NextRequest) {
 
     const matchedResident = residents.find((r) => {
       if (!r.date_of_birth) {
-        // If resident record has no DOB stored, allow login or check
-        return true
+        // Resident has no DOB on file — cannot authenticate via portal.
+        // PG owner must update the resident record before portal access is granted.
+        return false
       }
       const recordDob = new Date(r.date_of_birth).toISOString().split('T')[0]
       return recordDob === inputDob
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            'Date of birth does not match our records for this mobile number. Please verify and try again.',
+            'Date of birth does not match our records. If you never provided your date of birth, please contact your PG owner to update your profile.',
         },
         { status: 401 }
       )

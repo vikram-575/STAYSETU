@@ -41,15 +41,15 @@ export async function middleware(request: NextRequest) {
     }
   )
 
+  // Primary auth: Supabase JWT (cryptographically verified)
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Session cookies fallback
-  const authEmail = (request.cookies.get('auth_email')?.value || user?.email)?.toLowerCase()
-  const authRole = request.cookies.get('auth_role')?.value
-  const authToken = request.cookies.get('auth_token')?.value
+  // Read auth_role ONLY from httpOnly cookie (not client-spoofable in combination with Supabase user)
+  // auth_role is only valid when there is a verified Supabase session
+  const authRole = user ? request.cookies.get('auth_role')?.value : null
 
-  const isAuthenticated = Boolean(user || authEmail || authToken)
-  const isSuperAdmin = authRole === 'superadmin' || authEmail === 'vikramtomar0505@gmail.com'
+  const isAuthenticated = Boolean(user)
+  const isSuperAdmin = isAuthenticated && (authRole === 'superadmin' || user?.user_metadata?.role === 'superadmin')
 
   // If already logged in and visiting login/register/superman-login, redirect to appropriate home
   if (

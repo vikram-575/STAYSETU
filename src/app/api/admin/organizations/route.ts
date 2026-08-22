@@ -3,11 +3,33 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { rupeesToPaise } from '@/lib/money'
 
 /**
+ * Shared helper: verify request is from a superadmin via Supabase session
+ */
+async function requireSuperAdmin(request: NextRequest) {
+  const { createServerClient } = await import('@supabase/ssr')
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => request.cookies.getAll(), setAll: () => {} } }
+  )
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const service = await createServiceClient()
+  const { data: profile } = await service.from('users').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'superadmin') return null
+  return user
+}
+
+/**
  * GET /api/admin/organizations
  * Lists all onboarded PGs with capacity and financial metrics
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const adminUser = await requireSuperAdmin(request)
+    if (!adminUser) return NextResponse.json({ error: 'Super Admin access required.' }, { status: 403 })
+
     const supabase = await createServiceClient()
 
     // Fetch all organizations
@@ -46,7 +68,7 @@ export async function GET() {
       .from('properties')
       .select('id, organization_id')
 
-    const result = orgs.map((org) => {
+    const result = (orgs || []).map((org) => {
       const owner = owners?.find((o) => o.organization_id === org.id)
       const orgBeds = allBeds?.filter((b) => b.organization_id === org.id) || []
       const orgResidents = allResidents?.filter((r) => r.organization_id === org.id) || []
@@ -104,6 +126,9 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
+    const adminUser = await requireSuperAdmin(request)
+    if (!adminUser) return NextResponse.json({ error: 'Super Admin access required.' }, { status: 403 })
+
     const body = await request.json()
     const {
       org_name,
@@ -129,14 +154,12 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = await createServiceClient()
-
-    // 1. Create Organization
     const slug = org_name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-') + '-' + Math.random().toString(36).substring(2, 6)
 
     const initialSettings = {
       plan,
       subscription_status,
-      subscription_valid_until: new Date(Date.now() + 86400000 * 365).toISOString().split('T')[0], // 1 year
+      subscription_valid_until: new Date(Date.now() + 86400000 * 365).toISOString().split('T')[0],
       upi_id: `${slug}@upi`,
       currency: 'INR',
     }
@@ -159,9 +182,8 @@ export async function POST(request: NextRequest) {
 
     if (orgErr || !org) throw new Error(orgErr?.message || 'Failed to create organization')
 
-    // 2. Create Owner User Profile
     const userEmail = (owner_email || `${slug}@pgsetu.com`).toLowerCase().trim()
-    const { data: ownerUser } = await supabase
+    await supabase
       .from('users')
       .insert({
         organization_id: org.id,
@@ -173,12 +195,10 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
-    // 3. Initialize sequences
     await supabase.from('organization_sequences').insert({ organization_id: org.id, last_seq: 0 })
     await supabase.from('invoice_sequences').insert({ organization_id: org.id, last_seq: 0 })
     await supabase.from('payment_sequences').insert({ organization_id: org.id, last_seq: 0 })
 
-    // 4. Create Property
     const { data: property, error: propErr } = await supabase
       .from('properties')
       .insert({
@@ -193,11 +213,9 @@ export async function POST(request: NextRequest) {
 
     if (propErr || !property) throw new Error(propErr?.message || 'Failed to create property')
 
-    // 5. Automated Generation of Buildings, Floors, Rooms, and Beds
     const baseRentPaise = rupeesToPaise(Number(base_rent_rupees) || 6000)
     let totalRoomsCreated = 0
     let totalBedsCreated = 0
-
     const bedLetterLabels = ['A', 'B', 'C', 'D', 'E', 'F']
 
     for (let b = 1; b <= Math.min(Number(num_buildings) || 1, 5); b++) {
@@ -229,7 +247,7 @@ export async function POST(request: NextRequest) {
 
           if (floor) {
             for (let r = 1; r <= (Number(rooms_per_floor) || 4); r++) {
-              const roomNumber = `${f}${String(r).padStart(2, '0')}` // e.g. 001, 002, 101, 102, 201
+              const roomNumber = `${f}${String(r).padStart(2, '0')}`
               const sharingType = beds_per_room === 1 ? 'single' : beds_per_room === 2 ? 'double' : beds_per_room === 3 ? 'triple' : 'four'
               const { data: room } = await supabase
                 .from('rooms')
@@ -248,7 +266,6 @@ export async function POST(request: NextRequest) {
               if (room) {
                 totalRoomsCreated++
 
-                // Sub-meter for room
                 const { data: meter } = await supabase
                   .from('electricity_meters')
                   .insert({
@@ -262,7 +279,6 @@ export async function POST(request: NextRequest) {
                   .select()
                   .single()
 
-                // Initial 0 reading
                 if (meter) {
                   await supabase.from('electricity_readings').insert({
                     organization_id: org.id,
@@ -270,13 +286,12 @@ export async function POST(request: NextRequest) {
                     reading_date: new Date().toISOString().split('T')[0],
                     previous_reading: 0,
                     current_reading: 0,
-                    rate_per_unit_paise: 900, // ₹9/unit
+                    rate_per_unit_paise: 900,
                     period_month: new Date().getMonth() + 1,
                     period_year: new Date().getFullYear(),
                   })
                 }
 
-                // Beds
                 for (let bedIdx = 0; bedIdx < (Number(beds_per_room) || 2); bedIdx++) {
                   const label = bedLetterLabels[bedIdx] || String(bedIdx + 1)
                   await supabase.from('beds').insert({
@@ -295,7 +310,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 6. Seed message templates
     try {
       await supabase.rpc('seed_default_templates', { p_org_id: org.id })
     } catch {
