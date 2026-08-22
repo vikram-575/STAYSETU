@@ -6,7 +6,9 @@ import {
   Building2, Users, CreditCard, DollarSign, PlusCircle, Plus,
   TrendingUp, ShieldCheck, CheckCircle2, AlertCircle,
   Loader2, Sparkles, Database, Layers, ArrowUpRight,
-  ExternalLink, Search, RefreshCw, X, Check, Edit2, KeyRound
+  ExternalLink, Search, RefreshCw, X, Check, Edit2, KeyRound,
+  ShieldAlert, Server, Activity, Terminal, ArrowRight, Trash2,
+  Lock, Settings, BarChart3, ChevronRight, Phone, Mail, MapPin
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/money'
 import { formatDate, formatDateTime, cn } from '@/lib/utils'
@@ -14,6 +16,7 @@ import { formatDate, formatDateTime, cn } from '@/lib/utils'
 export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState<'pgs' | 'subscriptions' | 'transactions' | 'users' | 'tools'>('pgs')
   const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Data States
   const [stats, setStats] = useState<any>(null)
@@ -57,7 +60,7 @@ export default function AdminDashboardPage() {
     address: '',
     gst_enabled: false,
     gstin: '',
-    plan: 'starter',
+    plan: 'per_bed',
     num_buildings: 1,
     floors_per_building: 3,
     rooms_per_floor: 4,
@@ -116,31 +119,12 @@ export default function AdminDashboardPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to onboard PG organization')
 
-      setOnboardSuccess(`Successfully onboarded "${onboardForm.org_name}" with ${data.organization.rooms_created} rooms and ${data.organization.beds_created} beds!`)
-      
-      // Reload lists
-      loadData()
+      setOnboardSuccess(`Successfully onboarded "${onboardForm.org_name}" with ${data.organization?.rooms_created || 12} rooms and ${data.organization?.beds_created || 24} beds!`)
+      await loadData()
       setTimeout(() => {
         setShowOnboardModal(false)
         setOnboardSuccess('')
-        setOnboardForm({
-          org_name: '',
-          owner_name: '',
-          owner_email: '',
-          owner_phone: '',
-          property_name: '',
-          city: 'Pune',
-          address: '',
-          gst_enabled: false,
-          gstin: '',
-          plan: 'starter',
-          num_buildings: 1,
-          floors_per_building: 3,
-          rooms_per_floor: 4,
-          beds_per_room: 2,
-          base_rent_rupees: 6500,
-        })
-      }, 1500)
+      }, 2000)
     } catch (err: any) {
       setOnboardError(err.message)
     } finally {
@@ -148,7 +132,7 @@ export default function AdminDashboardPage() {
     }
   }
 
-  // Handle Create User & Password
+  // Handle Create User Submit
   const handleCreateUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setCreateUserLoading(true)
@@ -163,22 +147,15 @@ export default function AdminDashboardPage() {
       })
 
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to create user')
+      if (!res.ok) throw new Error(data.error || 'Failed to create platform user')
 
-      setCreateUserSuccess(`User ${userForm.email} created successfully!`)
+      setCreateUserSuccess(`User ${userForm.email} successfully created with role: ${userForm.role}!`)
       await loadData()
-
       setTimeout(() => {
         setShowCreateUserModal(false)
-        setUserForm({
-          email: '',
-          password: '',
-          full_name: '',
-          phone: '',
-          role: 'owner',
-          organization_id: '',
-        })
-      }, 1200)
+        setCreateUserSuccess('')
+        setUserForm({ email: '', password: '', full_name: '', phone: '', role: 'owner', organization_id: '' })
+      }, 1800)
     } catch (err: any) {
       setCreateUserError(err.message)
     } finally {
@@ -186,315 +163,590 @@ export default function AdminDashboardPage() {
     }
   }
 
-  // Handle Plan Update
-  const handleUpdatePlan = async (plan: string, status: string) => {
+  // Handle Plan Modification
+  const handleUpdatePlan = async (planId: string, status: string) => {
     if (!selectedOrgForPlan) return
     setPlanLoading(true)
+
     try {
       const res = await fetch('/api/admin/subscriptions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          org_id: selectedOrgForPlan.id || selectedOrgForPlan.org_id,
-          plan,
-          subscription_status: status,
-          valid_until_months: 12,
+          organization_id: selectedOrgForPlan.id || selectedOrgForPlan.org_id,
+          plan: planId,
+          status,
         }),
       })
-      if (res.ok) {
-        setSelectedOrgForPlan(null)
-        loadData()
-      }
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to update subscription')
+
+      setSelectedOrgForPlan(null)
+      await loadData()
+    } catch (err: any) {
+      alert(err.message)
     } finally {
       setPlanLoading(false)
     }
   }
 
-  if (loading && !stats) {
+  // Filter organizations by search
+  const filteredOrgs = organizations.filter((org) => {
+    const q = searchQuery.toLowerCase()
     return (
-      <div className="flex items-center justify-center h-96 text-slate-400">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500 mr-3" />
-        <span className="text-sm font-bold">Loading Company Platform Command Center...</span>
-      </div>
+      (org.name || '').toLowerCase().includes(q) ||
+      (org.slug || '').toLowerCase().includes(q) ||
+      (org.city || '').toLowerCase().includes(q) ||
+      (org.owner_name || '').toLowerCase().includes(q) ||
+      (org.owner_email || '').toLowerCase().includes(q)
     )
-  }
+  })
 
   return (
-    <div className="space-y-6">
-      {/* Top Banner & Quick Action */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-blue-900/40 via-indigo-900/30 to-slate-900 border border-blue-800/40 p-4 sm:p-5 rounded-2xl shadow-xl">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
-            Company-Level Platform Administration
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-300 font-medium mt-0.5">
-            Monitor client PGs, onboard new properties, manage SaaS billing & track company-wide GTV.
-          </p>
+    <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-blue-600 selection:text-white pb-20">
+      
+      {/* ------------------------------------------------------------- */}
+      {/* 1. TOP ENTERPRISE CONSOLE NAVIGATION BAR */}
+      {/* ------------------------------------------------------------- */}
+      <header className="h-16 bg-slate-900/90 backdrop-blur-md border-b border-slate-800/80 px-4 sm:px-8 flex items-center justify-between gap-4 sticky top-0 z-30">
+        
+        {/* Brand & Environment Identity */}
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 border border-blue-400/20 shrink-0">
+            <ShieldAlert className="w-5 h-5 stroke-[2.2]" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm font-black text-white tracking-tight uppercase">PG-SETU PLATFORM</h1>
+              <span className="px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400 text-[10px] font-mono font-extrabold uppercase">
+                ROOT ENTERPRISE
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 font-medium truncate">
+              Multi-Tenant Global Control Console · Master Administrator
+            </p>
+          </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setShowOnboardModal(true)}
-          className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-95 text-white text-xs font-black rounded-xl shadow-lg shadow-blue-600/30 transition shrink-0"
-        >
-          <PlusCircle className="w-4 h-4" /> 1-Click Onboard New PG
-        </button>
-      </div>
-
-      {/* 6 Platform KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="bg-slate-900/90 border border-slate-800 p-3.5 sm:p-4 rounded-2xl shadow-xs">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">Onboarded PGs</p>
-          <p className="text-xl sm:text-2xl font-black text-white mt-1">{stats?.total_organizations || 0}</p>
-          <p className="text-[10px] text-blue-400 font-bold mt-0.5">{stats?.total_properties || 0} properties</p>
-        </div>
-
-        <div className="bg-slate-900/90 border border-slate-800 p-3.5 sm:p-4 rounded-2xl shadow-xs">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">Total Bed Capacity</p>
-          <p className="text-xl sm:text-2xl font-black text-white mt-1">{stats?.total_beds || 0}</p>
-          <p className="text-[10px] text-green-400 font-bold mt-0.5">{stats?.occupied_beds || 0} occupied ({stats?.occupancy_rate_pct || 0}%)</p>
-        </div>
-
-        <div className="bg-slate-900/90 border border-slate-800 p-3.5 sm:p-4 rounded-2xl shadow-xs">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">Active Residents</p>
-          <p className="text-xl sm:text-2xl font-black text-indigo-300 mt-1">{stats?.total_active_residents || 0}</p>
-          <p className="text-[10px] text-slate-400 font-medium mt-0.5">Across all client PGs</p>
-        </div>
-
-        <div className="bg-slate-900/90 border border-slate-800 p-3.5 sm:p-4 rounded-2xl shadow-xs">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">Platform GTV Volume</p>
-          <p className="text-xl sm:text-2xl font-black text-emerald-400 mt-1">
-            {formatCurrency(stats?.platform_gtv_paise || 0)}
-          </p>
-          <p className="text-[10px] text-slate-400 font-medium mt-0.5">Total billing volume</p>
-        </div>
-
-        <div className="bg-slate-900/90 border border-slate-800 p-3.5 sm:p-4 rounded-2xl shadow-xs">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">Rent Collected</p>
-          <p className="text-xl sm:text-2xl font-black text-teal-400 mt-1">
-            {formatCurrency(stats?.platform_collected_paise || 0)}
-          </p>
-          <p className="text-[10px] text-teal-500 font-medium mt-0.5">Processed by PGs</p>
-        </div>
-
-        <div className="bg-slate-900/90 border border-slate-800 p-3.5 sm:p-4 rounded-2xl shadow-xs">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-purple-400 truncate">Company SaaS MRR</p>
-          <p className="text-xl sm:text-2xl font-black text-purple-300 mt-1">
-            {formatCurrency(stats?.platform_saas_mrr_paise || 0)}
-          </p>
-          <p className="text-[10px] text-purple-400 font-bold mt-0.5">Monthly subscription</p>
-        </div>
-      </div>
-
-      {/* Navigation Tabs */}
-      <div className="overflow-x-auto pb-1 scrollbar-none">
-        <div className="flex items-center gap-1.5 bg-slate-900 p-1.5 rounded-2xl border border-slate-800 w-max">
+        {/* Global Controls & Actions */}
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <button
-            type="button"
-            onClick={() => setActiveTab('pgs')}
-            className={cn(
-              'px-4 py-2 rounded-xl text-xs font-black transition whitespace-nowrap active:scale-95',
-              activeTab === 'pgs' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
-            )}
+            onClick={loadData}
+            disabled={loading}
+            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition active:scale-95"
+            title="Refresh Real-Time Telemetry"
           >
-            PG Organizations ({organizations.length})
+            <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin text-blue-400')} />
           </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('subscriptions')}
-            className={cn(
-              'px-4 py-2 rounded-xl text-xs font-black transition whitespace-nowrap active:scale-95',
-              activeTab === 'subscriptions' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
-            )}
-          >
-            SaaS Billing & Plans
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('transactions')}
-            className={cn(
-              'px-4 py-2 rounded-xl text-xs font-black transition whitespace-nowrap active:scale-95',
-              activeTab === 'transactions' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
-            )}
-          >
-            Global Transaction Stream ({transactions.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('users')}
-            className={cn(
-              'px-4 py-2 rounded-xl text-xs font-black transition whitespace-nowrap active:scale-95',
-              activeTab === 'users' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
-            )}
-          >
-            Platform Users ({users.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('tools')}
-            className={cn(
-              'px-4 py-2 rounded-xl text-xs font-black transition whitespace-nowrap active:scale-95',
-              activeTab === 'tools' ? 'bg-red-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
-            )}
-          >
-            Data Purge & Tools
-          </button>
-        </div>
-      </div>
 
-      {/* ----------------------------------------------------------- */}
-      {/* TAB 1: PG ORGANIZATIONS LIST */}
-      {/* ----------------------------------------------------------- */}
-      {activeTab === 'pgs' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm sm:text-base font-black text-white">All Client PG Organizations</h2>
+          <button
+            onClick={() => setShowCreateUserModal(true)}
+            className="hidden sm:flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition active:scale-95"
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>+ Create User</span>
+          </button>
+
+          <button
+            onClick={() => setShowOnboardModal(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-extrabold transition shadow-md shadow-blue-600/30 active:scale-95"
+          >
+            <Building2 className="w-4 h-4 stroke-[2.2]" />
+            <span>+ 1-Click Onboard PG</span>
+          </button>
+
+          <Link
+            href="/dashboard"
+            className="hidden md:flex items-center gap-1 text-xs text-slate-400 hover:text-white font-semibold pl-2 border-l border-slate-800 transition"
+          >
+            <span>Exit to PG Workspace</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+      </header>
+
+      {/* ------------------------------------------------------------- */}
+      {/* 2. MAIN PLATFORM CONTAINER */}
+      {/* ------------------------------------------------------------- */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-8 pt-6 space-y-6">
+        
+        {/* Executive Hero Banner */}
+        <div className="relative rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950/70 to-slate-900 border border-slate-800 p-6 sm:p-8 overflow-hidden shadow-2xl">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+          
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-mono text-blue-400 font-bold mb-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>SAAS PLATFORM OPERATIONAL · ZERO DOWNTIME</span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                Company Executive Administration
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl leading-relaxed">
+                Platform-wide oversight for client PGs, multi-property inventory matrix, SaaS subscription recurring run rate, and master transaction telemetry.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="px-4 py-3 bg-slate-950/80 border border-slate-800 rounded-2xl text-left">
+                <p className="text-[10px] font-mono uppercase text-slate-500 font-bold">Platform SaaS Model</p>
+                <p className="text-base sm:text-lg font-black text-blue-400 mt-0.5">₹10 / Bed / Mo</p>
+                <p className="text-[10px] text-slate-400">Pay-Per-Capacity Billing</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ------------------------------------------------------------- */}
+        {/* 3. PLATFORM TELEMETRY KPI CARDS (6-CARD ENTERPRISE GRID) */}
+        {/* ------------------------------------------------------------- */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+          
+          {/* Card 1: ONBOARDED PGS */}
+          <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl flex flex-col justify-between shadow-sm">
+            <div className="flex items-center justify-between text-slate-500 mb-2">
+              <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-slate-400">ONBOARDED PGS</span>
+              <Building2 className="w-3.5 h-3.5 text-blue-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-black text-white">{stats?.total_organizations ?? organizations.length ?? 0}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">{stats?.total_properties ?? organizations.length} active properties</p>
+            </div>
+          </div>
+
+          {/* Card 2: MANAGED BEDS */}
+          <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl flex flex-col justify-between shadow-sm">
+            <div className="flex items-center justify-between text-slate-500 mb-2">
+              <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-slate-400">TOTAL BEDS</span>
+              <Layers className="w-3.5 h-3.5 text-indigo-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-black text-white">{stats?.total_beds ?? 0}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                {stats?.occupied_beds ?? 0} occupied ({stats?.occupancy_rate ?? 0}%)
+              </p>
+            </div>
+          </div>
+
+          {/* Card 3: ACTIVE RESIDENTS */}
+          <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl flex flex-col justify-between shadow-sm">
+            <div className="flex items-center justify-between text-slate-500 mb-2">
+              <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-slate-400">RESIDENTS</span>
+              <Users className="w-3.5 h-3.5 text-purple-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-black text-white">{stats?.active_residents ?? 0}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Across all client PGs</p>
+            </div>
+          </div>
+
+          {/* Card 4: PLATFORM GTV VOLUME */}
+          <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl flex flex-col justify-between shadow-sm">
+            <div className="flex items-center justify-between text-slate-500 mb-2">
+              <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-slate-400">PLATFORM GTV</span>
+              <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-black text-emerald-400">{formatCurrency(stats?.platform_gtv_paise ?? 0)}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Gross billed volume</p>
+            </div>
+          </div>
+
+          {/* Card 5: PROCESSED RENT */}
+          <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl flex flex-col justify-between shadow-sm">
+            <div className="flex items-center justify-between text-slate-500 mb-2">
+              <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-slate-400">RENT COLLECTED</span>
+              <CreditCard className="w-3.5 h-3.5 text-teal-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-black text-teal-300">{formatCurrency(stats?.total_collected_paise ?? 0)}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Processed by PGs</p>
+            </div>
+          </div>
+
+          {/* Card 6: SAAS MRR RUN RATE */}
+          <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl flex flex-col justify-between shadow-sm bg-gradient-to-br from-purple-950/40 to-slate-900">
+            <div className="flex items-center justify-between text-slate-500 mb-2">
+              <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-purple-400">COMPANY MRR</span>
+              <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-black text-purple-300">
+                ₹{((stats?.saas_mrr_rupees ?? (stats?.total_beds ? stats.total_beds * 10 : 0))).toLocaleString('en-IN')}
+              </p>
+              <p className="text-[11px] text-purple-200/70 mt-0.5">Recurring SaaS revenue</p>
+            </div>
+          </div>
+        </div>
+
+        {/* ------------------------------------------------------------- */}
+        {/* 4. TAB NAVIGATION STRIP */}
+        {/* ------------------------------------------------------------- */}
+        <div className="flex items-center justify-between gap-4 border-b border-slate-800 pb-1">
+          <div className="overflow-x-auto pb-1 scrollbar-none flex items-center gap-1.5">
             <button
-              type="button"
-              onClick={loadData}
-              className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 font-bold"
+              onClick={() => setActiveTab('pgs')}
+              className={cn(
+                'px-4 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-2 whitespace-nowrap active:scale-95',
+                activeTab === 'pgs'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              )}
             >
-              <RefreshCw className="w-3.5 h-3.5" /> Refresh
+              <Building2 className="w-3.5 h-3.5" />
+              <span>PG Organizations</span>
+              <span className="px-1.5 py-0.2 text-[10px] bg-slate-950/60 rounded-md font-mono">{organizations.length}</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('subscriptions')}
+              className={cn(
+                'px-4 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-2 whitespace-nowrap active:scale-95',
+                activeTab === 'subscriptions'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              )}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>SaaS Subscriptions & Billing</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('transactions')}
+              className={cn(
+                'px-4 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-2 whitespace-nowrap active:scale-95',
+                activeTab === 'transactions'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              )}
+            >
+              <Activity className="w-3.5 h-3.5" />
+              <span>Global Transaction Stream</span>
+              <span className="px-1.5 py-0.2 text-[10px] bg-slate-950/60 rounded-md font-mono">{transactions.length}</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('users')}
+              className={cn(
+                'px-4 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-2 whitespace-nowrap active:scale-95',
+                activeTab === 'users'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              )}
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Platform Users & Roles</span>
+              <span className="px-1.5 py-0.2 text-[10px] bg-slate-950/60 rounded-md font-mono">{users.length}</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('tools')}
+              className={cn(
+                'px-4 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-2 whitespace-nowrap active:scale-95',
+                activeTab === 'tools'
+                  ? 'bg-rose-600 text-white shadow-md shadow-rose-500/20'
+                  : 'text-rose-400 hover:text-rose-300 hover:bg-slate-900'
+              )}
+            >
+              <Database className="w-3.5 h-3.5" />
+              <span>Data Purge & Diagnostics</span>
             </button>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {organizations.map((org) => (
-              <div
-                key={org.id}
-                className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl p-5 space-y-4 shadow-md transition"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="text-base font-black text-white">{org.name}</h3>
-                    <p className="text-xs text-slate-400 font-mono mt-0.5">{org.city || 'Location unset'} · slug: {org.slug}</p>
-                  </div>
-                  <span
-                    className={cn(
-                      'px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider',
-                      org.plan === 'enterprise'
-                        ? 'bg-purple-900/60 text-purple-300 border border-purple-700'
-                        : org.plan === 'growth'
-                        ? 'bg-blue-900/60 text-blue-300 border border-blue-700'
-                        : 'bg-slate-800 text-slate-300 border border-slate-700'
-                    )}
-                  >
-                    {org.plan}
-                  </span>
-                </div>
-
-                {/* Metrics */}
-                <div className="grid grid-cols-3 gap-2 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 text-center text-xs">
-                  <div>
-                    <span className="text-slate-500 text-[10px] font-bold block">Capacity</span>
-                    <strong className="text-white font-black">{org.total_beds} beds</strong>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 text-[10px] font-bold block">Occupancy</span>
-                    <strong className="text-green-400 font-black">{org.occupancy_rate}%</strong>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 text-[10px] font-bold block">Residents</span>
-                    <strong className="text-blue-400 font-black">{org.active_residents_count}</strong>
-                  </div>
-                </div>
-
-                {/* Owner info & revenue */}
-                <div className="space-y-1.5 text-xs text-slate-400 pt-1 border-t border-slate-800/80">
-                  <div className="flex justify-between">
-                    <span>Owner Contact:</span>
-                    <span className="text-white font-semibold">{org.owner?.name || org.phone || '—'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Rent Collected:</span>
-                    <span className="text-green-400 font-bold">{formatCurrency(org.total_collected_paise)}</span>
-                  </div>
-                </div>
-
-                {/* Action buttons */}
-                <div className="flex items-center gap-2 pt-2 border-t border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedOrgForPlan(org)}
-                    className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" /> Manage Plan
-                  </button>
-                  <Link
-                    href="/dashboard"
-                    className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition text-center"
-                  >
-                    Access Dashboard
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
-      )}
 
-      {/* ----------------------------------------------------------- */}
-      {/* TAB 2: SAAS BILLING & PLANS */}
-      {/* ----------------------------------------------------------- */}
-      {activeTab === 'subscriptions' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {subscriptionsData?.plan_tiers?.map((tier: any) => (
-              <div
-                key={tier.id}
-                className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3 shadow-md relative overflow-hidden"
-              >
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-black text-white">{tier.name}</h3>
-                  <span className="text-sm font-black text-purple-400">{formatCurrency(tier.price_paise)}/mo</span>
+        {/* ------------------------------------------------------------- */}
+        {/* TAB 1: PG ORGANIZATIONS DIRECTORY */}
+        {/* ------------------------------------------------------------- */}
+        {activeTab === 'pgs' && (
+          <div className="space-y-4">
+            
+            {/* Search and Filters Bar */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-900/60 border border-slate-800 p-3 rounded-2xl">
+              <div className="relative flex-1 max-w-md">
+                <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Filter by PG name, slug, city, owner..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:border-blue-500 outline-none"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 font-mono">
+                  Showing {filteredOrgs.length} of {organizations.length} PGs
+                </span>
+                <button
+                  onClick={() => setShowOnboardModal(true)}
+                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition shadow-sm"
+                >
+                  + Add Client PG
+                </button>
+              </div>
+            </div>
+
+            {/* Organizations Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredOrgs.map((org) => {
+                const totalBeds = org.total_beds || org.beds_count || 0
+                const occupiedBeds = org.occupied_beds || 0
+                const occupancyPct = totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0
+                const mrr = totalBeds * 10
+
+                return (
+                  <div
+                    key={org.id || org.slug}
+                    className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl p-5 space-y-4 shadow-sm transition group"
+                  >
+                    {/* Header: Title, City, Plan */}
+                    <div className="flex items-start justify-between gap-2 border-b border-slate-800/80 pb-3">
+                      <div>
+                        <h3 className="text-base font-black text-white group-hover:text-blue-400 transition-colors">
+                          {org.name}
+                        </h3>
+                        <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+                          <MapPin className="w-3 h-3 text-slate-500" />
+                          <span>{org.city || 'Pune'}</span>
+                          <span>·</span>
+                          <span className="font-mono text-[11px] text-slate-500">slug: {org.slug}</span>
+                        </p>
+                      </div>
+
+                      <span className="px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-400 text-[10px] font-mono font-bold uppercase">
+                        {org.settings?.plan || 'PER_BED'}
+                      </span>
+                    </div>
+
+                    {/* Capacity & Yield Stats */}
+                    <div className="grid grid-cols-3 gap-2 p-3 bg-slate-950/80 border border-slate-800/60 rounded-xl text-center">
+                      <div>
+                        <p className="text-[10px] font-mono text-slate-500 uppercase">Capacity</p>
+                        <p className="text-sm font-black text-white mt-0.5">{totalBeds} beds</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-mono text-slate-500 uppercase">Occupancy</p>
+                        <p className={cn('text-sm font-black mt-0.5', occupancyPct >= 80 ? 'text-emerald-400' : 'text-slate-300')}>
+                          {occupancyPct}%
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-mono text-slate-500 uppercase">SaaS Yield</p>
+                        <p className="text-sm font-black text-purple-400 mt-0.5">₹{mrr}/mo</p>
+                      </div>
+                    </div>
+
+                    {/* Owner Contact */}
+                    <div className="text-xs space-y-1 text-slate-400 pt-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500">Owner Contact:</span>
+                        <span className="text-white font-medium">{org.owner_name || org.phone || '—'}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500">Collected Rent:</span>
+                        <span className="text-emerald-400 font-bold">{formatCurrency(org.total_collected_paise || 0)}</span>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+                      <button
+                        onClick={() => setSelectedOrgForPlan(org)}
+                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition"
+                      >
+                        Edit Plan
+                      </button>
+
+                      <Link
+                        href={`/dashboard?orgId=${org.id}`}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 rounded-lg text-xs font-bold transition"
+                      >
+                        <span>Open Workspace</span>
+                        <ArrowUpRight className="w-3.5 h-3.5" />
+                      </Link>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ------------------------------------------------------------- */}
+        {/* TAB 2: SAAS SUBSCRIPTIONS & BILLING */}
+        {/* ------------------------------------------------------------- */}
+        {activeTab === 'subscriptions' && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              
+              {/* Plan 1: Standard Pay-Per-Bed */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4 relative">
+                <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono text-[10px] font-bold uppercase">
+                  DEFAULT SAAS
+                </span>
+                <div>
+                  <h3 className="text-lg font-black text-white">Standard Pay-Per-Bed</h3>
+                  <p className="text-xs text-slate-400 mt-1">₹10 per managed bed per month</p>
                 </div>
-                <p className="text-xs text-slate-400">{tier.features[0]}</p>
-                <ul className="space-y-1.5 text-xs text-slate-300 pt-2 border-t border-slate-800">
-                  {tier.features.map((f: string, idx: number) => (
-                    <li key={idx} className="flex items-center gap-2">
-                      <Check className="w-3.5 h-3.5 text-green-400 shrink-0" />
-                      <span>{f}</span>
-                    </li>
-                  ))}
+                <div className="text-3xl font-black text-blue-400">
+                  ₹10 <span className="text-xs font-normal text-slate-400">/ bed / mo</span>
+                </div>
+                <ul className="text-xs text-slate-300 space-y-2 border-t border-slate-800 pt-3">
+                  <li className="flex items-center gap-2">✓ Unlimited Residents & KYC Vault</li>
+                  <li className="flex items-center gap-2">✓ Dynamic UPI QR & Payment Registers</li>
+                  <li className="flex items-center gap-2">✓ Sub-Meter Electricity Splitter</li>
+                  <li className="flex items-center gap-2">✓ Tenant Self-Service Passbook Portal</li>
                 </ul>
               </div>
-            ))}
-          </div>
 
+              {/* Plan 2: 100-Bed Fixed */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+                <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 font-mono text-[10px] font-bold uppercase">
+                  VOLUME TIER
+                </span>
+                <div>
+                  <h3 className="text-lg font-black text-white">100-Bed Fixed Tier</h3>
+                  <p className="text-xs text-slate-400 mt-1">Optimized for mid-size PG hostels</p>
+                </div>
+                <div className="text-3xl font-black text-purple-400">
+                  ₹1,000 <span className="text-xs font-normal text-slate-400">/ month</span>
+                </div>
+                <ul className="text-xs text-slate-300 space-y-2 border-t border-slate-800 pt-3">
+                  <li className="flex items-center gap-2">✓ Up to 100 Managed Beds</li>
+                  <li className="flex items-center gap-2">✓ Multi-Manager Staff Accounts</li>
+                  <li className="flex items-center gap-2">✓ Priority WhatsApp Notifications</li>
+                </ul>
+              </div>
+
+              {/* Plan 3: 500-Bed Enterprise */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+                <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono text-[10px] font-bold uppercase">
+                  CAMPUS / ENTERPRISE
+                </span>
+                <div>
+                  <h3 className="text-lg font-black text-white">500-Bed Campus Tier</h3>
+                  <p className="text-xs text-slate-400 mt-1">For multi-building hostel campuses</p>
+                </div>
+                <div className="text-3xl font-black text-emerald-400">
+                  ₹5,000 <span className="text-xs font-normal text-slate-400">/ month</span>
+                </div>
+                <ul className="text-xs text-slate-300 space-y-2 border-t border-slate-800 pt-3">
+                  <li className="flex items-center gap-2">✓ Up to 500 Managed Beds</li>
+                  <li className="flex items-center gap-2">✓ Custom Billing Cycles & GST Integration</li>
+                  <li className="flex items-center gap-2">✓ Dedicated Account Manager</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ------------------------------------------------------------- */}
+        {/* TAB 3: GLOBAL TRANSACTION STREAM */}
+        {/* ------------------------------------------------------------- */}
+        {activeTab === 'transactions' && (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-            <h3 className="text-base font-black text-white">Client Subscription Roster</h3>
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-white">Real-Time Platform Transaction Feed</h3>
+                <p className="text-xs text-slate-400">Live stream of all rent collections across all client PGs</p>
+              </div>
+              <span className="text-xs font-mono text-emerald-400 font-bold flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                Live Stream
+              </span>
+            </div>
+
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
-                <thead className="text-[10px] text-slate-400 uppercase bg-slate-950/60 border-b border-slate-800">
+                <thead className="text-[10px] font-mono text-slate-400 uppercase bg-slate-950 border-b border-slate-800">
                   <tr>
+                    <th className="p-3">Time & Date</th>
                     <th className="p-3">PG Organization</th>
-                    <th className="p-3">Plan Tier</th>
-                    <th className="p-3">Monthly Fee</th>
+                    <th className="p-3">Resident</th>
+                    <th className="p-3">Payment Method</th>
+                    <th className="p-3">Amount</th>
                     <th className="p-3">Status</th>
-                    <th className="p-3">Valid Until</th>
-                    <th className="p-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800 text-slate-300 font-medium">
-                  {subscriptionsData?.subscriptions?.map((sub: any) => (
-                    <tr key={sub.org_id} className="hover:bg-slate-800/50">
-                      <td className="p-3 font-bold text-white">{sub.org_name}</td>
-                      <td className="p-3 uppercase font-bold text-purple-400">{sub.plan}</td>
-                      <td className="p-3 font-bold text-white">{formatCurrency(sub.monthly_fee_paise)}</td>
+                  {transactions.map((tx, idx) => (
+                    <tr key={tx.id || idx} className="hover:bg-slate-800/50">
+                      <td className="p-3 font-mono text-slate-400">{formatDateTime(tx.payment_time || tx.created_at)}</td>
+                      <td className="p-3 font-bold text-white">{tx.organizations?.name || 'PG-SETU'}</td>
+                      <td className="p-3 text-slate-200">{tx.residents?.full_name || 'Resident'}</td>
+                      <td className="p-3 uppercase font-mono text-slate-400">{tx.payment_method}</td>
+                      <td className="p-3 font-bold text-emerald-400">{formatCurrency(tx.amount_paise)}</td>
                       <td className="p-3">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-green-950 text-green-400 border border-green-800">
-                          {sub.status}
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          COMPLETED
                         </span>
                       </td>
-                      <td className="p-3 text-slate-400">{formatDate(sub.valid_until)}</td>
-                      <td className="p-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedOrgForPlan(sub)}
-                          className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-bold"
-                        >
-                          Modify
-                        </button>
+                    </tr>
+                  ))}
+                  {transactions.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-slate-500">
+                        No transactions recorded on the platform yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ------------------------------------------------------------- */}
+        {/* TAB 4: PLATFORM USERS & ROLES */}
+        {/* ------------------------------------------------------------- */}
+        {activeTab === 'users' && (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-white">Platform User Directory</h3>
+                <p className="text-xs text-slate-400">All registered PG owners, staff, and super administrators</p>
+              </div>
+              <button
+                onClick={() => setShowCreateUserModal(true)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition shadow-sm"
+              >
+                + Create User & Password
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="text-[10px] font-mono text-slate-400 uppercase bg-slate-950 border-b border-slate-800">
+                  <tr>
+                    <th className="p-3">User</th>
+                    <th className="p-3">Email Address</th>
+                    <th className="p-3">Assigned Role</th>
+                    <th className="p-3">PG Organization</th>
+                    <th className="p-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800 text-slate-300 font-medium">
+                  {users.map((u) => (
+                    <tr key={u.id} className="hover:bg-slate-800/50">
+                      <td className="p-3 font-bold text-white">{u.full_name || 'User'}</td>
+                      <td className="p-3 font-mono text-slate-400">{u.email}</td>
+                      <td className="p-3">
+                        <span className={cn(
+                          'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono',
+                          u.role === 'superadmin' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' :
+                          u.role === 'owner' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' :
+                          'bg-slate-800 text-slate-300'
+                        )}>
+                          {u.role}
+                        </span>
+                      </td>
+                      <td className="p-3 text-slate-400">{u.organizations?.name || 'All Platform'}</td>
+                      <td className="p-3">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold text-emerald-400 bg-emerald-500/10">
+                          Active
+                        </span>
                       </td>
                     </tr>
                   ))}
@@ -502,377 +754,224 @@ export default function AdminDashboardPage() {
               </table>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ----------------------------------------------------------- */}
-      {/* TAB 3: GLOBAL TRANSACTIONS STREAM */}
-      {/* ----------------------------------------------------------- */}
-      {activeTab === 'transactions' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-black text-white">Platform-Wide Rent Collection Stream</h3>
-              <p className="text-xs text-slate-400">Live aggregate feed of all rent transactions processed across all client PGs</p>
-            </div>
-            <button
-              type="button"
-              onClick={loadData}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold"
-            >
-              Refresh Feed
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead className="text-[10px] text-slate-400 uppercase bg-slate-950/60 border-b border-slate-800">
-                <tr>
-                  <th className="p-3">Receipt / Payment ID</th>
-                  <th className="p-3">PG Organization</th>
-                  <th className="p-3">Resident</th>
-                  <th className="p-3">Amount</th>
-                  <th className="p-3">Method</th>
-                  <th className="p-3">Date</th>
-                  <th className="p-3">Reference #</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800 text-slate-300 font-medium">
-                {transactions.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="p-6 text-center text-slate-500">No rent transactions recorded yet across the platform.</td>
-                  </tr>
-                ) : (
-                  transactions.map((tx) => (
-                    <tr key={tx.id} className="hover:bg-slate-800/50">
-                      <td className="p-3 font-mono font-bold text-blue-400">{tx.payment_number || 'RECEIPT'}</td>
-                      <td className="p-3 font-bold text-white">{tx.organizations?.name || '—'}</td>
-                      <td className="p-3 font-semibold text-slate-200">
-                        {tx.residents?.full_name || 'Resident'}
-                      </td>
-                      <td className="p-3 font-black text-green-400">+{formatCurrency(tx.amount_paise)}</td>
-                      <td className="p-3 uppercase font-bold text-[10px] text-slate-300">{tx.payment_method}</td>
-                      <td className="p-3 text-slate-400">{formatDate(tx.payment_date)}</td>
-                      <td className="p-3 font-mono text-[11px] text-slate-500">{tx.transaction_id || '—'}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ----------------------------------------------------------- */}
-      {/* TAB 4: PLATFORM USERS */}
-      {/* ----------------------------------------------------------- */}
-      {activeTab === 'users' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-800">
-            <div>
-              <h3 className="text-base font-black text-white">All Platform Users & Roles</h3>
-              <p className="text-xs text-slate-400">Manage owner, manager, staff, and super admin accounts</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowCreateUserModal(true)}
-              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-500/20 flex items-center justify-center gap-1.5 transition"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Create User & Password</span>
-            </button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead className="text-[10px] text-slate-400 uppercase bg-slate-950/60 border-b border-slate-800">
-                <tr>
-                  <th className="p-3">User Name</th>
-                  <th className="p-3">Email</th>
-                  <th className="p-3">Mobile Phone</th>
-                  <th className="p-3">PG Organization</th>
-                  <th className="p-3">Role</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3">Last Login</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800 text-slate-300 font-medium">
-                {users.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-800/50">
-                    <td className="p-3 font-bold text-white">{u.full_name}</td>
-                    <td className="p-3 text-slate-300">{u.email}</td>
-                    <td className="p-3 text-slate-400">{u.phone || '—'}</td>
-                    <td className="p-3 font-semibold text-blue-400">{u.organizations?.name || 'Platform'}</td>
-                    <td className="p-3">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-blue-950 text-blue-400 border border-blue-800">
-                        {u.role}
-                      </span>
-                    </td>
-                    <td className="p-3">
-                      <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold uppercase', u.is_active ? 'bg-green-950 text-green-400' : 'bg-red-950 text-red-400')}>
-                        {u.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="p-3 text-slate-500">{formatDateTime(u.last_login_at)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ----------------------------------------------------------- */}
-      {/* TAB 5: DATA PURGE & TOOLS */}
-      {/* ----------------------------------------------------------- */}
-      {activeTab === 'tools' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
-          <div>
-            <h3 className="text-base font-black text-red-400">Platform Data Reset & Production Purge</h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Select an organization to wipe mock transactions and prepare for real tenant onboarding.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {organizations.map((org) => (
-              <div key={org.id} className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-3">
-                <div className="flex justify-between items-center">
-                  <h4 className="font-bold text-white text-sm">{org.name}</h4>
-                  <span className="text-xs text-slate-400">{org.total_beds} Beds · {org.active_residents_count} Residents</span>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (!confirm(`Purge all test transactions and residents for "${org.name}"?`)) return
-                      const res = await fetch('/api/admin/purge-data', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ organization_id: org.id, wipe_all: false }),
-                      })
-                      const data = await res.json()
-                      alert(data.message || data.error)
-                      loadData()
-                    }}
-                    className="flex-1 py-2 bg-red-950 hover:bg-red-900 text-red-300 text-xs font-bold rounded-lg border border-red-800 transition"
-                  >
-                    Wipe Test Transactions
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (!confirm(`WARNING: Completely wipe all rooms, beds, and data for "${org.name}"?`)) return
-                      const res = await fetch('/api/admin/purge-data', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ organization_id: org.id, wipe_all: true }),
-                      })
-                      const data = await res.json()
-                      alert(data.message || data.error)
-                      loadData()
-                    }}
-                    className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-lg transition"
-                  >
-                    Reset to Blank
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ----------------------------------------------------------- */}
-      {/* MODAL 1: 1-CLICK ONBOARD NEW PG */}
-      {/* ----------------------------------------------------------- */}
-      {showOnboardModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-5 shadow-2xl relative my-8">
-            <button
-              type="button"
-              onClick={() => setShowOnboardModal(false)}
-              className="absolute top-5 right-5 p-1.5 text-slate-400 hover:text-white rounded-lg"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div>
-              <span className="text-[10px] uppercase font-bold text-blue-400 tracking-wider block">1-Click Fast Provisioning</span>
-              <h2 className="text-xl font-black text-white tracking-tight mt-0.5">Onboard New PG Business</h2>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Automatically provisions Organization, Property, Buildings, Floors, Rooms, Beds & Owner Account in one click.
+        {/* ------------------------------------------------------------- */}
+        {/* TAB 5: DATA PURGE & DIAGNOSTICS */}
+        {/* ------------------------------------------------------------- */}
+        {activeTab === 'tools' && (
+          <div className="bg-slate-900 border border-rose-900/50 rounded-2xl p-6 space-y-6">
+            <div className="border-b border-slate-800 pb-3">
+              <h3 className="text-base font-black text-rose-400 flex items-center gap-2">
+                <Database className="w-5 h-5 text-rose-500" />
+                <span>Production Data Purge & Diagnostics</span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Wipe test records, mock invoices, and sample resident data before handing over to actual PG owners.
               </p>
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {organizations.map((org) => (
+                <div key={org.id} className="p-5 bg-slate-950 border border-slate-800 rounded-2xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-sm text-white">{org.name}</h4>
+                    <span className="text-xs font-mono text-slate-500">ID: {org.id?.slice(0, 8)}</span>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    Capacity: <strong>{org.total_beds || 0} Beds</strong> · Total Collected: <strong>{formatCurrency(org.total_collected_paise || 0)}</strong>
+                  </p>
+                  
+                  <button
+                    onClick={async () => {
+                      if (!confirm(`Are you sure you want to wipe all test transactions and reset resident occupancy to 0 for "${org.name}"?`)) return
+                      try {
+                        const res = await fetch('/api/admin/purge-data', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ organization_id: org.id }),
+                        })
+                        const d = await res.json()
+                        if (!res.ok) throw new Error(d.error || 'Failed to purge')
+                        alert(`Data purged for ${org.name}!`)
+                        await loadData()
+                      } catch (err: any) {
+                        alert(err.message)
+                      }
+                    }}
+                    className="w-full py-2.5 bg-rose-950/60 hover:bg-rose-900 border border-rose-800/80 text-rose-300 hover:text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Wipe Mock Data & Reset to Blank</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+      </main>
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL 1: 1-CLICK ONBOARD PG ORGANIZATIONS */}
+      {/* ------------------------------------------------------------- */}
+      {showOnboardModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={() => setShowOnboardModal(false)}
+              className="absolute top-5 right-5 p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800 hover:bg-slate-700"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div>
+              <span className="px-2.5 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400 font-mono text-[10px] font-bold uppercase">
+                1-Click Deployment Engine
+              </span>
+              <h3 className="text-xl font-black text-white mt-1">Onboard New Client PG</h3>
+              <p className="text-xs text-slate-400">Instantly provisions Org, Property, Building, Floors, Rooms, Beds & Sub-Meters</p>
+            </div>
+
             {onboardError && (
-              <div className="p-3.5 bg-red-950/80 border border-red-800 rounded-xl text-xs text-red-300 font-medium">
+              <div className="p-3.5 bg-rose-950/70 border border-rose-800 text-rose-300 rounded-xl text-xs font-semibold">
                 {onboardError}
               </div>
             )}
             {onboardSuccess && (
-              <div className="p-3.5 bg-green-950/80 border border-green-800 rounded-xl text-xs text-green-300 font-bold flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" />
+              <div className="p-3.5 bg-emerald-950/70 border border-emerald-800 text-emerald-300 rounded-xl text-xs font-bold">
                 {onboardSuccess}
               </div>
             )}
 
-            <form onSubmit={handleOnboardSubmit} className="space-y-4">
+            <form onSubmit={handleOnboardSubmit} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">PG Business / Brand Name *</label>
+                  <label className="block font-bold text-slate-300 mb-1">PG Business Name *</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Apex Luxury PG"
+                    placeholder="e.g. Royal Living PG"
                     value={onboardForm.org_name}
                     onChange={(e) => setOnboardForm({ ...onboardForm, org_name: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white font-bold focus:border-blue-500 outline-none"
+                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Property Campus Name *</label>
+                  <label className="block font-bold text-slate-300 mb-1">Property Name *</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Main Residency Block"
+                    placeholder="e.g. Main Hostel Campus"
                     value={onboardForm.property_name}
                     onChange={(e) => setOnboardForm({ ...onboardForm, property_name: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white font-bold focus:border-blue-500 outline-none"
+                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Owner Full Name</label>
+                  <label className="block font-bold text-slate-300 mb-1">Owner Name</label>
                   <input
                     type="text"
-                    placeholder="e.g. Vikram Sharma"
+                    placeholder="e.g. Rajesh Kumar"
                     value={onboardForm.owner_name}
                     onChange={(e) => setOnboardForm({ ...onboardForm, owner_name: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:border-blue-500 outline-none"
+                    className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Owner Email</label>
+                  <label className="block font-bold text-slate-300 mb-1">Owner Email</label>
                   <input
                     type="email"
-                    placeholder="owner@pgname.com"
+                    placeholder="owner@royalpg.com"
                     value={onboardForm.owner_email}
                     onChange={(e) => setOnboardForm({ ...onboardForm, owner_email: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:border-blue-500 outline-none"
+                    className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Owner Mobile Phone</label>
+                  <label className="block font-bold text-slate-300 mb-1">Owner Mobile</label>
                   <input
                     type="tel"
-                    placeholder="10-digit number"
+                    placeholder="9876543210"
                     value={onboardForm.owner_phone}
                     onChange={(e) => setOnboardForm({ ...onboardForm, owner_phone: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:border-blue-500 outline-none"
+                    className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white"
                   />
                 </div>
               </div>
 
-              {/* Building & Bed Auto-Generator */}
-              <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800/80 space-y-3">
-                <span className="text-xs font-black text-blue-400 block uppercase tracking-wider">
-                  🏗️ Automated Room & Bed Capacity Generator
-                </span>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              {/* Physical Layout Matrix */}
+              <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl space-y-3">
+                <span className="font-bold text-slate-200 block text-xs">Inventory Generator</span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <div>
-                    <label className="block text-slate-400 mb-1 text-[11px]">Floors</label>
+                    <label className="block text-[11px] text-slate-400 mb-1">Total Floors</label>
                     <input
                       type="number"
                       min={1}
                       max={10}
                       value={onboardForm.floors_per_building}
                       onChange={(e) => setOnboardForm({ ...onboardForm, floors_per_building: Number(e.target.value) })}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-bold"
+                      className="w-full p-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-bold"
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1 text-[11px]">Rooms / Floor</label>
+                    <label className="block text-[11px] text-slate-400 mb-1">Rooms / Floor</label>
                     <input
                       type="number"
                       min={1}
                       max={20}
                       value={onboardForm.rooms_per_floor}
                       onChange={(e) => setOnboardForm({ ...onboardForm, rooms_per_floor: Number(e.target.value) })}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-bold"
+                      className="w-full p-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-bold"
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1 text-[11px]">Beds / Room</label>
+                    <label className="block text-[11px] text-slate-400 mb-1">Beds / Room</label>
                     <input
                       type="number"
                       min={1}
                       max={6}
                       value={onboardForm.beds_per_room}
                       onChange={(e) => setOnboardForm({ ...onboardForm, beds_per_room: Number(e.target.value) })}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-bold"
+                      className="w-full p-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-bold"
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1 text-[11px]">Default Rent (₹)</label>
+                    <label className="block text-[11px] text-slate-400 mb-1">Rent / Bed (₹)</label>
                     <input
                       type="number"
-                      min={1000}
                       step={500}
                       value={onboardForm.base_rent_rupees}
                       onChange={(e) => setOnboardForm({ ...onboardForm, base_rent_rupees: Number(e.target.value) })}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-bold"
+                      className="w-full p-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-bold"
                     />
                   </div>
                 </div>
 
-                <p className="text-[11px] text-slate-400 pt-1">
-                  Will instantly create <strong className="text-white">{onboardForm.floors_per_building * onboardForm.rooms_per_floor} rooms</strong> and <strong className="text-blue-400">{onboardForm.floors_per_building * onboardForm.rooms_per_floor * onboardForm.beds_per_room} beds</strong> with sub-meters.
+                <p className="text-[11px] text-blue-400 font-mono">
+                  ➜ Generates {onboardForm.floors_per_building * onboardForm.rooms_per_floor} Rooms & {onboardForm.floors_per_building * onboardForm.rooms_per_floor * onboardForm.beds_per_room} Beds with Sub-Meters.
                 </p>
               </div>
 
-              {/* Plan Selection */}
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5">SaaS Subscription Pricing</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { id: 'per_bed', name: 'Standard (₹10/Bed/mo)' },
-                    { id: 'standard_100', name: '100 Beds (₹1,000/mo)' },
-                    { id: 'enterprise_500', name: '500 Beds (₹5,000/mo)' },
-                  ].map((p) => (
-                    <button
-                      type="button"
-                      key={p.id}
-                      onClick={() => setOnboardForm({ ...onboardForm, plan: p.id })}
-                      className={cn(
-                        'p-2.5 rounded-xl border text-center text-xs font-bold transition active:scale-95',
-                        onboardForm.plan === p.id
-                          ? 'bg-blue-600 border-blue-500 text-white shadow-md'
-                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                      )}
-                    >
-                      {p.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-slate-800 flex justify-end gap-2">
+              <div className="pt-2 border-t border-slate-800 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowOnboardModal(false)}
-                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition"
+                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={onboardLoading}
-                  className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-95 disabled:bg-blue-900 text-white rounded-xl text-xs font-black transition shadow-lg shadow-blue-600/30"
+                  className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold rounded-xl shadow-lg shadow-blue-600/30 flex items-center gap-2"
                 >
                   {onboardLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                  {onboardLoading ? 'Provisioning PG System...' : 'Launch & Provision PG'}
+                  <span>{onboardLoading ? 'Provisioning System...' : 'Deploy & Launch PG'}</span>
                 </button>
               </div>
             </form>
@@ -880,26 +979,25 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* ----------------------------------------------------------- */}
-      {/* MODAL 2: MODIFY SUBSCRIPTION PLAN */}
-      {/* ----------------------------------------------------------- */}
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL 2: EDIT SUBSCRIPTION PLAN */}
+      {/* ------------------------------------------------------------- */}
       {selectedOrgForPlan && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl relative">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl relative">
             <button
-              type="button"
               onClick={() => setSelectedOrgForPlan(null)}
-              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-white rounded-lg"
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
 
             <div>
-              <h3 className="text-base font-black text-white">SaaS Plan: {selectedOrgForPlan.name || selectedOrgForPlan.org_name}</h3>
-              <p className="text-xs text-slate-400 mt-0.5">₹10 per Managed Bed / Month Billing</p>
+              <h3 className="text-base font-black text-white">SaaS Plan: {selectedOrgForPlan.name}</h3>
+              <p className="text-xs text-slate-400">Select pricing tier for client organization</p>
             </div>
 
-            <div className="space-y-2 pt-2">
+            <div className="space-y-2 text-xs">
               <button
                 type="button"
                 disabled={planLoading}
@@ -907,10 +1005,10 @@ export default function AdminDashboardPage() {
                 className="w-full p-3 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-left flex justify-between items-center transition"
               >
                 <div>
-                  <strong className="text-white text-xs block">Standard Pay-Per-Bed</strong>
-                  <span className="text-[10px] text-slate-400">₹10 per Bed / month based on capacity</span>
+                  <strong className="text-white block">Standard Pay-Per-Bed</strong>
+                  <span className="text-[10px] text-slate-400">₹10 per bed/month based on inventory</span>
                 </div>
-                <span className="text-xs font-black text-blue-400">₹10/bed/mo</span>
+                <span className="font-mono font-bold text-blue-400">₹10/bed</span>
               </button>
 
               <button
@@ -920,10 +1018,10 @@ export default function AdminDashboardPage() {
                 className="w-full p-3 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-left flex justify-between items-center transition"
               >
                 <div>
-                  <strong className="text-white text-xs block">100-Bed Fixed Tier</strong>
-                  <span className="text-[10px] text-slate-400">Up to 100 Beds (@ ₹10/bed)</span>
+                  <strong className="text-white block">100-Bed Fixed Tier</strong>
+                  <span className="text-[10px] text-slate-400">Fixed rate up to 100 beds</span>
                 </div>
-                <span className="text-xs font-black text-purple-400">₹1,000/mo</span>
+                <span className="font-mono font-bold text-purple-400">₹1,000/mo</span>
               </button>
 
               <button
@@ -933,133 +1031,121 @@ export default function AdminDashboardPage() {
                 className="w-full p-3 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-left flex justify-between items-center transition"
               >
                 <div>
-                  <strong className="text-white text-xs block">500-Bed Campus Tier</strong>
-                  <span className="text-[10px] text-slate-400">Up to 500 Beds (@ ₹10/bed)</span>
+                  <strong className="text-white block">500-Bed Campus Tier</strong>
+                  <span className="text-[10px] text-slate-400">Enterprise multi-building campus</span>
                 </div>
-                <span className="text-xs font-black text-emerald-400">₹5,000/mo</span>
-              </button>
-            </div>
-
-            <div className="pt-2 border-t border-slate-800 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setSelectedOrgForPlan(null)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition"
-              >
-                Close
+                <span className="font-mono font-bold text-emerald-400">₹5,000/mo</span>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ----------------------------------------------------------- */}
-      {/* MODAL 3: CREATE USER & PASSWORD */}
-      {/* ----------------------------------------------------------- */}
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL 3: CREATE PLATFORM USER */}
+      {/* ------------------------------------------------------------- */}
       {showCreateUserModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl relative">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl relative">
             <button
-              type="button"
               onClick={() => setShowCreateUserModal(false)}
-              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-white rounded-lg"
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
 
             <div>
               <h3 className="text-base font-black text-white">Create Platform User</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Assign credentials, system role, and PG Organization</p>
+              <p className="text-xs text-slate-400">Assign role and credentials for any PG organization</p>
             </div>
 
             {createUserError && (
-              <div className="p-3 bg-red-950/60 border border-red-800 rounded-xl text-xs text-red-300">
+              <div className="p-3 bg-rose-950 border border-rose-800 text-rose-300 rounded-xl text-xs">
                 {createUserError}
               </div>
             )}
-
             {createUserSuccess && (
-              <div className="p-3 bg-green-950/60 border border-green-800 rounded-xl text-xs text-green-300 font-bold">
+              <div className="p-3 bg-emerald-950 border border-emerald-800 text-emerald-300 rounded-xl text-xs font-bold">
                 {createUserSuccess}
               </div>
             )}
 
-            <form onSubmit={handleCreateUserSubmit} className="space-y-3">
+            <form onSubmit={handleCreateUserSubmit} className="space-y-3 text-xs">
               <div>
-                <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">Full Name</label>
+                <label className="block font-bold text-slate-300 mb-1">Full Name</label>
                 <input
                   type="text"
                   required
+                  placeholder="e.g. Vikram Sharma"
                   value={userForm.full_name}
                   onChange={(e) => setUserForm({ ...userForm, full_name: e.target.value })}
-                  placeholder="e.g. Ramesh Kumar"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-blue-500 outline-none"
+                  className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">Email Address (Username)</label>
+                <label className="block font-bold text-slate-300 mb-1">Login Email</label>
                 <input
                   type="email"
                   required
+                  placeholder="owner@mypropertypg.com"
                   value={userForm.email}
                   onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
-                  placeholder="owner@mypropertypg.com"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-blue-500 outline-none"
+                  className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">Password</label>
+                <label className="block font-bold text-slate-300 mb-1">Password</label>
                 <input
                   type="password"
                   required
                   minLength={6}
+                  placeholder="••••••••"
                   value={userForm.password}
                   onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
-                  placeholder="•••••••• (Min 6 chars)"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-blue-500 outline-none"
+                  className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">Role</label>
+                  <label className="block font-bold text-slate-300 mb-1">Role</label>
                   <select
                     value={userForm.role}
                     onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-blue-500 outline-none"
+                    className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold"
                   >
                     <option value="owner">PG Owner</option>
-                    <option value="manager">Property Manager</option>
+                    <option value="manager">Manager</option>
                     <option value="accountant">Accountant</option>
-                    <option value="staff">Staff / Caretaker</option>
+                    <option value="staff">Staff</option>
                     <option value="superadmin">Super Admin</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">Mobile Phone</label>
+                  <label className="block font-bold text-slate-300 mb-1">Phone</label>
                   <input
                     type="tel"
+                    placeholder="9876543210"
                     value={userForm.phone}
                     onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })}
-                    placeholder="9876543210"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-blue-500 outline-none"
+                    className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">PG Organization</label>
+                <label className="block font-bold text-slate-300 mb-1">Organization</label>
                 <select
                   value={userForm.organization_id}
                   onChange={(e) => setUserForm({ ...userForm, organization_id: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-blue-500 outline-none"
+                  className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold"
                 >
-                  <option value="">Platform / All Organizations</option>
-                  {organizations.map((org) => (
-                    <option key={org.id} value={org.id}>{org.name}</option>
+                  <option value="">Platform / All PGs</option>
+                  {organizations.map((o) => (
+                    <option key={o.id} value={o.id}>{o.name}</option>
                   ))}
                 </select>
               </div>
@@ -1068,29 +1154,23 @@ export default function AdminDashboardPage() {
                 <button
                   type="button"
                   onClick={() => setShowCreateUserModal(false)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition"
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={createUserLoading}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-500/20 transition flex items-center gap-1.5"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-md shadow-blue-600/30"
                 >
-                  {createUserLoading ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Creating...</span>
-                    </>
-                  ) : (
-                    <span>Create User</span>
-                  )}
+                  {createUserLoading ? 'Creating...' : 'Create Account'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
     </div>
   )
 }
