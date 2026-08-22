@@ -54,12 +54,11 @@ export async function POST(request: NextRequest) {
     if (!authError && authUser?.user) {
       userId = authUser.user.id
     } else {
-      // If user exists in Auth, update password
       const { data: existingUsers } = await supabase.auth.admin.listUsers()
-      const found = existingUsers?.users?.find((u) => u.email?.toLowerCase() === cleanEmail)
-      if (found) {
+      const found = existingUsers?.users?.find((u: any) => u.email?.toLowerCase() === cleanEmail)
+      if (found && found.id) {
         userId = found.id
-        await supabase.auth.admin.updateUserById(userId, {
+        await supabase.auth.admin.updateUserById(found.id, {
           password,
           user_metadata: { full_name, role },
         })

@@ -1,10 +1,9 @@
-import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
-  // Fast-path bypass for static files and public routes
+  // Fast-path bypass for static files, landing page, and public routes
   const isPublicRoute =
     pathname === '/' ||
     pathname.startsWith('/login') ||
@@ -14,50 +13,18 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/reset-password') ||
     pathname.startsWith('/api/')
 
-  let supabaseResponse = NextResponse.next({ request })
-
   if (isPublicRoute) {
-    return supabaseResponse
+    return NextResponse.next({ request })
   }
 
-  // Check custom session cookies
+  // Check Firebase and session cookies
   const authEmail = request.cookies.get('auth_email')?.value
   const authToken = request.cookies.get('auth_token')?.value
   const firebaseUserId = request.cookies.get('firebase_user_id')?.value
 
   if (authEmail || authToken || firebaseUserId) {
-    return supabaseResponse
+    return NextResponse.next({ request })
   }
-
-  // Check Supabase session
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://rygtyzwkhcuiwxzqmmlo.supabase.co'
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || ''
-
-  try {
-    const supabase = createServerClient(
-      url,
-      key,
-      {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll()
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-            supabaseResponse = NextResponse.next({ request })
-            cookiesToSet.forEach(({ name, value, options }) =>
-              supabaseResponse.cookies.set(name, value, options)
-            )
-          },
-        },
-      }
-    )
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      return supabaseResponse
-    }
-  } catch {}
 
   // Not authenticated -> redirect to login
   const redirectUrl = request.nextUrl.clone()
