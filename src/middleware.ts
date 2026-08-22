@@ -54,7 +54,7 @@ export async function middleware(request: NextRequest) {
   // If already logged in and visiting login/register, redirect to appropriate home
   if (isAuthenticated && (pathname === '/login' || pathname === '/register')) {
     const targetUrl = request.nextUrl.clone()
-    targetUrl.pathname = isSuperAdmin ? '/admin' : '/dashboard'
+    targetUrl.pathname = isSuperAdmin ? '/superman' : '/dashboard'
     return NextResponse.redirect(targetUrl)
   }
 
@@ -72,8 +72,8 @@ export async function middleware(request: NextRequest) {
     return response
   }
 
-  // Protect /admin routes (Super Admin only)
-  if (pathname.startsWith('/admin')) {
+  // Protect /superman and /admin routes (Super Admin only)
+  if (pathname.startsWith('/superman') || pathname.startsWith('/admin')) {
     if (!isAuthenticated) {
       const redirectUrl = request.nextUrl.clone()
       redirectUrl.pathname = '/login'

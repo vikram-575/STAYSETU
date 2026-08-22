@@ -79,7 +79,7 @@ export default function AppSidebar({ role, orgName }: Props) {
       {isSuperAdmin && (
         <div className="p-3 bg-gradient-to-r from-slate-900 to-indigo-950 border-b border-slate-800">
           <Link
-            href="/admin"
+            href="/superman"
             className="flex items-center justify-between p-2.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-white transition group"
           >
             <div className="flex items-center gap-2">
