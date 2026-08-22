@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import AppSidebar from '@/components/layout/app-sidebar'
 import AppHeader from '@/components/layout/app-header'
 import MobileBottomNav from '@/components/layout/mobile-bottom-nav'
+import { FirebaseProvider } from '@/components/FirebaseProvider'
 
 export default async function DashboardLayout({
   children,
@@ -40,15 +41,24 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      <AppSidebar role={profile.role} orgName={profile.organizations?.name ?? 'PG-SETU Management'} />
-      <div className="flex-1 flex flex-col min-w-0 w-full overflow-hidden">
-        <AppHeader user={profile as any} />
-        <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 pb-28 md:pb-6">
-          {children}
-        </main>
-        <MobileBottomNav />
+    <FirebaseProvider
+      orgId={profile.organization_id || undefined}
+      userProfile={{
+        id: profile.id,
+        name: profile.full_name,
+        role: profile.role,
+      }}
+    >
+      <div className="flex h-screen bg-gray-50 overflow-hidden">
+        <AppSidebar role={profile.role} orgName={profile.organizations?.name ?? 'PG-SETU Management'} />
+        <div className="flex-1 flex flex-col min-w-0 w-full overflow-hidden">
+          <AppHeader user={profile as any} />
+          <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 pb-28 md:pb-6">
+            {children}
+          </main>
+          <MobileBottomNav />
+        </div>
       </div>
-    </div>
+    </FirebaseProvider>
   )
 }

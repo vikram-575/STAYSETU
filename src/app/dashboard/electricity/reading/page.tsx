@@ -9,6 +9,7 @@ import {
   Users, Calculator, Loader2
 } from 'lucide-react'
 import { formatCurrency, rupeesToPaise } from '@/lib/money'
+import { FirebaseFileUploader } from '@/components/ui/firebase-file-uploader'
 
 export default function RecordElectricityReadingPage() {
   const router = useRouter()
@@ -27,6 +28,7 @@ export default function RecordElectricityReadingPage() {
   const [currentReading, setCurrentReading] = useState(0)
   const [ratePerUnitRupees, setRatePerUnitRupees] = useState(8)
   const [isMeterReset, setIsMeterReset] = useState(false)
+  const [meterPhotoUrl, setMeterPhotoUrl] = useState('')
   const [notes, setNotes] = useState('')
   const [roomResidents, setRoomResidents] = useState<any[]>([])
 
@@ -251,6 +253,14 @@ export default function RecordElectricityReadingPage() {
             </div>
           )}
         </div>
+
+        <FirebaseFileUploader
+          label="Upload Sub-Meter Snapshot Photo (Firebase Cloud Storage)"
+          storagePath={`meters/${selectedMeterId || 'general'}`}
+          accept="image/*"
+          currentUrl={meterPhotoUrl}
+          onUploadSuccess={(url) => setMeterPhotoUrl(url)}
+        />
 
         <div>
           <label className="block text-xs font-bold text-gray-700 mb-1">Notes / Remarks</label>

@@ -9,6 +9,7 @@ import {
   Building2, BedDouble, Shield, FileText, Loader2, DollarSign
 } from 'lucide-react'
 import { formatCurrency, rupeesToPaise } from '@/lib/money'
+import { FirebaseFileUploader } from '@/components/ui/firebase-file-uploader'
 
 export default function CheckInResidentPage() {
   const router = useRouter()
@@ -45,6 +46,7 @@ export default function CheckInResidentPage() {
     // Step 3: ID Proof
     id_type: 'aadhaar',
     id_number: '',
+    kyc_doc_url: '',
     notes: '',
     // Step 4: Assignment
     property_id: '',
@@ -481,6 +483,14 @@ export default function CheckInResidentPage() {
                   value={form.id_number}
                   onChange={(e) => setForm({ ...form, id_number: e.target.value })}
                   className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-mono font-bold"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <FirebaseFileUploader
+                  label="Upload KYC Identity Document (Firebase Cloud Storage)"
+                  storagePath={`kyc/${form.property_id || 'general'}/${form.phone || 'resident'}`}
+                  currentUrl={form.kyc_doc_url}
+                  onUploadSuccess={(url) => setForm((prev) => ({ ...prev, kyc_doc_url: url }))}
                 />
               </div>
               <div className="sm:col-span-2">
