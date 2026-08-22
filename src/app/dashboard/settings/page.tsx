@@ -2,22 +2,36 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
 import {
   Settings, Building2, Shield, Users, DollarSign,
-  Sparkles, CheckCircle2, Loader2, Database, AlertTriangle
+  Sparkles, CheckCircle2, Loader2, Database, AlertTriangle,
+  User, Lock, Save, Trash2, Download, LogOut, Plus, QrCode,
+  Check, Phone, Mail, MapPin, Building
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export default function SettingsPage() {
   const supabase = createClient()
+  const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [seeding, setSeeding] = useState(false)
-  const [seedSuccess, setSeedSuccess] = useState('')
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [activeTab, setActiveTab] = useState<'profile' | 'account' | 'staff' | 'data'>('profile')
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'catalog' | 'data'>('profile')
+  // User Profile
+  const [userProfile, setUserProfile] = useState<any>({
+    id: '',
+    full_name: '',
+    email: '',
+    phone: '',
+    role: 'owner',
+  })
 
+  // Organization Data
   const [org, setOrg] = useState<any>({
+    id: '',
     name: '',
     phone: '',
     email: '',
@@ -26,10 +40,29 @@ export default function SettingsPage() {
     state: '',
     gst_enabled: false,
     gstin: '',
+    upi_id: '',
   })
 
+  // Password Update
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordLoading, setPasswordLoading] = useState(false)
+
+  // Staff list
+  const [staffUsers, setStaffUsers] = useState<any[]>([])
+  const [showAddStaffModal, setShowAddStaffModal] = useState(false)
+  const [staffForm, setStaffForm] = useState({
+    full_name: '',
+    email: '',
+    password: '',
+    phone: '',
+    role: 'manager',
+  })
+  const [staffLoading, setStaffLoading] = useState(false)
+
+  // Load Organization & User Profile
   useEffect(() => {
-    async function loadOrg() {
+    async function loadData() {
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
@@ -39,182 +72,403 @@ export default function SettingsPage() {
             .eq('id', user.id)
             .single()
 
-          if (profile?.organizations) {
-            setOrg(profile.organizations)
-            setLoading(false)
-            return
+          if (profile) {
+            setUserProfile({
+              id: profile.id,
+              full_name: profile.full_name || '',
+              email: profile.email || user.email || '',
+              phone: profile.phone || '',
+              role: profile.role || 'owner',
+            })
+
+            if (profile.organizations) {
+              setOrg({
+                id: profile.organizations.id,
+                name: profile.organizations.name || '',
+                phone: profile.organizations.phone || '',
+                email: profile.organizations.email || '',
+                address: profile.organizations.address || '',
+                city: profile.organizations.city || '',
+                state: profile.organizations.state || '',
+                gst_enabled: !!profile.organizations.gst_enabled,
+                gstin: profile.organizations.gstin || '',
+                upi_id: (profile.organizations.settings as any)?.upi_id || '',
+              })
+            }
           }
         }
 
-        // Fallback fetch from organizations endpoint
-        const res = await fetch('/api/admin/organizations')
-        const data = await res.json()
-        if (data?.organizations && data.organizations.length > 0) {
-          setOrg(data.organizations[0])
+        // Fetch staff users
+        const { data: users } = await supabase
+          .from('users')
+          .select('*')
+          .order('created_at', { ascending: false })
+
+        if (users) {
+          setStaffUsers(users)
         }
-      } catch {}
-      setLoading(false)
+      } catch (err: any) {
+        console.error('Failed to load profile settings', err)
+      } finally {
+        setLoading(false)
+      }
     }
-    loadOrg()
+    loadData()
   }, [supabase])
 
+  // Save Business Profile
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
     setError('')
+    setSuccess('')
 
-    const { error: updateError } = await supabase
-      .from('organizations')
-      .update({
-        name: org.name,
-        phone: org.phone,
-        email: org.email,
-        address: org.address,
-        city: org.city,
-        state: org.state,
-        gst_enabled: org.gst_enabled,
-        gstin: org.gstin,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', org.id)
+    try {
+      if (org.id) {
+        const { error: updateError } = await supabase
+          .from('organizations')
+          .update({
+            name: org.name,
+            phone: org.phone || null,
+            email: org.email || null,
+            address: org.address || null,
+            city: org.city || null,
+            state: org.state || null,
+            gst_enabled: org.gst_enabled,
+            gstin: org.gstin || null,
+            settings: {
+              upi_id: org.upi_id || undefined,
+            },
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', org.id)
 
-    setSaving(false)
-    if (updateError) setError(updateError.message)
-    else alert('Organization settings updated successfully!')
+        if (updateError) throw updateError
+      }
+
+      setSuccess('Organization profile and billing settings saved successfully!')
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (err: any) {
+      setError(err.message || 'Failed to save settings')
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const handleSeedDemoData = async () => {
-    if (!confirm('This will populate sample buildings, rooms, beds, residents, invoices, and payments for testing. Proceed?')) {
+  // Update Account Password
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (newPassword.length < 6) {
+      setError('Password must be at least 6 characters.')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match.')
       return
     }
 
-    setSeeding(true)
-    setSeedSuccess('')
+    setPasswordLoading(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      const { error: pwdError } = await supabase.auth.updateUser({ password: newPassword })
+      if (pwdError) throw pwdError
+      setSuccess('Password updated successfully!')
+      setNewPassword('')
+      setConfirmPassword('')
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (err: any) {
+      setError(err.message || 'Failed to update password')
+    } finally {
+      setPasswordLoading(false)
+    }
+  }
+
+  // Create Staff User
+  const handleCreateStaff = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setStaffLoading(true)
     setError('')
 
     try {
-      const res = await fetch('/api/dev/seed', { method: 'POST' })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to seed demo data')
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...staffForm,
+          organization_id: org.id || undefined,
+        }),
+      })
 
-      setSeedSuccess('Demo data populated successfully! Refresh or visit Dashboard to see live metrics.')
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to create staff account')
+
+      setSuccess(`Staff account for ${staffForm.email} created!`)
+      setShowAddStaffModal(false)
+      setStaffForm({ full_name: '', email: '', password: '', phone: '', role: 'manager' })
+
+      // Reload staff
+      const { data: users } = await supabase.from('users').select('*').order('created_at', { ascending: false })
+      if (users) setStaffUsers(users)
     } catch (err: any) {
       setError(err.message)
     } finally {
-      setSeeding(false)
+      setStaffLoading(false)
     }
+  }
+
+  // Wipe Test Data / Production Reset
+  const handlePurgeTestData = async () => {
+    if (!confirm('Are you sure you want to wipe test transactions and reset bed occupancy to vacant? This cannot be undone.')) {
+      return
+    }
+
+    setSaving(true)
+    try {
+      const res = await fetch('/api/admin/purge-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organization_id: org.id,
+          wipe_all: false,
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to purge test data')
+      alert('All mock transactions and invoices have been wiped clean!')
+      router.push('/dashboard')
+      router.refresh()
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSignOut = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+      await supabase.auth.signOut()
+    } catch {}
+    router.push('/login')
+    router.refresh()
   }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64 text-sm text-gray-500">
-        <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading settings...
+      <div className="flex items-center justify-center h-64 text-sm text-slate-500">
+        <Loader2 className="w-5 h-5 animate-spin mr-2 text-blue-600" /> Loading profile settings...
       </div>
     )
   }
 
   return (
-    <div className="max-w-4xl space-y-4 sm:space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">System Settings & Configuration</h1>
-        <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
-          Organization profile · Billing & GST preferences · Test seed data
-        </p>
-      </div>
+    <div className="max-w-4xl mx-auto space-y-5 pb-20">
+      
+      {/* 1. Executive Profile Hero Card */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-black text-xl flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0">
+            {userProfile.full_name?.charAt(0)?.toUpperCase() || userProfile.email?.charAt(0)?.toUpperCase() || 'P'}
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base sm:text-lg font-black text-slate-900 leading-tight tracking-tight">
+                {userProfile.full_name || 'PG Owner Profile'}
+              </h1>
+              <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-extrabold border border-blue-200/60 uppercase">
+                {userProfile.role}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">{userProfile.email}</p>
+            <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+              🏢 {org.name || 'PG-SETU Accommodation'}
+            </p>
+          </div>
+        </div>
 
-      {/* Tabs with horizontal scroll */}
-      <div className="overflow-x-auto pb-1 scrollbar-none">
-        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl text-xs font-bold w-max">
+        {/* Quick Action Buttons */}
+        <div className="flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
           <button
-            onClick={() => setActiveTab('profile')}
-            className={`px-3.5 py-1.5 rounded-lg transition whitespace-nowrap ${
-              activeTab === 'profile' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-600 hover:text-gray-900'
-            }`}
+            type="button"
+            onClick={handleSignOut}
+            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs transition active:scale-95"
           >
-            PG Profile & GST
-          </button>
-          <button
-            onClick={() => setActiveTab('data')}
-            className={`px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'data' ? 'bg-white text-red-700 shadow-xs' : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <Database className="w-3.5 h-3.5" /> Data & Production Clean
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Sign Out</span>
           </button>
         </div>
       </div>
 
+      {/* 2. Navigation Tabs */}
+      <div className="overflow-x-auto pb-1 scrollbar-none">
+        <div className="flex items-center gap-1.5 bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200/80 w-max">
+          <button
+            type="button"
+            onClick={() => setActiveTab('profile')}
+            className={cn(
+              'px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap active:scale-95',
+              activeTab === 'profile' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            )}
+          >
+            <Building2 className="w-3.5 h-3.5" /> PG Profile & GST
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('account')}
+            className={cn(
+              'px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap active:scale-95',
+              activeTab === 'account' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            )}
+          >
+            <User className="w-3.5 h-3.5" /> Account & Password
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('staff')}
+            className={cn(
+              'px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap active:scale-95',
+              activeTab === 'staff' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            )}
+          >
+            <Users className="w-3.5 h-3.5" /> Staff & Roles ({staffUsers.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('data')}
+            className={cn(
+              'px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap active:scale-95',
+              activeTab === 'data' ? 'bg-rose-600 text-white shadow-sm' : 'text-rose-700 hover:bg-rose-50'
+            )}
+          >
+            <Database className="w-3.5 h-3.5" /> Clean Fake / Test Data
+          </button>
+        </div>
+      </div>
+
+      {/* Notifications / Alerts */}
       {error && (
-        <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium">
-          {error}
+        <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-semibold flex items-center gap-2 animate-in fade-in">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+      {success && (
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-700 font-bold flex items-center gap-2 animate-in fade-in">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{success}</span>
         </div>
       )}
 
-      {/* Profile Form */}
+      {/* ------------------------------------------------------------------ */}
+      {/* TAB 1: PG BUSINESS PROFILE & GST */}
+      {/* ------------------------------------------------------------------ */}
       {activeTab === 'profile' && (
-        <form onSubmit={handleSaveProfile} className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-5">
-          <h2 className="text-sm sm:text-base font-bold text-gray-900 border-b border-gray-100 pb-3">Organization Profile</h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
+        <form onSubmit={handleSaveProfile} className="bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">PG Organization Name *</label>
+              <h2 className="text-sm sm:text-base font-bold text-slate-900">Organization & Property Profile</h2>
+              <p className="text-xs text-slate-500">Business identity shown on invoices, receipts & tenant passbooks</p>
+            </div>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 disabled:bg-blue-300 text-white rounded-xl text-xs font-bold transition shadow-sm"
+            >
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              <span>Save Changes</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">PG Business / Property Name *</label>
               <input
                 type="text"
                 required
+                placeholder="e.g. Sai Executive PG"
                 value={org.name || ''}
                 onChange={(e) => setOrg({ ...org, name: e.target.value })}
-                className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+                className="w-full px-3.5 py-2.5 text-xs bg-slate-50/70 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-500 outline-none font-bold text-slate-900"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Official Mobile Phone</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Official Contact Phone</label>
               <input
                 type="tel"
+                placeholder="e.g. +91 98765 43210"
                 value={org.phone || ''}
                 onChange={(e) => setOrg({ ...org, phone: e.target.value })}
-                className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full px-3.5 py-2.5 text-xs bg-slate-50/70 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-500 outline-none font-bold text-slate-900"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Official Email</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Official Billing Email</label>
               <input
                 type="email"
+                placeholder="e.g. contact@saipg.com"
                 value={org.email || ''}
                 onChange={(e) => setOrg({ ...org, email: e.target.value })}
-                className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full px-3.5 py-2.5 text-xs bg-slate-50/70 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-500 outline-none font-bold text-slate-900"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">City / Location</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">UPI ID (For Instant Tenant Rent QR)</label>
               <input
                 type="text"
+                placeholder="e.g. saiexecutive@upi"
+                value={org.upi_id || ''}
+                onChange={(e) => setOrg({ ...org, upi_id: e.target.value })}
+                className="w-full px-3.5 py-2.5 text-xs bg-slate-50/70 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-500 outline-none font-bold text-slate-900"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">City / Location</label>
+              <input
+                type="text"
+                placeholder="e.g. Pune"
                 value={org.city || ''}
                 onChange={(e) => setOrg({ ...org, city: e.target.value })}
-                className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full px-3.5 py-2.5 text-xs bg-slate-50/70 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-500 outline-none font-bold text-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">State</label>
+              <input
+                type="text"
+                placeholder="e.g. Maharashtra"
+                value={org.state || ''}
+                onChange={(e) => setOrg({ ...org, state: e.target.value })}
+                className="w-full px-3.5 py-2.5 text-xs bg-slate-50/70 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-500 outline-none font-bold text-slate-900"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1">Full Property Address</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Full Property Address</label>
             <textarea
               rows={2}
+              placeholder="Enter building number, street, area and landmark"
               value={org.address || ''}
               onChange={(e) => setOrg({ ...org, address: e.target.value })}
-              className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-3.5 py-2.5 text-xs bg-slate-50/70 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-500 outline-none font-bold text-slate-900"
             />
           </div>
 
-          {/* GST Configuration (Optional) */}
-          <div className="p-3.5 sm:p-4 bg-gray-50 border border-gray-200 rounded-xl sm:rounded-2xl space-y-3">
+          {/* GST Configuration */}
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs font-bold text-gray-900 block">GST / Tax Invoicing (Optional)</span>
-                <span className="text-[11px] text-gray-500">Enable GST tax calculations on bills & invoices</span>
+                <span className="text-xs font-bold text-slate-900 block">GST / Tax Invoicing (Optional)</span>
+                <span className="text-[11px] text-slate-500">Calculate 18% GST on room and commercial invoices</span>
               </div>
               <input
                 type="checkbox"
@@ -226,129 +480,275 @@ export default function SettingsPage() {
 
             {org.gst_enabled && (
               <div className="pt-2">
-                <label className="block text-xs font-bold text-gray-700 mb-1">GSTIN Number</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">GSTIN Registration Number</label>
                 <input
                   type="text"
                   placeholder="e.g. 27ABCDE1234F1Z5"
                   value={org.gstin || ''}
                   onChange={(e) => setOrg({ ...org, gstin: e.target.value })}
-                  className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl bg-white font-mono uppercase font-bold"
+                  className="w-full px-3.5 py-2.5 text-xs border border-slate-200 rounded-xl bg-white font-mono uppercase font-bold"
                 />
               </div>
             )}
           </div>
 
-          <div className="pt-3 border-t border-gray-100 flex justify-end">
+          {/* Bottom Action Strip */}
+          <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <p className="text-[11px] text-slate-400">All changes apply in real-time across invoices & tenant portal</p>
             <button
               type="submit"
               disabled={saving}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 disabled:bg-blue-400 text-white rounded-xl text-xs font-bold transition shadow-xs"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 disabled:bg-blue-400 text-white rounded-xl text-xs font-bold transition shadow-sm"
             >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-              {saving ? 'Saving...' : 'Save Settings'}
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              <span>Save Settings</span>
             </button>
           </div>
         </form>
       )}
 
-      {/* Data Management & Purge Tab */}
-      {activeTab === 'data' && (
-        <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-5">
-          <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-            <Database className="w-5 h-5 text-red-600 shrink-0" />
+      {/* ------------------------------------------------------------------ */}
+      {/* TAB 2: USER ACCOUNT & PASSWORD */}
+      {/* ------------------------------------------------------------------ */}
+      {activeTab === 'account' && (
+        <form onSubmit={handleUpdatePassword} className="bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] space-y-4">
+          <div className="border-b border-slate-100 pb-3">
+            <h2 className="text-sm sm:text-base font-bold text-slate-900">Personal Account & Security</h2>
+            <p className="text-xs text-slate-500">Update your login password and security settings</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
-              <h2 className="text-sm sm:text-base font-bold text-gray-900">Data Management & Production Reset</h2>
-              <p className="text-[11px] sm:text-xs text-gray-500">
-                Purge mock/test transactions or reset your organization to clean production mode.
-              </p>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Full Name</label>
+              <input
+                type="text"
+                disabled
+                value={userProfile.full_name || 'PG Owner'}
+                className="w-full px-3.5 py-2.5 text-xs bg-slate-100 border border-slate-200 rounded-xl text-slate-600 font-bold cursor-not-allowed"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Login Email</label>
+              <input
+                type="email"
+                disabled
+                value={userProfile.email}
+                className="w-full px-3.5 py-2.5 text-xs bg-slate-100 border border-slate-200 rounded-xl text-slate-600 font-bold cursor-not-allowed"
+              />
             </div>
           </div>
 
-          {seedSuccess && (
-            <div className="p-3.5 sm:p-4 bg-green-50 border border-green-200 rounded-xl text-xs text-green-800 font-semibold flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
-              {seedSuccess}
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+            <span className="text-xs font-bold text-slate-800 block">Change Password</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">New Password</label>
+                <input
+                  type="password"
+                  placeholder="Min 6 characters"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-200 rounded-xl focus:border-blue-500 outline-none font-bold"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">Confirm New Password</label>
+                <input
+                  type="password"
+                  placeholder="Re-type password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-200 rounded-xl focus:border-blue-500 outline-none font-bold"
+                />
+              </div>
             </div>
-          )}
+          </div>
 
-          <div className="p-4 bg-red-50 border border-red-200 rounded-xl sm:rounded-2xl space-y-2 text-xs text-red-950">
-            <p className="font-black text-red-700">⚠️ Production Launch & Data Purge Options</p>
-            <p className="text-red-800 text-[11px] sm:text-xs">
-              When transitioning to live production, you can wipe test records so you start with 0 residents, 0 dummy invoices, and accurate financial reporting.
+          <div className="pt-3 border-t border-slate-100 flex justify-end">
+            <button
+              type="submit"
+              disabled={passwordLoading || !newPassword}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 disabled:bg-blue-300 text-white rounded-xl text-xs font-bold transition shadow-sm"
+            >
+              {passwordLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
+              <span>Update Password</span>
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* ------------------------------------------------------------------ */}
+      {/* TAB 3: STAFF & USER MANAGEMENT */}
+      {/* ------------------------------------------------------------------ */}
+      {activeTab === 'staff' && (
+        <div className="bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div>
+              <h2 className="text-sm sm:text-base font-bold text-slate-900">Staff & Team Permissions</h2>
+              <p className="text-xs text-slate-500">Manage property managers, caretakers, and accountants</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowAddStaffModal(true)}
+              className="flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold transition shadow-sm"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Add Staff Member</span>
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead className="text-[10px] text-slate-400 uppercase bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="p-3">Staff Name</th>
+                  <th className="p-3">Email Address</th>
+                  <th className="p-3">Phone</th>
+                  <th className="p-3">Assigned Role</th>
+                  <th className="p-3">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
+                {staffUsers.map((u) => (
+                  <tr key={u.id} className="hover:bg-slate-50/60">
+                    <td className="p-3 font-bold text-slate-900">{u.full_name || 'Staff User'}</td>
+                    <td className="p-3 text-slate-600">{u.email}</td>
+                    <td className="p-3 text-slate-500">{u.phone || '—'}</td>
+                    <td className="p-3">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-blue-50 text-blue-700 border border-blue-200">
+                        {u.role}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold text-emerald-700 bg-emerald-50">
+                        Active
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------------ */}
+      {/* TAB 4: CLEAN FAKE / TEST DATA (PRODUCTION RESET) */}
+      {/* ------------------------------------------------------------------ */}
+      {activeTab === 'data' && (
+        <div className="bg-white rounded-2xl border border-rose-200 p-5 sm:p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] space-y-4">
+          <div className="border-b border-slate-100 pb-3">
+            <h2 className="text-sm sm:text-base font-black text-rose-700 flex items-center gap-2">
+              <Database className="w-4 h-4 text-rose-600" />
+              <span>Clean Fake / Mock Test Data (Production Reset)</span>
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Wipe out test transactions, mock resident records, and reset bed occupancy to 100% vacant for clean live production use.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-            <div className="p-4 border border-gray-200 rounded-xl space-y-2">
-              <h3 className="font-bold text-xs text-gray-900">1. Purge Test Transactions & Residents</h3>
-              <p className="text-[11px] text-gray-500">
-                Wipes all test residents, invoices, payments, and ledger logs. Keeps your rooms and beds intact and marks them 100% available for live check-ins.
-              </p>
-              <button
-                type="button"
-                disabled={seeding}
-                onClick={async () => {
-                  if (!confirm('Are you sure you want to purge all test residents, invoices, and payments? This cannot be undone.')) return
-                  setSeeding(true)
-                  setSeedSuccess('')
-                  setError('')
-                  try {
-                    const res = await fetch('/api/admin/purge-data', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ wipe_all: false }),
-                    })
-                    const data = await res.json()
-                    if (!res.ok) throw new Error(data.error || 'Failed to purge data')
-                    setSeedSuccess(data.message)
-                  } catch (err: any) {
-                    setError(err.message)
-                  } finally {
-                    setSeeding(false)
-                  }
-                }}
-                className="w-full mt-2 py-2.5 px-3 bg-red-600 hover:bg-red-700 active:scale-95 disabled:bg-red-300 text-white rounded-xl text-xs font-bold transition shadow-xs"
-              >
-                {seeding ? 'Purging...' : 'Purge Test Transactions'}
-              </button>
+          <div className="p-4 bg-rose-50/60 border border-rose-200 rounded-2xl space-y-3">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-xs font-black text-rose-900">What will this do?</h3>
+                <ul className="text-xs text-rose-800 space-y-1 mt-1 list-disc list-inside">
+                  <li>Deletes all mock invoices, charges, and test payments.</li>
+                  <li>Resets all occupied beds back to <strong>Available</strong>.</li>
+                  <li>Wipes mock resident records so you start with <strong>0 residents & ₹0 revenue</strong>.</li>
+                  <li>Preserves your PG Organization profile, buildings, rooms, and beds intact.</li>
+                </ul>
+              </div>
             </div>
 
-            <div className="p-4 border border-gray-200 rounded-xl space-y-2">
-              <h3 className="font-bold text-xs text-gray-900">2. Complete Organization Reset</h3>
-              <p className="text-[11px] text-gray-500">
-                Wipes everything including properties, rooms, beds, and records, giving you a completely blank organization ready for custom onboarding.
-              </p>
+            <div className="pt-3 border-t border-rose-200 flex flex-col sm:flex-row gap-2">
               <button
                 type="button"
-                disabled={seeding}
-                onClick={async () => {
-                  if (!confirm('WARNING: This will completely delete ALL properties, rooms, beds, residents, and financial records for this organization. Proceed?')) return
-                  setSeeding(true)
-                  setSeedSuccess('')
-                  setError('')
-                  try {
-                    const res = await fetch('/api/admin/purge-data', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ wipe_all: true }),
-                    })
-                    const data = await res.json()
-                    if (!res.ok) throw new Error(data.error || 'Failed to purge data')
-                    setSeedSuccess(data.message)
-                  } catch (err: any) {
-                    setError(err.message)
-                  } finally {
-                    setSeeding(false)
-                  }
-                }}
-                className="w-full mt-2 py-2.5 px-3 bg-gray-900 hover:bg-black active:scale-95 disabled:bg-gray-400 text-white rounded-xl text-xs font-bold transition shadow-xs"
+                onClick={handlePurgeTestData}
+                disabled={saving}
+                className="flex-1 py-3 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-2"
               >
-                {seeding ? 'Resetting...' : 'Complete Reset to Blank'}
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                <span>Wipe All Test Data & Reset to Clean 0</span>
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Modal: Add Staff Member */}
+      {showAddStaffModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl relative">
+            <h3 className="text-base font-black text-slate-900">Add Staff Account</h3>
+            <form onSubmit={handleCreateStaff} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Ramesh Caretaker"
+                  value={staffForm.full_name}
+                  onChange={(e) => setStaffForm({ ...staffForm, full_name: e.target.value })}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold"
+                />
+              </div>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="staff@pg.com"
+                  value={staffForm.email}
+                  onChange={(e) => setStaffForm({ ...staffForm, email: e.target.value })}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold"
+                />
+              </div>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Password</label>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  placeholder="••••••••"
+                  value={staffForm.password}
+                  onChange={(e) => setStaffForm({ ...staffForm, password: e.target.value })}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold"
+                />
+              </div>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Role</label>
+                <select
+                  value={staffForm.role}
+                  onChange={(e) => setStaffForm({ ...staffForm, role: e.target.value })}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold"
+                >
+                  <option value="manager">Property Manager</option>
+                  <option value="accountant">Accountant</option>
+                  <option value="staff">Staff / Caretaker</option>
+                </select>
+              </div>
+              <div className="pt-2 border-t border-slate-100 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddStaffModal(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={staffLoading}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl"
+                >
+                  {staffLoading ? 'Creating...' : 'Create Account'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
