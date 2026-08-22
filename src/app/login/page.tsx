@@ -143,7 +143,18 @@ export default function LoginPage() {
           </Link>
         </div>
 
-        <p className="text-center text-[11px] text-gray-400 mt-6 font-medium">
+        {/* Company Admin Command Center Link */}
+        <div className="mt-3 text-center">
+          <Link
+            href="/superman/login"
+            className="text-[11.5px] font-semibold text-slate-500 hover:text-slate-900 transition inline-flex items-center gap-1.5 py-1 px-3 rounded-full hover:bg-slate-100/80"
+          >
+            <span>🛡️ Platform Super Admin Access</span>
+            <span>→</span>
+          </Link>
+        </div>
+
+        <p className="text-center text-[11px] text-gray-400 mt-4 font-medium">
           © 2026 PG-SETU. All data encrypted and secured.
         </p>
       </div>

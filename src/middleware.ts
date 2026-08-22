@@ -51,8 +51,14 @@ export async function middleware(request: NextRequest) {
   const isAuthenticated = Boolean(user || authEmail || authToken)
   const isSuperAdmin = authRole === 'superadmin' || authEmail === 'vikramtomar0505@gmail.com'
 
-  // If already logged in and visiting login/register, redirect to appropriate home
-  if (isAuthenticated && (pathname === '/login' || pathname === '/register')) {
+  // If already logged in and visiting login/register/superman-login, redirect to appropriate home
+  if (
+    isAuthenticated &&
+    (pathname === '/login' ||
+      pathname === '/register' ||
+      pathname === '/superman/login' ||
+      pathname === '/admin/login')
+  ) {
     const targetUrl = request.nextUrl.clone()
     targetUrl.pathname = isSuperAdmin ? '/superman' : '/dashboard'
     return NextResponse.redirect(targetUrl)
@@ -63,6 +69,8 @@ export async function middleware(request: NextRequest) {
     pathname === '/' ||
     pathname.startsWith('/login') ||
     pathname.startsWith('/register') ||
+    pathname.startsWith('/superman/login') ||
+    pathname.startsWith('/admin/login') ||
     pathname.startsWith('/portal') ||
     pathname.startsWith('/forgot-password') ||
     pathname.startsWith('/reset-password') ||
@@ -76,7 +84,7 @@ export async function middleware(request: NextRequest) {
   if (pathname.startsWith('/superman') || pathname.startsWith('/admin')) {
     if (!isAuthenticated) {
       const redirectUrl = request.nextUrl.clone()
-      redirectUrl.pathname = '/login'
+      redirectUrl.pathname = '/superman/login'
       redirectUrl.searchParams.set('redirectTo', pathname)
       return NextResponse.redirect(redirectUrl)
     }
