@@ -4,6 +4,7 @@ import './globals.css'
 import { Toaster } from '@/components/ui/toast'
 import Providers from '@/components/providers'
 import { cn } from "@/lib/utils"
+import { Analytics } from '@vercel/analytics/next'
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-sans' })
 const inter = Inter({ subsets: ['latin'] })
@@ -42,6 +43,7 @@ export default function RootLayout({
           {children}
           <Toaster />
         </Providers>
+        <Analytics />
       </body>
     </html>
   )
