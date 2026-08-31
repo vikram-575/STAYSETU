@@ -3,7 +3,10 @@
 import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Building2, Eye, EyeOff, Loader2, KeyRound } from 'lucide-react'
+import {
+  Building2, Eye, EyeOff, Loader2, KeyRound, Sparkles,
+  ArrowRight, Shield, QrCode, FileText, CheckCircle2
+} from 'lucide-react'
 
 function LoginForm() {
   const [email, setEmail] = useState('')
@@ -44,46 +47,52 @@ function LoginForm() {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
-      <div className="mb-6">
-        <h2 className="text-xl font-bold text-gray-900">Sign in to your account</h2>
-        <p className="text-xs text-gray-500 mt-1">Enter your registered email and password to access the portal</p>
+    <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-200/80 p-7 sm:p-8 space-y-6">
+      <div>
+        <h2 className="text-xl font-black text-slate-900 tracking-tight">PG Owner & Staff Login</h2>
+        <p className="text-xs text-slate-500 font-medium mt-1">
+          Access your property management dashboard, room inventory & ledger
+        </p>
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 font-medium">
+        <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-semibold animate-in fade-in">
           {error}
         </div>
       )}
 
       <form onSubmit={handleLogin} className="space-y-4">
         <div>
-          <label className="block text-xs font-bold text-gray-700 mb-1">Email address</label>
+          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+            Registered Email
+          </label>
           <input
             type="email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 outline-none"
-            placeholder="admin@pgsetu.com"
+            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 font-medium focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition"
+            placeholder="e.g. owner@example.com"
           />
         </div>
 
         <div>
-          <label className="block text-xs font-bold text-gray-700 mb-1">Password</label>
+          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+            Password
+          </label>
           <div className="relative">
             <input
               type={showPassword ? 'text' : 'password'}
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2.5 pr-10 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-4 py-3 pr-11 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 font-medium focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition"
               placeholder="••••••••"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
@@ -93,19 +102,19 @@ function LoginForm() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold py-2.5 px-4 rounded-lg text-xs transition flex items-center justify-center gap-2 shadow-sm"
+          className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:via-indigo-500 hover:to-blue-600 active:scale-[0.99] disabled:opacity-50 text-white font-black py-3.5 px-4 rounded-xl text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25"
         >
           {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-          {loading ? 'Signing in...' : 'Sign in'}
+          <span>{loading ? 'Authenticating...' : 'Sign In to Dashboard →'}</span>
         </button>
       </form>
 
-      <div className="mt-5 pt-4 border-t flex items-center justify-between text-xs text-gray-500">
-        <Link href="/forgot-password" className="text-blue-600 hover:text-blue-700 font-medium">
+      <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
+        <Link href="/forgot-password" className="text-slate-500 hover:text-blue-600 font-medium transition">
           Forgot password?
         </Link>
-        <Link href="/register" className="text-gray-700 hover:text-gray-900 font-bold">
-          Create Owner Account →
+        <Link href="/register" className="text-blue-600 hover:text-blue-700 font-bold transition">
+          Register New PG →
         </Link>
       </div>
     </div>
@@ -114,50 +123,60 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4 shadow-md shadow-blue-200">
-            <Building2 className="w-8 h-8 text-white" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-blue-950 flex flex-col justify-between p-4 sm:p-6 selection:bg-blue-600 selection:text-white">
+      {/* Background Glow */}
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-80 bg-gradient-to-b from-blue-600/20 to-transparent blur-3xl pointer-events-none" />
+
+      <div className="w-full max-w-md mx-auto my-auto relative z-10 space-y-6">
+        
+        {/* Brand Header */}
+        <div className="text-center space-y-2">
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl shadow-xl shadow-blue-500/25 text-white mb-1">
+            <Building2 className="w-7 h-7" />
           </div>
-          <h1 className="text-3xl font-black text-gray-900 tracking-tight">PG-SETU</h1>
-          <p className="text-gray-500 text-xs mt-1 font-medium">PG Management & Revenue Control System</p>
+          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">PG-SETU</h1>
+          <p className="text-xs sm:text-sm text-blue-200/80 font-medium">PG Operations & Revenue Management System</p>
         </div>
 
-        <Suspense fallback={<div className="bg-white p-8 rounded-2xl text-center text-xs text-gray-500">Loading form...</div>}>
+        {/* Owner & Staff Login Box */}
+        <Suspense fallback={<div className="bg-white p-8 rounded-3xl text-center text-xs text-slate-400">Loading secure login...</div>}>
           <LoginForm />
         </Suspense>
 
-        {/* Tenant Self-Service Passbook Portal Link */}
-        <div className="mt-4 p-4 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl text-white shadow-md shadow-blue-200/50 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-black">Living as a Resident / Tenant?</p>
-            <p className="text-[11px] text-blue-100 font-medium mt-0.5">View your bills, receipts & ledger with Phone + DOB</p>
+        {/* 🌟 HIGH-VISIBILITY HIGHLIGHTED TENANT PASSBOOK CARD */}
+        <div className="relative overflow-hidden p-5 rounded-3xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white shadow-xl shadow-emerald-900/30 border border-emerald-400/40 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="px-2.5 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-black uppercase tracking-wider backdrop-blur-md flex items-center gap-1">
+              <Sparkles className="w-3 h-3 text-amber-300" /> Tenant Self-Service
+            </span>
+            <span className="text-[11px] text-emerald-100 font-bold">Phone + DOB Login</span>
           </div>
+
+          <div className="space-y-1">
+            <h3 className="text-base font-black text-white leading-tight">
+              Resident & Tenant Passbook Portal
+            </h3>
+            <p className="text-xs text-emerald-50 leading-relaxed font-medium">
+              View your rent receipts, check live electricity dues, download bills & pay rent directly via UPI.
+            </p>
+          </div>
+
           <Link
             href="/portal"
-            className="px-3.5 py-2 bg-white text-blue-700 hover:bg-blue-50 active:scale-95 font-extrabold text-xs rounded-xl shadow-xs shrink-0 transition"
+            className="w-full py-3 px-4 bg-white text-emerald-800 hover:bg-emerald-50 active:scale-[0.99] font-black text-xs sm:text-sm rounded-xl shadow-md transition flex items-center justify-center gap-2 group"
           >
-            Tenant Portal →
+            <FileText className="w-4 h-4 text-emerald-600" />
+            <span>Open Resident Digital Passbook →</span>
           </Link>
         </div>
 
-        {/* Company Admin Command Center Link */}
-        <div className="mt-3 text-center">
-          <Link
-            href="/superman/login"
-            className="text-[11.5px] font-semibold text-slate-500 hover:text-slate-900 transition inline-flex items-center gap-1.5 py-1 px-3 rounded-full hover:bg-slate-100/80"
-          >
-            <span>🛡️ Platform Super Admin Access</span>
-            <span>→</span>
-          </Link>
-        </div>
-
-        <p className="text-center text-[11px] text-gray-400 mt-4 font-medium">
-          © 2026 PG-SETU. All data encrypted and secured.
+        {/* Discreet Footer Note without any visible super admin link */}
+        <p className="text-center text-[11px] text-slate-500 font-medium pt-2">
+          © 2026 PG-SETU. Enterprise 256-bit SSL encrypted.
         </p>
       </div>
+
+      <div />
     </div>
   )
 }
