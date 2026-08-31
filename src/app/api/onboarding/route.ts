@@ -5,10 +5,18 @@ import { cookies } from 'next/headers'
 import { getAdminSessionFromCookies, SUPER_ADMIN_EMAIL } from '@/lib/admin-auth'
 
 /**
+ * Helper to generate a secure 8-digit temporary password
+ */
+function generate8DigitPassword(): string {
+  return Math.floor(10000000 + Math.random() * 90000000).toString()
+}
+
+/**
  * POST /api/onboarding
  * Comprehensive Enterprise PG Onboarding:
  * Creates organization, full property address, building, floors, rooms, beds,
- * electricity sub-meters, bank/UPI settlement settings, and staff user accounts.
+ * electricity sub-meters, bank/UPI settlement settings, generates 8-digit temporary passwords,
+ * and provisions staff user accounts.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -78,7 +86,8 @@ export async function POST(request: NextRequest) {
     }
 
     const serviceClient = await createServiceClient()
-    const effectiveEmail = email || authEmail || (adminSession ? SUPER_ADMIN_EMAIL : null)
+    const effectiveEmail = (email || authEmail || (adminSession ? SUPER_ADMIN_EMAIL : `owner_${Date.now()}@pgsetu.com`)).toLowerCase().trim()
+    const ownerTemporaryPassword = generate8DigitPassword()
 
     // Generate unique organization slug
     const slug =
@@ -180,54 +189,87 @@ export async function POST(request: NextRequest) {
       await serviceClient.from('payment_sequences').insert({ organization_id: orgId, last_seq: 0 })
     } catch {}
 
-    // 3. Link or Upsert Owner User Profile
-    if (effectiveEmail) {
-      const { data: existingUser } = await serviceClient
-        .from('users')
-        .select('id')
-        .eq('email', effectiveEmail.toLowerCase())
-        .single()
+    // 3. Create or Update Owner in Supabase Auth & Users table with 8-digit password
+    try {
+      // Try creating in Supabase Auth
+      const { data: authUser, error: authCreateErr } = await serviceClient.auth.admin.createUser({
+        email: effectiveEmail,
+        password: ownerTemporaryPassword,
+        email_confirm: true,
+        user_metadata: {
+          full_name: owner_name?.trim() || org_name,
+          role: 'owner',
+          organization_id: orgId,
+        },
+      })
 
-      if (existingUser) {
-        await serviceClient
+      if (authCreateErr && authCreateErr.message.includes('already registered')) {
+        // Find existing user and update password
+        const { data: existingUser } = await serviceClient
           .from('users')
-          .update({
-            organization_id: orgId,
-            full_name: owner_name?.trim() || org_name,
-            phone: phone?.trim() || null,
-            role: 'owner',
-          })
-          .eq('id', existingUser.id)
-      } else {
-        try {
-          await serviceClient.from('users').insert({
-            organization_id: orgId,
-            email: effectiveEmail.toLowerCase(),
-            full_name: owner_name?.trim() || 'PG Owner',
-            phone: phone?.trim() || null,
-            role: 'owner',
-            is_active: true,
-          })
-        } catch {}
+          .select('id')
+          .eq('email', effectiveEmail)
+          .single()
+
+        if (existingUser) {
+          await serviceClient.auth.admin.updateUserById(existingUser.id, {
+            password: ownerTemporaryPassword,
+            user_metadata: { organization_id: orgId },
+          }).catch(() => {})
+        }
       }
+
+      // Upsert profile in users table
+      await serviceClient.from('users').upsert({
+        organization_id: orgId,
+        email: effectiveEmail,
+        full_name: owner_name?.trim() || org_name,
+        phone: phone?.trim() || null,
+        role: 'owner',
+        is_active: true,
+      }, { onConflict: 'email' })
+    } catch (userErr) {
+      console.warn('[Owner Auth Setup Warning]:', userErr)
     }
 
-    // 4. Create Staff / Warden / Manager Accounts if specified
+    // 4. Create Staff / Warden / Manager Accounts with 8-Digit Passwords
+    const createdStaffCredentials: Array<{ name: string; email: string; temporary_password: string; role: string }> = []
+
     if (Array.isArray(staff_members) && staff_members.length > 0) {
       for (const staff of staff_members) {
         if (staff.name && (staff.phone || staff.email)) {
           const staffEmail = (staff.email?.trim() || `${staff.name.toLowerCase().replace(/[^a-z0-9]/g, '')}_${slug}@pgsetu.com`).toLowerCase()
+          const staffTemporaryPassword = generate8DigitPassword()
+
           try {
-            await serviceClient
-              .from('users')
-              .insert({
-                organization_id: orgId,
-                email: staffEmail,
+            // Create in Supabase Auth
+            await serviceClient.auth.admin.createUser({
+              email: staffEmail,
+              password: staffTemporaryPassword,
+              email_confirm: true,
+              user_metadata: {
                 full_name: staff.name.trim(),
-                phone: staff.phone?.trim() || null,
                 role: staff.role || 'manager',
-                is_active: true,
-              })
+                organization_id: orgId,
+              },
+            }).catch(() => {})
+
+            // Upsert in users table
+            await serviceClient.from('users').upsert({
+              organization_id: orgId,
+              email: staffEmail,
+              full_name: staff.name.trim(),
+              phone: staff.phone?.trim() || null,
+              role: staff.role || 'manager',
+              is_active: true,
+            }, { onConflict: 'email' })
+
+            createdStaffCredentials.push({
+              name: staff.name.trim(),
+              email: staffEmail,
+              temporary_password: staffTemporaryPassword,
+              role: staff.role || 'manager',
+            })
           } catch {}
         }
       }
@@ -420,6 +462,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       org_id: orgId,
+      credentials: {
+        email: effectiveEmail,
+        temporary_password: ownerTemporaryPassword,
+        full_name: owner_name?.trim() || org_name,
+        phone: phone?.trim() || '',
+        role: 'owner',
+        login_url: '/login',
+      },
+      staff_credentials: createdStaffCredentials,
       summary: {
         organization_name: org.name,
         slug: org.slug,

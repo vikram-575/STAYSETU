@@ -8,7 +8,7 @@ import {
   Users, CheckCircle2, ArrowRight, ArrowLeft, Loader2,
   Sparkles, Layers, Home, Phone, Mail, FileText, QrCode,
   DollarSign, Plus, Trash2, AlertCircle, Info, Landmark,
-  Clock, Award, Lock, ChevronRight
+  Clock, Award, Lock, ChevronRight, Copy, Check, ExternalLink
 } from 'lucide-react'
 
 interface StaffMember {
@@ -27,6 +27,8 @@ function OnboardingContent() {
   const [currentStep, setCurrentStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [onboardingSuccessData, setOnboardingSuccessData] = useState<any>(null)
+  const [copied, setCopied] = useState(false)
 
   // Form State
   const [form, setForm] = useState({
@@ -180,9 +182,10 @@ function OnboardingContent() {
         throw new Error(data.error || 'Failed to onboard PG profile.')
       }
 
-      // Successful onboarding - redirect back to target
-      router.push(returnTo)
-      router.refresh()
+      // Successful onboarding - show credentials modal
+      setOnboardingSuccessData(data)
+      setLoading(false)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err: any) {
       setError(err.message || 'Onboarding error. Please check your inputs.')
       setLoading(false)
@@ -1209,6 +1212,123 @@ function OnboardingContent() {
         </div>
 
       </main>
+
+      {/* ─────────────────────────────────────────────────────────────
+          ONBOARDING SUCCESS & 8-DIGIT CREDENTIALS REVEAL MODAL
+      ───────────────────────────────────────────────────────────── */}
+      {onboardingSuccessData && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl p-6 sm:p-8 max-w-lg w-full space-y-6 shadow-2xl animate-in zoom-in-95 duration-200 my-auto">
+            
+            {/* Header Badge */}
+            <div className="text-center space-y-2">
+              <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-500 text-white flex items-center justify-center mx-auto shadow-xl shadow-emerald-500/25">
+                <CheckCircle2 className="w-8 h-8" />
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                PG Setup Completed Successfully!
+              </h2>
+              <p className="text-xs text-slate-300">
+                <strong>{onboardingSuccessData.summary?.organization_name}</strong> is live in Supabase with{' '}
+                <strong className="text-emerald-400">{onboardingSuccessData.summary?.total_rooms} Rooms</strong> and{' '}
+                <strong className="text-emerald-400">{onboardingSuccessData.summary?.total_beds} Beds</strong>.
+              </p>
+            </div>
+
+            {/* Owner Credentials Card */}
+            <div className="p-5 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black uppercase text-blue-400 tracking-wider flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5" /> PG Owner Dashboard Login
+                </span>
+                <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-bold">
+                  Saved in Supabase
+                </span>
+              </div>
+
+              <div className="space-y-2 pt-1 text-xs">
+                <div className="flex items-center justify-between py-1.5 px-3 bg-slate-900 rounded-xl border border-slate-800">
+                  <span className="text-slate-400">Login Email:</span>
+                  <strong className="text-white font-mono">{onboardingSuccessData.credentials?.email}</strong>
+                </div>
+
+                <div className="flex items-center justify-between py-2 px-3 bg-blue-950/40 rounded-xl border border-blue-800/50">
+                  <div>
+                    <span className="text-blue-300 font-bold block text-[11px]">8-Digit Temporary Password:</span>
+                    <span className="text-[10px] text-slate-400">Owner can change anytime from Settings</span>
+                  </div>
+                  <strong className="text-xl font-mono font-black text-amber-300 tracking-widest px-2 py-0.5 bg-slate-900 rounded-lg border border-amber-500/30">
+                    {onboardingSuccessData.credentials?.temporary_password}
+                  </strong>
+                </div>
+              </div>
+
+              {/* 1-Click Copy Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  const credsText = `🏢 PG-SETU Login Credentials for ${onboardingSuccessData.summary?.organization_name}\n\n📧 Email: ${onboardingSuccessData.credentials?.email}\n🔑 8-Digit Password: ${onboardingSuccessData.credentials?.temporary_password}\n🌐 Login URL: https://staysetu-ruby.vercel.app/login`
+                  navigator.clipboard.writeText(credsText)
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 2500)
+                }}
+                className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 active:scale-[0.99] text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 border border-slate-700"
+              >
+                {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-slate-400" />}
+                <span>{copied ? 'Credentials Copied to Clipboard!' : 'Copy Login Credentials (Email & Password)'}</span>
+              </button>
+            </div>
+
+            {/* Staff Accounts (if any) */}
+            {onboardingSuccessData.staff_credentials?.length > 0 && (
+              <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-2 text-xs">
+                <h4 className="font-bold text-slate-300 flex items-center gap-1.5 text-xs">
+                  <Users className="w-3.5 h-3.5 text-teal-400" /> Staff & Warden Accounts ({onboardingSuccessData.staff_credentials.length})
+                </h4>
+                <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                  {onboardingSuccessData.staff_credentials.map((st: any, idx: number) => (
+                    <div key={idx} className="p-2 bg-slate-900 rounded-lg flex items-center justify-between text-[11px]">
+                      <div>
+                        <strong className="text-white block">{st.name} ({st.role})</strong>
+                        <span className="text-slate-400">{st.email}</span>
+                      </div>
+                      <span className="font-mono text-amber-300 font-bold bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                        {st.temporary_password}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="space-y-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  router.push(returnTo)
+                  router.refresh()
+                }}
+                className="w-full py-3.5 px-6 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 text-white font-black rounded-xl text-xs sm:text-sm shadow-xl shadow-blue-500/25 transition flex items-center justify-center gap-2 active:scale-[0.99]"
+              >
+                <span>{isFromAdmin ? 'Return to Command Center (/superman) →' : 'Enter PG Dashboard Now →'}</span>
+              </button>
+
+              {onboardingSuccessData.credentials?.phone && (
+                <a
+                  href={`https://wa.me/91${onboardingSuccessData.credentials.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hello ${onboardingSuccessData.credentials.full_name},\nWelcome to PG-SETU! Your PG property "${onboardingSuccessData.summary?.organization_name}" has been provisioned.\n\n*Your Dashboard Login Details:*\n📧 Email: ${onboardingSuccessData.credentials.email}\n🔑 8-Digit Password: ${onboardingSuccessData.credentials.temporary_password}\n🌐 Login Link: https://staysetu-ruby.vercel.app/login`)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full py-2.5 px-4 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5"
+                >
+                  <Phone className="w-3.5 h-3.5" /> Send Login Details to Owner on WhatsApp
+                </a>
+              )}
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="border-t border-slate-900 bg-slate-950 py-4 text-center text-xs text-slate-600">

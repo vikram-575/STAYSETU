@@ -11,14 +11,14 @@ import {
   ShieldAlert, Server, Activity, Terminal, ArrowRight, Trash2,
   Lock, Settings, BarChart3, ChevronRight, Phone, Mail, MapPin,
   MessageSquare, Radio, Send, LifeBuoy, AlertTriangle, UserCheck,
-  Zap, Copy, ArrowDownRight, Globe
+  Zap, Copy, ArrowDownRight, Globe, Receipt, CheckCircle, Clock
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/money'
 import { formatDate, formatDateTime, cn } from '@/lib/utils'
 
 export default function MasterCompanyAdminPage() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'fleet' | 'payments' | 'support' | 'users' | 'broadcast' | 'health'>('fleet')
+  const [activeTab, setActiveTab] = useState<'fleet' | 'billing' | 'payments' | 'support' | 'users' | 'broadcast' | 'health'>('fleet')
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [cityFilter, setCityFilter] = useState('all')
@@ -30,6 +30,7 @@ export default function MasterCompanyAdminPage() {
   const [transactions, setTransactions] = useState<any[]>([])
   const [tickets, setTickets] = useState<any[]>([])
   const [users, setUsers] = useState<any[]>([])
+  const [billingData, setBillingData] = useState<any>(null)
 
   // Modal States
   const [showCreateUserModal, setShowCreateUserModal] = useState(false)
@@ -44,6 +45,7 @@ export default function MasterCompanyAdminPage() {
   const [ticketActionLoading, setTicketActionLoading] = useState(false)
 
   const [impersonatingOrgId, setImpersonatingOrgId] = useState<string | null>(null)
+  const [markPaidLoading, setMarkPaidLoading] = useState<string | null>(null)
 
   // Broadcast Modal
   const [showBroadcastModal, setShowBroadcastModal] = useState(false)
@@ -68,12 +70,13 @@ export default function MasterCompanyAdminPage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [statsRes, orgsRes, txRes, usersRes, supportRes] = await Promise.all([
+      const [statsRes, orgsRes, txRes, usersRes, supportRes, billingRes] = await Promise.all([
         fetch('/api/admin/stats'),
         fetch('/api/admin/organizations'),
         fetch('/api/admin/payments?limit=100'),
         fetch('/api/admin/users'),
         fetch('/api/admin/support?limit=100'),
+        fetch('/api/admin/billing'),
       ])
 
       const statsData = await statsRes.json()
@@ -81,12 +84,14 @@ export default function MasterCompanyAdminPage() {
       const txData = await txRes.json()
       const usersData = await usersRes.json()
       const supportData = await supportRes.json()
+      const billingJson = await billingRes.json()
 
       if (statsData.success) setStats(statsData.stats)
       if (orgsData.success) setOrganizations(orgsData.organizations || [])
       if (txData.success) setTransactions(txData.payments || [])
       if (usersData.success) setUsers(usersData.users || [])
       if (supportData.success) setTickets(supportData.tickets || [])
+      if (billingJson.success) setBillingData(billingJson)
     } catch (err) {
       console.error('Failed to load company admin data', err)
     } finally {
@@ -115,6 +120,32 @@ export default function MasterCompanyAdminPage() {
     } catch (err: any) {
       alert(err.message || 'Impersonation failed')
       setImpersonatingOrgId(null)
+    }
+  }
+
+  // Mark PG SaaS Invoice Paid
+  const handleMarkSaaSInvoicePaid = async (orgId: string, amountRupees: number, period: string) => {
+    setMarkPaidLoading(orgId)
+    try {
+      const res = await fetch('/api/admin/billing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          org_id: orgId,
+          action: 'mark_paid',
+          amount_rupees: amountRupees,
+          period,
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to mark SaaS fee paid')
+
+      await loadData()
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
+      setMarkPaidLoading(null)
     }
   }
 
@@ -331,12 +362,12 @@ export default function MasterCompanyAdminPage() {
                 <span>Managed Beds: <strong className="text-white">{stats.total_beds}</strong> ({stats.occupancy_rate_pct}% Occupied)</span>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Platform GMV: <strong className="text-emerald-400">{formatCurrency(stats.platform_gtv_paise)}</strong></span>
+                <Zap className="w-3.5 h-3.5 text-amber-400" />
+                <span>SaaS MRR (₹10/bed): <strong className="text-amber-300">{formatCurrency(billingData?.kpis?.total_expected_mrr_paise || stats.platform_saas_mrr_paise || 0)}/mo</strong></span>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <Zap className="w-3.5 h-3.5 text-amber-400" />
-                <span>SaaS MRR (₹10/bed): <strong className="text-amber-300">{formatCurrency(stats.platform_saas_mrr_paise)}/mo</strong></span>
+                <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Platform GMV: <strong className="text-emerald-400">{formatCurrency(stats.platform_gtv_paise)}</strong></span>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <LifeBuoy className="w-3.5 h-3.5 text-rose-400" />
@@ -354,6 +385,7 @@ export default function MasterCompanyAdminPage() {
         <div className="flex items-center gap-2 overflow-x-auto border-b border-slate-800 pb-2">
           {[
             { id: 'fleet', label: '🏢 PG Fleet Management', count: organizations.length },
+            { id: 'billing', label: '💰 ₹10/Bed SaaS Billing & Invoicing', count: billingData?.billing_items?.length, highlight: billingData?.kpis?.total_pending_paise > 0 },
             { id: 'payments', label: '💳 Financials & Settlements', count: transactions.length },
             { id: 'support', label: '🎧 Customer Support & Tickets', count: tickets.filter((t) => t.status === 'open').length, highlight: tickets.some((t) => t.status === 'open') },
             { id: 'users', label: '👥 User & Staff Directory', count: users.length },
@@ -373,7 +405,7 @@ export default function MasterCompanyAdminPage() {
               {tab.count !== undefined && (
                 <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono ${
                   tab.highlight
-                    ? 'bg-rose-500 text-white font-black animate-pulse'
+                    ? 'bg-amber-500 text-slate-950 font-black'
                     : activeTab === tab.id ? 'bg-blue-700 text-white' : 'bg-slate-800 text-slate-400'
                 }`}>
                   {tab.count}
@@ -587,7 +619,184 @@ export default function MasterCompanyAdminPage() {
         )}
 
         {/* ─────────────────────────────────────────────────────────────
-            TAB 2: GLOBAL PAYMENTS & TRANSACTIONS STREAM
+            TAB 2: COMPANY SAAS BILLING SYSTEM (₹10 / BED / MONTH)
+        ───────────────────────────────────────────────────────────── */}
+        {activeTab === 'billing' && (
+          <div className="space-y-6">
+            
+            {/* SaaS Invoicing KPIs */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="p-5 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-2 shadow-lg">
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span>Expected Monthly MRR</span>
+                  <Zap className="w-4 h-4 text-amber-400" />
+                </div>
+                <div className="text-2xl font-black text-white">
+                  {formatCurrency(billingData?.kpis?.total_expected_mrr_paise || 0)}
+                  <span className="text-xs text-slate-400 font-normal"> / mo</span>
+                </div>
+                <p className="text-[11px] text-amber-400 font-medium">@ ₹10 per Managed Bed</p>
+              </div>
+
+              <div className="p-5 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-2 shadow-lg">
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span>Collected ({billingData?.current_period})</span>
+                  <CheckCircle className="w-4 h-4 text-emerald-400" />
+                </div>
+                <div className="text-2xl font-black text-emerald-400">
+                  {formatCurrency(billingData?.kpis?.total_collected_paise || 0)}
+                </div>
+                <p className="text-[11px] text-slate-400">Received via UPI / Bank</p>
+              </div>
+
+              <div className="p-5 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-2 shadow-lg">
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span>Pending Collections</span>
+                  <Clock className="w-4 h-4 text-amber-400" />
+                </div>
+                <div className="text-2xl font-black text-amber-300">
+                  {formatCurrency(billingData?.kpis?.total_pending_paise || 0)}
+                </div>
+                <p className="text-[11px] text-slate-400">Awaiting PG Owner Remittance</p>
+              </div>
+
+              <div className="p-5 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-2 shadow-lg">
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span>Total Billed Fleet</span>
+                  <Building2 className="w-4 h-4 text-blue-400" />
+                </div>
+                <div className="text-2xl font-black text-white">
+                  {billingData?.kpis?.total_managed_beds || 0} Beds
+                </div>
+                <p className="text-[11px] text-blue-400 font-medium">Across {billingData?.kpis?.total_active_pgs || 0} PG Properties</p>
+              </div>
+            </div>
+
+            {/* Invoices List Table */}
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-xl space-y-3">
+              <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-black text-white flex items-center gap-2">
+                    <Receipt className="w-4 h-4 text-blue-400" />
+                    <span>Monthly SaaS Invoicing Schedule ({billingData?.current_period})</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    PG platform fee calculation: <strong>₹10 / Bed / Month</strong>. Collect via direct WhatsApp UPI payment link.
+                  </p>
+                </div>
+                <span className="text-xs font-mono font-bold bg-blue-500/20 text-blue-300 px-3 py-1 rounded-xl border border-blue-500/30">
+                  Settlement VPA: pgsetu@icici
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-800 bg-slate-950/80 text-[11px] uppercase tracking-wider text-slate-400">
+                      <th className="py-3 px-4 font-bold">PG Property & Owner</th>
+                      <th className="py-3 px-4 font-bold">Managed Beds</th>
+                      <th className="py-3 px-4 font-bold">SaaS Rate</th>
+                      <th className="py-3 px-4 font-bold">Monthly Due (₹)</th>
+                      <th className="py-3 px-4 font-bold">Invoice Status</th>
+                      <th className="py-3 px-4 font-bold text-right">Collection Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {(!billingData?.billing_items || billingData.billing_items.length === 0) ? (
+                      <tr>
+                        <td colSpan={6} className="py-12 text-center text-slate-500">
+                          No PG subscription billing records generated yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      billingData.billing_items.map((item: any) => {
+                        const isMarking = markPaidLoading === item.org_id
+                        const isPaid = item.billing_status === 'paid'
+                        return (
+                          <tr key={item.org_id} className="hover:bg-slate-800/40 transition">
+                            <td className="py-3.5 px-4">
+                              <strong className="text-white block">{item.org_name}</strong>
+                              <span className="text-[11px] text-slate-400">
+                                {item.city} · {item.owner_phone || 'No phone'}
+                              </span>
+                            </td>
+
+                            <td className="py-3.5 px-4 font-mono font-bold text-white">
+                              {item.total_beds} Beds
+                            </td>
+
+                            <td className="py-3.5 px-4 text-slate-400 font-mono">
+                              ₹10 / bed
+                            </td>
+
+                            <td className="py-3.5 px-4 font-black text-amber-300 text-sm">
+                              ₹{item.monthly_fee_rupees.toLocaleString('en-IN')}
+                            </td>
+
+                            <td className="py-3.5 px-4">
+                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
+                                isPaid
+                                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                  : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                              }`}>
+                                {isPaid ? 'Paid & Active' : 'Payment Due'}
+                              </span>
+                              {isPaid && item.paid_at && (
+                                <span className="text-[10px] text-slate-400 block mt-0.5">
+                                  {formatDate(item.paid_at)}
+                                </span>
+                              )}
+                            </td>
+
+                            <td className="py-3.5 px-4 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                
+                                {/* 1-Click Send WhatsApp Payment Link */}
+                                {item.whatsapp_url && (
+                                  <a
+                                    href={item.whatsapp_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="py-1.5 px-3 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white rounded-lg border border-emerald-500/30 text-[11px] font-bold transition flex items-center gap-1.5"
+                                    title="Send WhatsApp Invoice & UPI Link to PG Owner"
+                                  >
+                                    <Phone className="w-3.5 h-3.5" />
+                                    <span>WhatsApp UPI Link</span>
+                                  </a>
+                                )}
+
+                                {/* Mark as Paid Toggle */}
+                                {!isPaid ? (
+                                  <button
+                                    onClick={() => handleMarkSaaSInvoicePaid(item.org_id, item.monthly_fee_rupees, item.current_period)}
+                                    disabled={isMarking}
+                                    className="py-1.5 px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[11px] font-bold transition flex items-center gap-1"
+                                  >
+                                    {isMarking ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+                                    <span>Mark as Paid</span>
+                                  </button>
+                                ) : (
+                                  <span className="text-[11px] text-emerald-400 font-bold flex items-center gap-1">
+                                    <Check className="w-3.5 h-3.5" /> Settled
+                                  </span>
+                                )}
+
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* ─────────────────────────────────────────────────────────────
+            TAB 3: GLOBAL PAYMENTS & TRANSACTIONS STREAM
         ───────────────────────────────────────────────────────────── */}
         {activeTab === 'payments' && (
           <div className="space-y-4">
@@ -662,7 +871,7 @@ export default function MasterCompanyAdminPage() {
         )}
 
         {/* ─────────────────────────────────────────────────────────────
-            TAB 3: CUSTOMER SUPPORT & HELPDESK TICKETS
+            TAB 4: CUSTOMER SUPPORT & HELPDESK TICKETS
         ───────────────────────────────────────────────────────────── */}
         {activeTab === 'support' && (
           <div className="space-y-4">
@@ -743,7 +952,7 @@ export default function MasterCompanyAdminPage() {
         )}
 
         {/* ─────────────────────────────────────────────────────────────
-            TAB 4: GLOBAL USER & STAFF DIRECTORY
+            TAB 5: GLOBAL USER & STAFF DIRECTORY
         ───────────────────────────────────────────────────────────── */}
         {activeTab === 'users' && (
           <div className="space-y-4">
@@ -809,7 +1018,7 @@ export default function MasterCompanyAdminPage() {
         )}
 
         {/* ─────────────────────────────────────────────────────────────
-            TAB 5: SYSTEM ANNOUNCEMENTS & BROADCAST
+            TAB 6: SYSTEM ANNOUNCEMENTS & BROADCAST
         ───────────────────────────────────────────────────────────── */}
         {activeTab === 'broadcast' && (
           <div className="max-w-2xl mx-auto space-y-6">
@@ -881,7 +1090,7 @@ export default function MasterCompanyAdminPage() {
         )}
 
         {/* ─────────────────────────────────────────────────────────────
-            TAB 6: INFRASTRUCTURE & PLATFORM DIAGNOSTICS
+            TAB 7: INFRASTRUCTURE & PLATFORM DIAGNOSTICS
         ───────────────────────────────────────────────────────────── */}
         {activeTab === 'health' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
