@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import {
   Building2, MapPin, User, ShieldCheck, Zap, CreditCard,
   Users, CheckCircle2, ArrowRight, ArrowLeft, Loader2,
@@ -17,8 +18,12 @@ interface StaffMember {
   email: string
 }
 
-export default function EnterpriseOnboardingPage() {
+function OnboardingContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const returnTo = searchParams.get('returnTo') || '/dashboard'
+  const isFromAdmin = returnTo.includes('/superman') || returnTo.includes('/admin')
+
   const [currentStep, setCurrentStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -175,8 +180,8 @@ export default function EnterpriseOnboardingPage() {
         throw new Error(data.error || 'Failed to onboard PG profile.')
       }
 
-      // Successful onboarding
-      router.push('/dashboard')
+      // Successful onboarding - redirect back to target
+      router.push(returnTo)
       router.refresh()
     } catch (err: any) {
       setError(err.message || 'Onboarding error. Please check your inputs.')
@@ -204,13 +209,24 @@ export default function EnterpriseOnboardingPage() {
             </div>
           </div>
 
-          <div className="hidden sm:flex items-center gap-4 text-xs">
-            <span className="text-slate-400">Step <strong className="text-white">{currentStep}</strong> of 7</span>
-            <div className="w-32 bg-slate-800 rounded-full h-1.5 overflow-hidden">
-              <div
-                className="bg-gradient-to-r from-blue-500 to-emerald-400 h-full transition-all duration-300"
-                style={{ width: `${(currentStep / 7) * 100}%` }}
-              />
+          <div className="flex items-center gap-3">
+            {isFromAdmin && (
+              <Link
+                href={returnTo}
+                className="py-1.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl border border-slate-700 transition"
+              >
+                ← Back to Command Center
+              </Link>
+            )}
+
+            <div className="hidden sm:flex items-center gap-3 text-xs">
+              <span className="text-slate-400">Step <strong className="text-white">{currentStep}</strong> of 7</span>
+              <div className="w-28 bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                <div
+                  className="bg-gradient-to-r from-blue-500 to-emerald-400 h-full transition-all duration-300"
+                  style={{ width: `${(currentStep / 7) * 100}%` }}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -219,6 +235,16 @@ export default function EnterpriseOnboardingPage() {
       {/* Main Wizard Area */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 w-full relative z-10 flex-1">
         
+        {/* Super Admin Notice if launched from Admin panel */}
+        {isFromAdmin && (
+          <div className="mb-6 p-3.5 bg-blue-950/40 border border-blue-800/60 rounded-2xl flex items-center justify-between text-xs text-blue-200">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-blue-400 shrink-0" />
+              <span><strong>Super Admin Mode:</strong> Onboarding a new PG property into the central platform fleet. Once completed, you will be redirected back to the Command Center.</span>
+            </div>
+          </div>
+        )}
+
         {/* Step Progress Pills */}
         <div className="hidden md:grid grid-cols-7 gap-2 mb-8">
           {steps.map((s) => {
@@ -1189,5 +1215,17 @@ export default function EnterpriseOnboardingPage() {
         PG-SETU Platform Enterprise · Built for large-scale PG & Hostel operations across India
       </footer>
     </div>
+  )
+}
+
+export default function EnterpriseOnboardingPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+      </div>
+    }>
+      <OnboardingContent />
+    </Suspense>
   )
 }

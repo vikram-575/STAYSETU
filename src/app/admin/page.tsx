@@ -32,11 +32,6 @@ export default function MasterCompanyAdminPage() {
   const [users, setUsers] = useState<any[]>([])
 
   // Modal States
-  const [showOnboardModal, setShowOnboardModal] = useState(false)
-  const [onboardLoading, setOnboardLoading] = useState(false)
-  const [onboardError, setOnboardError] = useState('')
-  const [onboardSuccess, setOnboardSuccess] = useState('')
-
   const [showCreateUserModal, setShowCreateUserModal] = useState(false)
   const [createUserLoading, setCreateUserLoading] = useState(false)
   const [createUserError, setCreateUserError] = useState('')
@@ -58,23 +53,6 @@ export default function MasterCompanyAdminPage() {
     title: '',
     message: '',
     target_city: 'all',
-  })
-
-  // Forms
-  const [onboardForm, setOnboardForm] = useState({
-    org_name: '',
-    owner_name: '',
-    owner_email: '',
-    owner_phone: '',
-    property_name: '',
-    city: 'Pune',
-    address: '',
-    num_buildings: 1,
-    floors_per_building: 3,
-    rooms_per_floor: 4,
-    beds_per_room: 2,
-    base_rent_rupees: 6500,
-    upi_id: '',
   })
 
   const [userForm, setUserForm] = useState({
@@ -137,36 +115,6 @@ export default function MasterCompanyAdminPage() {
     } catch (err: any) {
       alert(err.message || 'Impersonation failed')
       setImpersonatingOrgId(null)
-    }
-  }
-
-  // 1-Click Onboard Submit
-  const handleOnboardSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setOnboardLoading(true)
-    setOnboardError('')
-    setOnboardSuccess('')
-
-    try {
-      const res = await fetch('/api/admin/organizations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(onboardForm),
-      })
-
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to onboard PG organization')
-
-      setOnboardSuccess(`Successfully provisioned "${onboardForm.org_name}" with ${data.organization?.rooms_created || 12} rooms & ${data.organization?.beds_created || 24} beds!`)
-      await loadData()
-      setTimeout(() => {
-        setShowOnboardModal(false)
-        setOnboardSuccess('')
-      }, 1500)
-    } catch (err: any) {
-      setOnboardError(err.message)
-    } finally {
-      setOnboardLoading(false)
     }
   }
 
@@ -359,19 +307,14 @@ export default function MasterCompanyAdminPage() {
               <Radio className="w-3.5 h-3.5 text-purple-400" /> Broadcast
             </button>
 
-            <button
-              onClick={() => setShowCreateUserModal(true)}
-              className="py-2.5 px-3.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+            {/* Direct Connect to 7-Step Enterprise Onboarding Wizard */}
+            <Link
+              href="/onboarding?returnTo=/superman"
+              className="py-2.5 px-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 text-white rounded-xl text-xs font-black shadow-lg shadow-blue-500/25 transition flex items-center gap-2"
             >
-              <Users className="w-3.5 h-3.5 text-blue-400" /> Add User
-            </button>
-
-            <button
-              onClick={() => setShowOnboardModal(true)}
-              className="py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-black shadow-lg shadow-blue-500/20 transition flex items-center gap-1.5"
-            >
-              <PlusCircle className="w-4 h-4" /> Quick Onboard PG
-            </button>
+              <Sparkles className="w-4 h-4 text-blue-200" />
+              <span>Onboard New PG (Enterprise Wizard) →</span>
+            </Link>
           </div>
         </div>
 
@@ -480,6 +423,13 @@ export default function MasterCompanyAdminPage() {
                   <option value="trial">Free Trial</option>
                   <option value="suspended">Suspended</option>
                 </select>
+
+                <Link
+                  href="/onboarding?returnTo=/superman"
+                  className="py-2 px-3.5 bg-blue-600/20 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Onboard PG
+                </Link>
               </div>
             </div>
 
@@ -501,7 +451,14 @@ export default function MasterCompanyAdminPage() {
                     {filteredOrgs.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="py-12 text-center text-slate-500">
-                          No PG organizations matching your search criteria.
+                          <Building2 className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                          <p className="text-sm font-bold text-slate-400">No PG organizations matching your search criteria.</p>
+                          <Link
+                            href="/onboarding?returnTo=/superman"
+                            className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:underline mt-2 font-bold"
+                          >
+                            Launch Enterprise Onboarding Wizard →
+                          </Link>
                         </td>
                       </tr>
                     ) : (
@@ -988,148 +945,6 @@ export default function MasterCompanyAdminPage() {
         )}
 
       </main>
-
-      {/* ─────────────────────────────────────────────────────────────
-          MODAL: QUICK ONBOARD PG (OPERATIONS TEAM)
-      ───────────────────────────────────────────────────────────── */}
-      {showOnboardModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full space-y-5 shadow-2xl my-8">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div>
-                <h3 className="text-base font-black text-white flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-blue-400" /> 1-Click Fast PG Onboard
-                </h3>
-                <p className="text-[11px] text-slate-400">Instantly provision an organization, buildings, rooms, beds & owner account</p>
-              </div>
-              <button onClick={() => setShowOnboardModal(false)} className="text-slate-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {onboardError && (
-              <div className="p-3 bg-rose-950/80 border border-rose-800 text-rose-300 text-xs rounded-xl font-bold">
-                {onboardError}
-              </div>
-            )}
-
-            {onboardSuccess && (
-              <div className="p-3 bg-emerald-950/80 border border-emerald-800 text-emerald-300 text-xs rounded-xl font-bold">
-                {onboardSuccess}
-              </div>
-            )}
-
-            <form onSubmit={handleOnboardSubmit} className="space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-400 font-bold mb-1">PG Brand Name *</label>
-                  <input
-                    required
-                    value={onboardForm.org_name}
-                    onChange={(e) => setOnboardForm({ ...onboardForm, org_name: e.target.value })}
-                    placeholder="e.g. Royal Star Living"
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-400 font-bold mb-1">Campus Name *</label>
-                  <input
-                    required
-                    value={onboardForm.property_name}
-                    onChange={(e) => setOnboardForm({ ...onboardForm, property_name: e.target.value })}
-                    placeholder="e.g. Hinjawadi Main"
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-400 font-bold mb-1">Owner Name *</label>
-                  <input
-                    required
-                    value={onboardForm.owner_name}
-                    onChange={(e) => setOnboardForm({ ...onboardForm, owner_name: e.target.value })}
-                    placeholder="Owner Full Name"
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-400 font-bold mb-1">Owner Phone *</label>
-                  <input
-                    required
-                    value={onboardForm.owner_phone}
-                    onChange={(e) => setOnboardForm({ ...onboardForm, owner_phone: e.target.value })}
-                    placeholder="10-digit mobile"
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="block text-slate-400 font-bold mb-1">City</label>
-                  <input
-                    value={onboardForm.city}
-                    onChange={(e) => setOnboardForm({ ...onboardForm, city: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-400 font-bold mb-1">Floors</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={10}
-                    value={onboardForm.floors_per_building}
-                    onChange={(e) => setOnboardForm({ ...onboardForm, floors_per_building: Number(e.target.value) })}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-400 font-bold mb-1">Rooms/Floor</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={20}
-                    value={onboardForm.rooms_per_floor}
-                    onChange={(e) => setOnboardForm({ ...onboardForm, rooms_per_floor: Number(e.target.value) })}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-slate-400 font-bold mb-1">Direct PG Owner UPI ID (VPA)</label>
-                <input
-                  value={onboardForm.upi_id}
-                  onChange={(e) => setOnboardForm({ ...onboardForm, upi_id: e.target.value })}
-                  placeholder="e.g. royalstar@upi"
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono outline-none"
-                />
-              </div>
-
-              <div className="pt-2 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowOnboardModal(false)}
-                  className="py-2.5 px-4 bg-slate-800 text-slate-300 rounded-xl font-bold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={onboardLoading}
-                  className="py-2.5 px-5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl flex items-center gap-1.5"
-                >
-                  {onboardLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                  <span>Provision PG Now</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* ─────────────────────────────────────────────────────────────
           MODAL: EDIT PG CONFIGURATION & SUBSCRIPTION PLAN
