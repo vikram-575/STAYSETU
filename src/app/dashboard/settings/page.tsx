@@ -18,7 +18,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [activeTab, setActiveTab] = useState<'profile' | 'account' | 'staff' | 'data'>('profile')
+  const [activeTab, setActiveTab] = useState<'profile' | 'account' | 'staff'>('profile')
 
   // User Profile
   const [userProfile, setUserProfile] = useState<any>({
@@ -218,34 +218,6 @@ export default function SettingsPage() {
     }
   }
 
-  // Wipe Test Data / Production Reset
-  const handlePurgeTestData = async () => {
-    if (!confirm('Are you sure you want to wipe test transactions and reset bed occupancy to vacant? This cannot be undone.')) {
-      return
-    }
-
-    setSaving(true)
-    try {
-      const res = await fetch('/api/admin/purge-data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          organization_id: org.id,
-          wipe_all: false,
-        }),
-      })
-
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to purge test data')
-      alert('All mock transactions and invoices have been wiped clean!')
-      router.push('/dashboard')
-      router.refresh()
-    } catch (err: any) {
-      alert(err.message)
-    } finally {
-      setSaving(false)
-    }
-  }
 
   const handleSignOut = async () => {
     try {
@@ -334,16 +306,6 @@ export default function SettingsPage() {
             )}
           >
             <Users className="w-3.5 h-3.5" /> Staff & Roles ({staffUsers.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('data')}
-            className={cn(
-              'px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap active:scale-95',
-              activeTab === 'data' ? 'bg-rose-600 text-white shadow-sm' : 'text-rose-700 hover:bg-rose-50'
-            )}
-          >
-            <Database className="w-3.5 h-3.5" /> Clean Fake / Test Data
           </button>
         </div>
       </div>
@@ -632,49 +594,7 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* ------------------------------------------------------------------ */}
-      {/* TAB 4: CLEAN FAKE / TEST DATA (PRODUCTION RESET) */}
-      {/* ------------------------------------------------------------------ */}
-      {activeTab === 'data' && (
-        <div className="bg-white rounded-2xl border border-rose-200 p-5 sm:p-6 shadow-[0_1px_3px_rgba(0,0,0,0.03)] space-y-4">
-          <div className="border-b border-slate-100 pb-3">
-            <h2 className="text-sm sm:text-base font-black text-rose-700 flex items-center gap-2">
-              <Database className="w-4 h-4 text-rose-600" />
-              <span>Clean Fake / Mock Test Data (Production Reset)</span>
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Wipe out test transactions, mock resident records, and reset bed occupancy to 100% vacant for clean live production use.
-            </p>
-          </div>
 
-          <div className="p-4 bg-rose-50/60 border border-rose-200 rounded-2xl space-y-3">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
-              <div>
-                <h3 className="text-xs font-black text-rose-900">What will this do?</h3>
-                <ul className="text-xs text-rose-800 space-y-1 mt-1 list-disc list-inside">
-                  <li>Deletes all mock invoices, charges, and test payments.</li>
-                  <li>Resets all occupied beds back to <strong>Available</strong>.</li>
-                  <li>Wipes mock resident records so you start with <strong>0 residents & ₹0 revenue</strong>.</li>
-                  <li>Preserves your PG Organization profile, buildings, rooms, and beds intact.</li>
-                </ul>
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-rose-200 flex flex-col sm:flex-row gap-2">
-              <button
-                type="button"
-                onClick={handlePurgeTestData}
-                disabled={saving}
-                className="flex-1 py-3 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-2"
-              >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                <span>Wipe All Test Data & Reset to Clean 0</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Modal: Add Staff Member */}
       {showAddStaffModal && (
