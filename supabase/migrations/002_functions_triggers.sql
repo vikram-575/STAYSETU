@@ -385,11 +385,10 @@ LEFT JOIN beds b ON b.room_id = rm.id
 LEFT JOIN residents r ON r.organization_id = org.id
 LEFT JOIN invoices i ON i.organization_id = org.id
 LEFT JOIN LATERAL (
-  SELECT org2.id AS org_id, COALESCE(SUM(dep.amount_paise), 0) AS deposit_held
+  SELECT COALESCE(SUM(dep.amount_paise), 0) AS deposit_held
   FROM deposits dep
-  JOIN residents res ON res.id = dep.resident_id AND res.organization_id = org.id
-  WHERE dep.is_refunded = FALSE
-  GROUP BY org2.id
+  JOIN residents res ON res.id = dep.resident_id
+  WHERE res.organization_id = org.id AND dep.is_refunded = FALSE
 ) d ON TRUE
 GROUP BY org.id, org.name;
 
