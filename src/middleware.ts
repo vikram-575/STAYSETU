@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import { isSuperAdminFromRequest } from '@/lib/admin-auth'
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
@@ -19,39 +20,39 @@ export async function middleware(request: NextRequest) {
     return response
   }
 
-  // Create Supabase client for session verification and token refresh
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
+  // 1. Check SuperAdmin token
+  const isSuperAdmin = isSuperAdminFromRequest(request)
+
+  // 2. Check Supabase session
+  let sbUser: any = null
+  try {
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll()
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+            response = NextResponse.next({
+              request,
+            })
+            cookiesToSet.forEach(({ name, value, options }) =>
+              response.cookies.set(name, value, options)
+            )
+          },
         },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          response = NextResponse.next({
-            request,
-          })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          )
-        },
-      },
-    }
-  )
+      }
+    )
+    const { data } = await supabase.auth.getUser()
+    sbUser = data?.user || null
+  } catch {}
 
-  // Primary auth: Supabase JWT (cryptographically verified)
-  const { data: { user } } = await supabase.auth.getUser()
+  const isAuthenticated = Boolean(isSuperAdmin || sbUser)
 
-  // Read auth_role ONLY from httpOnly cookie (not client-spoofable in combination with Supabase user)
-  // auth_role is only valid when there is a verified Supabase session
-  const authRole = user ? request.cookies.get('auth_role')?.value : null
-
-  const isAuthenticated = Boolean(user)
-  const isSuperAdmin = isAuthenticated && (authRole === 'superadmin' || user?.user_metadata?.role === 'superadmin')
-
-  // If already logged in and visiting login/register/superman-login, redirect to appropriate home
+  // If already logged in and visiting login pages, redirect to home
   if (
     isAuthenticated &&
     (pathname === '/login' ||
@@ -82,21 +83,16 @@ export async function middleware(request: NextRequest) {
 
   // Protect /superman and /admin routes (Super Admin only)
   if (pathname.startsWith('/superman') || pathname.startsWith('/admin')) {
-    if (!isAuthenticated) {
+    if (!isSuperAdmin && (!sbUser || sbUser.user_metadata?.role !== 'superadmin')) {
       const redirectUrl = request.nextUrl.clone()
       redirectUrl.pathname = '/superman/login'
       redirectUrl.searchParams.set('redirectTo', pathname)
       return NextResponse.redirect(redirectUrl)
     }
-    if (!isSuperAdmin) {
-      const redirectUrl = request.nextUrl.clone()
-      redirectUrl.pathname = '/dashboard'
-      return NextResponse.redirect(redirectUrl)
-    }
     return response
   }
 
-  // Protect /dashboard routes (All authenticated staff/owners)
+  // Protect /dashboard routes (All authenticated staff/owners/superadmins)
   if (pathname.startsWith('/dashboard') || pathname.startsWith('/onboarding')) {
     if (!isAuthenticated) {
       const redirectUrl = request.nextUrl.clone()

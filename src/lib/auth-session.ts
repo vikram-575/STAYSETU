@@ -1,4 +1,5 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { getAdminSessionFromCookies, SUPER_ADMIN_EMAIL } from '@/lib/admin-auth'
 
 export interface AuthSessionUser {
   id: string
@@ -17,12 +18,50 @@ export interface AuthSessionUser {
 
 /**
  * Server-side helper to retrieve current authenticated user.
- * Auth is strictly via Supabase JWT — no cookie fallback to prevent spoofing.
+ * Supports Supabase JWT sessions & HMAC SuperAdmin sessions.
  */
 export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
   try {
-    const supabase = await createClient()
-    const { data: { user: sbUser } } = await supabase.auth.getUser()
+    // 1. Check SuperAdmin token session
+    const adminSession = await getAdminSessionFromCookies()
+    if (adminSession) {
+      try {
+        const serviceClient = await createServiceClient()
+        const { data: adminProfile } = await serviceClient
+          .from('users')
+          .select('*, organizations(*)')
+          .eq('email', SUPER_ADMIN_EMAIL)
+          .single()
+
+        if (adminProfile) {
+          return {
+            id: adminProfile.id,
+            email: SUPER_ADMIN_EMAIL,
+            full_name: adminProfile.full_name || 'Vikram Tomar (Super Admin)',
+            role: 'superadmin',
+            organization_id: adminProfile.organization_id,
+            organizations: adminProfile.organizations || { id: 'primary', name: 'PG-SETU Platform' },
+          }
+        }
+      } catch {}
+
+      return {
+        id: 'superadmin_master',
+        email: SUPER_ADMIN_EMAIL,
+        full_name: 'Vikram Tomar (Super Admin)',
+        role: 'superadmin',
+        organization_id: null,
+        organizations: { id: 'platform', name: 'PG-SETU Platform Enterprise' },
+      }
+    }
+
+    // 2. Check Supabase JWT session
+    let sbUser: any = null
+    try {
+      const supabase = await createClient()
+      const { data } = await supabase.auth.getUser()
+      sbUser = data?.user || null
+    } catch {}
 
     if (!sbUser) {
       return null

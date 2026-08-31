@@ -1,19 +1,28 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 
+import { isSuperAdminFromRequest } from '@/lib/admin-auth'
+
 async function requireSuperAdmin(request: NextRequest) {
-  const { createServerClient } = await import('@supabase/ssr')
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => request.cookies.getAll(), setAll: () => {} } }
-  )
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-  const service = await createServiceClient()
-  const { data: profile } = await service.from('users').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'superadmin') return null
-  return user
+  if (isSuperAdminFromRequest(request)) {
+    return { role: 'superadmin' }
+  }
+  try {
+    const { createServerClient } = await import('@supabase/ssr')
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { cookies: { getAll: () => request.cookies.getAll(), setAll: () => {} } }
+    )
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
+    const service = await createServiceClient()
+    const { data: profile } = await service.from('users').select('role').eq('id', user.id).single()
+    if (profile?.role !== 'superadmin') return null
+    return user
+  } catch {
+    return null
+  }
 }
 
 /**

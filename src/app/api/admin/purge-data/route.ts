@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { isSuperAdminFromRequest } from '@/lib/admin-auth'
 
 /**
  * POST /api/admin/purge-data
@@ -8,23 +9,33 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const isSuperAdmin = isSuperAdminFromRequest(request)
+    let orgIdFromProfile: string | null = null
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id, organization_id, role')
-      .eq('id', user.id)
-      .single()
+    if (!isSuperAdmin) {
+      const supabase = await createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    if (!profile || !['owner', 'superadmin'].includes(profile.role)) {
-      return NextResponse.json({ error: 'Only Organization Owners or Super Admins can purge data.' }, { status: 403 })
+      const { data: profile } = await supabase
+        .from('users')
+        .select('id, organization_id, role')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile || !['owner', 'superadmin'].includes(profile.role)) {
+        return NextResponse.json({ error: 'Only Organization Owners or Super Admins can purge data.' }, { status: 403 })
+      }
+      orgIdFromProfile = profile.organization_id
     }
 
     const body = await request.json().catch(() => ({}))
-    const targetOrgId = body.organization_id || profile.organization_id
-    const wipeAll = body.wipe_all === true // if true, also deletes rooms and buildings
+    const targetOrgId = isSuperAdmin ? (body.organization_id || orgIdFromProfile) : orgIdFromProfile
+    const wipeAll = body.wipe_all === true
+
+    if (!targetOrgId) {
+      return NextResponse.json({ error: 'Target Organization ID is required' }, { status: 400 })
+    }
 
     const serviceClient = await createServiceClient()
 
