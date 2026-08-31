@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-
 import { isSuperAdminFromRequest } from '@/lib/admin-auth'
 
 async function requireSuperAdmin(request: NextRequest) {
@@ -32,11 +31,14 @@ export async function GET(request: NextRequest) {
 
     const supabase = await createServiceClient()
 
+    // 1. Core Counts
     const { count: totalOrgs } = await supabase.from('organizations').select('*', { count: 'exact', head: true })
     const { count: totalProps } = await supabase.from('properties').select('*', { count: 'exact', head: true })
     const { count: totalBuildings } = await supabase.from('buildings').select('*', { count: 'exact', head: true })
     const { count: totalRooms } = await supabase.from('rooms').select('*', { count: 'exact', head: true })
+    const { count: totalUsers } = await supabase.from('users').select('*', { count: 'exact', head: true })
 
+    // 2. Beds & Occupancy
     const { data: beds } = await supabase.from('beds').select('status')
     const totalBeds = beds?.length || 0
     const occupiedBeds = beds?.filter((b) => b.status === 'occupied').length || 0
@@ -45,6 +47,7 @@ export async function GET(request: NextRequest) {
 
     const { count: activeResidents } = await supabase.from('residents').select('*', { count: 'exact', head: true }).eq('status', 'active')
 
+    // 3. Financial Invoicing & GMV
     const { data: invoices } = await supabase
       .from('invoices')
       .select('total_paise, paid_paise, balance_paise, status')
@@ -53,7 +56,22 @@ export async function GET(request: NextRequest) {
     const totalGtvPaise = invoices?.reduce((s, i) => s + (i.total_paise || 0), 0) || 0
     const totalCollectedPaise = invoices?.reduce((s, i) => s + (i.paid_paise || 0), 0) || 0
     const totalOutstandingPaise = invoices?.reduce((s, i) => s + Math.max(0, i.balance_paise || 0), 0) || 0
-    const saasMrrPaise = totalBeds * 1000
+    const saasMrrPaise = totalBeds * 1000 // ₹10/bed/mo in paise
+
+    // 4. Support Tickets
+    let openTicketsCount = 0
+    try {
+      const { count } = await supabase.from('complaints').select('*', { count: 'exact', head: true }).eq('status', 'open')
+      openTicketsCount = count || 0
+    } catch {}
+
+    // 5. City Breakdown
+    const { data: orgsList } = await supabase.from('organizations').select('city, name')
+    const cityCounts: Record<string, number> = {}
+    orgsList?.forEach((o) => {
+      const c = o.city?.trim() || 'Other'
+      cityCounts[c] = (cityCounts[c] || 0) + 1
+    })
 
     return NextResponse.json({
       success: true,
@@ -67,10 +85,13 @@ export async function GET(request: NextRequest) {
         available_beds: availableBeds,
         occupancy_rate_pct: occupancyRate,
         total_active_residents: activeResidents || 0,
+        total_users: totalUsers || 0,
         platform_gtv_paise: totalGtvPaise,
         platform_collected_paise: totalCollectedPaise,
         platform_outstanding_paise: totalOutstandingPaise,
         platform_saas_mrr_paise: saasMrrPaise,
+        open_tickets_count: openTicketsCount,
+        city_breakdown: cityCounts,
       },
     })
   } catch (err: any) {

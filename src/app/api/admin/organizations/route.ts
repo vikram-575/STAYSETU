@@ -342,3 +342,120 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: err.message || 'Failed to onboard PG organization' }, { status: 500 })
   }
 }
+
+/**
+ * PATCH /api/admin/organizations
+ * Quick update PG status, subscription expiry, plan, or bank/UPI settings
+ */
+export async function PATCH(request: NextRequest) {
+  try {
+    const adminUser = await requireSuperAdmin(request)
+    if (!adminUser) return NextResponse.json({ error: 'Super Admin access required.' }, { status: 403 })
+
+    const body = await request.json()
+    const { id, name, phone, city, address, plan, status, valid_until, upi_id, gst_enabled, gstin } = body
+
+    if (!id) {
+      return NextResponse.json({ error: 'Organization ID is required.' }, { status: 400 })
+    }
+
+    const supabase = await createServiceClient()
+    const { data: existingOrg, error: fetchErr } = await supabase
+      .from('organizations')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (fetchErr || !existingOrg) {
+      return NextResponse.json({ error: 'Organization not found.' }, { status: 404 })
+    }
+
+    const currentSettings = existingOrg.settings || {}
+    const updatedSettings = {
+      ...currentSettings,
+      plan: plan || currentSettings.plan || 'per_bed',
+      subscription_status: status || currentSettings.subscription_status || 'active',
+      subscription_valid_until: valid_until || currentSettings.subscription_valid_until,
+      upi_id: upi_id || currentSettings.upi_id,
+    }
+
+    const updatePayload: any = {
+      settings: updatedSettings,
+    }
+
+    if (name) updatePayload.name = name.trim()
+    if (phone !== undefined) updatePayload.phone = phone?.trim() || null
+    if (city !== undefined) updatePayload.city = city?.trim() || null
+    if (address !== undefined) updatePayload.address = address?.trim() || null
+    if (gst_enabled !== undefined) updatePayload.gst_enabled = Boolean(gst_enabled)
+    if (gstin !== undefined) updatePayload.gstin = gstin?.trim() || null
+
+    const { data: updated, error: updateErr } = await supabase
+      .from('organizations')
+      .update(updatePayload)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (updateErr) throw updateErr
+
+    return NextResponse.json({
+      success: true,
+      message: `Organization "${updated.name}" updated successfully.`,
+      organization: updated,
+    })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'Failed to update organization' }, { status: 500 })
+  }
+}
+
+/**
+ * DELETE /api/admin/organizations
+ * Completely removes an organization and all its data
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const adminUser = await requireSuperAdmin(request)
+    if (!adminUser) return NextResponse.json({ error: 'Super Admin access required.' }, { status: 403 })
+
+    const { searchParams } = new URL(request.url)
+    const orgId = searchParams.get('id')
+
+    if (!orgId) {
+      return NextResponse.json({ error: 'Organization ID is required.' }, { status: 400 })
+    }
+
+    const supabase = await createServiceClient()
+
+    // 1. Delete dependent transactional records
+    await supabase.from('ledger_entries').delete().eq('organization_id', orgId)
+    await supabase.from('payments').delete().eq('organization_id', orgId)
+    await supabase.from('invoices').delete().eq('organization_id', orgId)
+    await supabase.from('electricity_readings').delete().eq('organization_id', orgId)
+    await supabase.from('electricity_meters').delete().eq('organization_id', orgId)
+    await supabase.from('complaints').delete().eq('organization_id', orgId)
+    await supabase.from('message_logs').delete().eq('organization_id', orgId)
+    await supabase.from('expenses').delete().eq('organization_id', orgId)
+    await supabase.from('beds').delete().eq('organization_id', orgId)
+    await supabase.from('rooms').delete().eq('organization_id', orgId)
+    await supabase.from('floors').delete().eq('organization_id', orgId)
+    await supabase.from('buildings').delete().eq('organization_id', orgId)
+    await supabase.from('properties').delete().eq('organization_id', orgId)
+    await supabase.from('residents').delete().eq('organization_id', orgId)
+    await supabase.from('users').delete().eq('organization_id', orgId)
+    await supabase.from('organization_sequences').delete().eq('organization_id', orgId)
+    await supabase.from('invoice_sequences').delete().eq('organization_id', orgId)
+    await supabase.from('payment_sequences').delete().eq('organization_id', orgId)
+
+    // 2. Delete organization record
+    const { error } = await supabase.from('organizations').delete().eq('id', orgId)
+    if (error) throw error
+
+    return NextResponse.json({
+      success: true,
+      message: 'Organization and all associated records permanently removed.',
+    })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'Failed to delete organization' }, { status: 500 })
+  }
+}

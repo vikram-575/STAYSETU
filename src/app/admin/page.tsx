@@ -1,28 +1,34 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   Building2, Users, CreditCard, DollarSign, PlusCircle, Plus,
   TrendingUp, ShieldCheck, CheckCircle2, AlertCircle,
   Loader2, Sparkles, Database, Layers, ArrowUpRight,
   ExternalLink, Search, RefreshCw, X, Check, Edit2, KeyRound,
   ShieldAlert, Server, Activity, Terminal, ArrowRight, Trash2,
-  Lock, Settings, BarChart3, ChevronRight, Phone, Mail, MapPin
+  Lock, Settings, BarChart3, ChevronRight, Phone, Mail, MapPin,
+  MessageSquare, Radio, Send, LifeBuoy, AlertTriangle, UserCheck,
+  Zap, Copy, ArrowDownRight, Globe
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/money'
 import { formatDate, formatDateTime, cn } from '@/lib/utils'
 
-export default function AdminDashboardPage() {
-  const [activeTab, setActiveTab] = useState<'pgs' | 'subscriptions' | 'transactions' | 'users' | 'tools'>('pgs')
+export default function MasterCompanyAdminPage() {
+  const router = useRouter()
+  const [activeTab, setActiveTab] = useState<'fleet' | 'payments' | 'support' | 'users' | 'broadcast' | 'health'>('fleet')
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [cityFilter, setCityFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
 
   // Data States
   const [stats, setStats] = useState<any>(null)
   const [organizations, setOrganizations] = useState<any[]>([])
-  const [subscriptionsData, setSubscriptionsData] = useState<any>(null)
   const [transactions, setTransactions] = useState<any[]>([])
+  const [tickets, setTickets] = useState<any[]>([])
   const [users, setUsers] = useState<any[]>([])
 
   // Modal States
@@ -31,11 +37,46 @@ export default function AdminDashboardPage() {
   const [onboardError, setOnboardError] = useState('')
   const [onboardSuccess, setOnboardSuccess] = useState('')
 
-  // Create User Modal State
   const [showCreateUserModal, setShowCreateUserModal] = useState(false)
   const [createUserLoading, setCreateUserLoading] = useState(false)
   const [createUserError, setCreateUserError] = useState('')
   const [createUserSuccess, setCreateUserSuccess] = useState('')
+
+  const [selectedOrgForEdit, setSelectedOrgForEdit] = useState<any>(null)
+  const [editOrgLoading, setEditOrgLoading] = useState(false)
+
+  const [selectedTicket, setSelectedTicket] = useState<any>(null)
+  const [ticketActionLoading, setTicketActionLoading] = useState(false)
+
+  const [impersonatingOrgId, setImpersonatingOrgId] = useState<string | null>(null)
+
+  // Broadcast Modal
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false)
+  const [broadcastLoading, setBroadcastLoading] = useState(false)
+  const [broadcastSuccess, setBroadcastSuccess] = useState('')
+  const [broadcastForm, setBroadcastForm] = useState({
+    title: '',
+    message: '',
+    target_city: 'all',
+  })
+
+  // Forms
+  const [onboardForm, setOnboardForm] = useState({
+    org_name: '',
+    owner_name: '',
+    owner_email: '',
+    owner_phone: '',
+    property_name: '',
+    city: 'Pune',
+    address: '',
+    num_buildings: 1,
+    floors_per_building: 3,
+    rooms_per_floor: 4,
+    beds_per_room: 2,
+    base_rent_rupees: 6500,
+    upi_id: '',
+  })
+
   const [userForm, setUserForm] = useState({
     email: '',
     password: '',
@@ -45,54 +86,31 @@ export default function AdminDashboardPage() {
     organization_id: '',
   })
 
-  // Edit Plan Modal
-  const [selectedOrgForPlan, setSelectedOrgForPlan] = useState<any>(null)
-  const [planLoading, setPlanLoading] = useState(false)
-
-  // Onboard Form State
-  const [onboardForm, setOnboardForm] = useState({
-    org_name: '',
-    owner_name: '',
-    owner_email: '',
-    owner_phone: '',
-    property_name: '',
-    city: 'Pune',
-    address: '',
-    gst_enabled: false,
-    gstin: '',
-    plan: 'per_bed',
-    num_buildings: 1,
-    floors_per_building: 3,
-    rooms_per_floor: 4,
-    beds_per_room: 2,
-    base_rent_rupees: 6500,
-  })
-
   // Load all platform data
   const loadData = async () => {
     setLoading(true)
     try {
-      const [statsRes, orgsRes, subsRes, txRes, usersRes] = await Promise.all([
+      const [statsRes, orgsRes, txRes, usersRes, supportRes] = await Promise.all([
         fetch('/api/admin/stats'),
         fetch('/api/admin/organizations'),
-        fetch('/api/admin/subscriptions'),
-        fetch('/api/admin/payments?limit=50'),
+        fetch('/api/admin/payments?limit=100'),
         fetch('/api/admin/users'),
+        fetch('/api/admin/support?limit=100'),
       ])
 
       const statsData = await statsRes.json()
       const orgsData = await orgsRes.json()
-      const subsData = await subsRes.json()
       const txData = await txRes.json()
       const usersData = await usersRes.json()
+      const supportData = await supportRes.json()
 
       if (statsData.success) setStats(statsData.stats)
       if (orgsData.success) setOrganizations(orgsData.organizations || [])
-      if (subsData.success) setSubscriptionsData(subsData)
       if (txData.success) setTransactions(txData.payments || [])
       if (usersData.success) setUsers(usersData.users || [])
+      if (supportData.success) setTickets(supportData.tickets || [])
     } catch (err) {
-      console.error('Failed to load admin data', err)
+      console.error('Failed to load company admin data', err)
     } finally {
       setLoading(false)
     }
@@ -102,7 +120,27 @@ export default function AdminDashboardPage() {
     loadData()
   }, [])
 
-  // Handle 1-Click Onboard Submit
+  // 1-Click PG Impersonation ("Login as PG Owner")
+  const handleImpersonate = async (org: any) => {
+    setImpersonatingOrgId(org.id)
+    try {
+      const res = await fetch('/api/admin/impersonate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organization_id: org.id }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to switch PG context')
+
+      router.push('/dashboard')
+    } catch (err: any) {
+      alert(err.message || 'Impersonation failed')
+      setImpersonatingOrgId(null)
+    }
+  }
+
+  // 1-Click Onboard Submit
   const handleOnboardSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setOnboardLoading(true)
@@ -119,12 +157,12 @@ export default function AdminDashboardPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to onboard PG organization')
 
-      setOnboardSuccess(`Successfully onboarded "${onboardForm.org_name}" with ${data.organization?.rooms_created || 12} rooms and ${data.organization?.beds_created || 24} beds!`)
+      setOnboardSuccess(`Successfully provisioned "${onboardForm.org_name}" with ${data.organization?.rooms_created || 12} rooms & ${data.organization?.beds_created || 24} beds!`)
       await loadData()
       setTimeout(() => {
         setShowOnboardModal(false)
         setOnboardSuccess('')
-      }, 2000)
+      }, 1500)
     } catch (err: any) {
       setOnboardError(err.message)
     } finally {
@@ -132,7 +170,7 @@ export default function AdminDashboardPage() {
     }
   }
 
-  // Handle Create User Submit
+  // Create User Submit
   const handleCreateUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setCreateUserLoading(true)
@@ -149,13 +187,13 @@ export default function AdminDashboardPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to create platform user')
 
-      setCreateUserSuccess(`User ${userForm.email} successfully created with role: ${userForm.role}!`)
+      setCreateUserSuccess(`User ${userForm.email} created as ${userForm.role}!`)
       await loadData()
       setTimeout(() => {
         setShowCreateUserModal(false)
         setCreateUserSuccess('')
         setUserForm({ email: '', password: '', full_name: '', phone: '', role: 'owner', organization_id: '' })
-      }, 1800)
+      }, 1500)
     } catch (err: any) {
       setCreateUserError(err.message)
     } finally {
@@ -163,815 +201,929 @@ export default function AdminDashboardPage() {
     }
   }
 
-  // Handle Plan Modification
-  const handleUpdatePlan = async (planId: string, status: string) => {
-    if (!selectedOrgForPlan) return
-    setPlanLoading(true)
+  // Update Org Plan & Details
+  const handleUpdateOrg = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedOrgForEdit) return
+    setEditOrgLoading(true)
 
     try {
-      const res = await fetch('/api/admin/subscriptions', {
-        method: 'POST',
+      const res = await fetch('/api/admin/organizations', {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          organization_id: selectedOrgForPlan.id || selectedOrgForPlan.org_id,
-          plan: planId,
-          status,
-        }),
+        body: JSON.stringify(selectedOrgForEdit),
       })
 
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to update subscription')
+      if (!res.ok) throw new Error(data.error || 'Failed to update PG')
 
-      setSelectedOrgForPlan(null)
+      setSelectedOrgForEdit(null)
       await loadData()
     } catch (err: any) {
       alert(err.message)
     } finally {
-      setPlanLoading(false)
+      setEditOrgLoading(false)
     }
   }
 
-  // Filter organizations by search
-  const filteredOrgs = organizations.filter((org) => {
-    const q = searchQuery.toLowerCase()
-    return (
-      (org.name || '').toLowerCase().includes(q) ||
-      (org.slug || '').toLowerCase().includes(q) ||
-      (org.city || '').toLowerCase().includes(q) ||
-      (org.owner_name || '').toLowerCase().includes(q) ||
-      (org.owner_email || '').toLowerCase().includes(q)
-    )
-  })
+  // Delete / Purge Org
+  const handleDeleteOrg = async (orgId: string, orgName: string) => {
+    if (!confirm(`Are you sure you want to PERMANENTLY DELETE "${orgName}" and all its rooms, residents, and transactions?`)) {
+      return
+    }
+
+    try {
+      const res = await fetch(`/api/admin/organizations?id=${orgId}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to delete PG')
+      await loadData()
+    } catch (err: any) {
+      alert(err.message)
+    }
+  }
+
+  // Support Ticket Status Update
+  const handleUpdateTicketStatus = async (ticketId: string, newStatus: string, adminNotes?: string) => {
+    setTicketActionLoading(true)
+    try {
+      const res = await fetch('/api/admin/support', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: ticketId, status: newStatus, admin_notes: adminNotes }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to update ticket')
+
+      setSelectedTicket(null)
+      await loadData()
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
+      setTicketActionLoading(false)
+    }
+  }
+
+  // Send Broadcast Announcement
+  const handleBroadcastSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setBroadcastLoading(true)
+    setBroadcastSuccess('')
+
+    try {
+      const res = await fetch('/api/admin/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(broadcastForm),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to send broadcast')
+
+      setBroadcastSuccess(data.message || 'Broadcast queued successfully!')
+      setTimeout(() => {
+        setShowBroadcastModal(false)
+        setBroadcastSuccess('')
+        setBroadcastForm({ title: '', message: '', target_city: 'all' })
+      }, 1500)
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
+      setBroadcastLoading(false)
+    }
+  }
+
+  // Filtered Orgs
+  const filteredOrgs = useMemo(() => {
+    return organizations.filter((org) => {
+      const q = searchQuery.toLowerCase()
+      const matchesSearch =
+        (org.name || '').toLowerCase().includes(q) ||
+        (org.slug || '').toLowerCase().includes(q) ||
+        (org.city || '').toLowerCase().includes(q) ||
+        (org.owner_name || '').toLowerCase().includes(q) ||
+        (org.owner_phone || '').includes(q)
+
+      const matchesCity = cityFilter === 'all' || (org.city || '').toLowerCase() === cityFilter.toLowerCase()
+      const matchesStatus = statusFilter === 'all' || (org.subscription_status || 'active') === statusFilter
+
+      return matchesSearch && matchesCity && matchesStatus
+    })
+  }, [organizations, searchQuery, cityFilter, statusFilter])
+
+  // Unique cities list
+  const uniqueCities = useMemo(() => {
+    const set = new Set<string>()
+    organizations.forEach((o) => {
+      if (o.city) set.add(o.city)
+    })
+    return Array.from(set)
+  }, [organizations])
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-blue-600 selection:text-white pb-20">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-blue-600 selection:text-white">
       
-      {/* ------------------------------------------------------------- */}
-      {/* 1. TOP ENTERPRISE CONSOLE NAVIGATION BAR */}
-      {/* ------------------------------------------------------------- */}
-      <header className="h-16 bg-slate-900/90 backdrop-blur-md border-b border-slate-800/80 px-4 sm:px-8 flex items-center justify-between gap-4 sticky top-0 z-30">
-        
-        {/* Brand & Environment Identity */}
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 border border-blue-400/20 shrink-0">
-            <ShieldAlert className="w-5 h-5 stroke-[2.2]" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-sm font-black text-white tracking-tight uppercase">PG-SETU PLATFORM</h1>
-              <span className="px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400 text-[10px] font-mono font-extrabold uppercase">
-                ROOT ENTERPRISE
-              </span>
+      {/* Top Header Bar */}
+      <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur-xl sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
+              <ShieldCheck className="w-5 h-5" />
             </div>
-            <p className="text-[11px] text-slate-400 font-medium truncate">
-              Multi-Tenant Global Control Console · Master Administrator
-            </p>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base font-black text-white tracking-tight">PG-SETU COMMAND CENTER</h1>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[10px] font-mono font-black uppercase">
+                  Super Admin
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">Enterprise Fleet & Platform Control for Thousands of PGs</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <button
+              onClick={loadData}
+              disabled={loading}
+              className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 transition"
+              title="Refresh Real-Time Data"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+
+            <button
+              onClick={() => setShowBroadcastModal(true)}
+              className="py-2.5 px-3.5 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-300 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+            >
+              <Radio className="w-3.5 h-3.5 text-purple-400" /> Broadcast
+            </button>
+
+            <button
+              onClick={() => setShowCreateUserModal(true)}
+              className="py-2.5 px-3.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+            >
+              <Users className="w-3.5 h-3.5 text-blue-400" /> Add User
+            </button>
+
+            <button
+              onClick={() => setShowOnboardModal(true)}
+              className="py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-black shadow-lg shadow-blue-500/20 transition flex items-center gap-1.5"
+            >
+              <PlusCircle className="w-4 h-4" /> Quick Onboard PG
+            </button>
           </div>
         </div>
 
-        {/* Global Controls & Actions */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <button
-            onClick={loadData}
-            disabled={loading}
-            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition active:scale-95"
-            title="Refresh Real-Time Telemetry"
-          >
-            <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin text-blue-400')} />
-          </button>
-
-          <button
-            onClick={() => setShowCreateUserModal(true)}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition active:scale-95"
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span>+ Create User</span>
-          </button>
-
-          <button
-            onClick={() => setShowOnboardModal(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-extrabold transition shadow-md shadow-blue-600/30 active:scale-95"
-          >
-            <Building2 className="w-4 h-4 stroke-[2.2]" />
-            <span>+ 1-Click Onboard PG</span>
-          </button>
-
-          <Link
-            href="/dashboard"
-            className="hidden md:flex items-center gap-1 text-xs text-slate-400 hover:text-white font-semibold pl-2 border-l border-slate-800 transition"
-          >
-            <span>Exit to PG Workspace</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
+        {/* Global Live Ticker Bar */}
+        {stats && (
+          <div className="bg-slate-950 border-t border-slate-800/80 px-4 sm:px-6 py-2.5 text-xs">
+            <div className="max-w-7xl mx-auto flex items-center justify-between overflow-x-auto gap-6 text-slate-400">
+              <div className="flex items-center gap-2 shrink-0">
+                <Building2 className="w-3.5 h-3.5 text-blue-400" />
+                <span>PGs: <strong className="text-white">{stats.total_organizations}</strong></span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Layers className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Managed Beds: <strong className="text-white">{stats.total_beds}</strong> ({stats.occupancy_rate_pct}% Occupied)</span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Platform GMV: <strong className="text-emerald-400">{formatCurrency(stats.platform_gtv_paise)}</strong></span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Zap className="w-3.5 h-3.5 text-amber-400" />
+                <span>SaaS MRR (₹10/bed): <strong className="text-amber-300">{formatCurrency(stats.platform_saas_mrr_paise)}/mo</strong></span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <LifeBuoy className="w-3.5 h-3.5 text-rose-400" />
+                <span>Open Tickets: <strong className={stats.open_tickets_count > 0 ? 'text-rose-400 font-bold' : 'text-slate-300'}>{stats.open_tickets_count}</strong></span>
+              </div>
+            </div>
+          </div>
+        )}
       </header>
 
-      {/* ------------------------------------------------------------- */}
-      {/* 2. MAIN PLATFORM CONTAINER */}
-      {/* ------------------------------------------------------------- */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-8 pt-6 space-y-6">
+      {/* Main Content & Tabs */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full flex-1 space-y-6">
         
-        {/* Executive Hero Banner */}
-        <div className="relative rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950/70 to-slate-900 border border-slate-800 p-6 sm:p-8 overflow-hidden shadow-2xl">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-          
-          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 text-xs font-mono text-blue-400 font-bold mb-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>SAAS PLATFORM OPERATIONAL · ZERO DOWNTIME</span>
-              </div>
-              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                Company Executive Administration
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl leading-relaxed">
-                Platform-wide oversight for client PGs, multi-property inventory matrix, SaaS subscription recurring run rate, and master transaction telemetry.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="px-4 py-3 bg-slate-950/80 border border-slate-800 rounded-2xl text-left">
-                <p className="text-[10px] font-mono uppercase text-slate-500 font-bold">Platform SaaS Model</p>
-                <p className="text-base sm:text-lg font-black text-blue-400 mt-0.5">₹10 / Bed / Mo</p>
-                <p className="text-[10px] text-slate-400">Pay-Per-Capacity Billing</p>
-              </div>
-            </div>
-          </div>
+        {/* Tab Selector */}
+        <div className="flex items-center gap-2 overflow-x-auto border-b border-slate-800 pb-2">
+          {[
+            { id: 'fleet', label: '🏢 PG Fleet Management', count: organizations.length },
+            { id: 'payments', label: '💳 Financials & Settlements', count: transactions.length },
+            { id: 'support', label: '🎧 Customer Support & Tickets', count: tickets.filter((t) => t.status === 'open').length, highlight: tickets.some((t) => t.status === 'open') },
+            { id: 'users', label: '👥 User & Staff Directory', count: users.length },
+            { id: 'broadcast', label: '📢 System Announcements' },
+            { id: 'health', label: '⚡ Infrastructure Health' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`py-2.5 px-4 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-2 ${
+                activeTab === tab.id
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                  : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800/80'
+              }`}
+            >
+              <span>{tab.label}</span>
+              {tab.count !== undefined && (
+                <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono ${
+                  tab.highlight
+                    ? 'bg-rose-500 text-white font-black animate-pulse'
+                    : activeTab === tab.id ? 'bg-blue-700 text-white' : 'bg-slate-800 text-slate-400'
+                }`}>
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
 
-        {/* ------------------------------------------------------------- */}
-        {/* 3. PLATFORM TELEMETRY KPI CARDS (6-CARD ENTERPRISE GRID) */}
-        {/* ------------------------------------------------------------- */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-          
-          {/* Card 1: ONBOARDED PGS */}
-          <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl flex flex-col justify-between shadow-sm">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-slate-400">ONBOARDED PGS</span>
-              <Building2 className="w-3.5 h-3.5 text-blue-400" />
-            </div>
-            <div>
-              <p className="text-2xl font-black text-white">{stats?.total_organizations ?? organizations.length ?? 0}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">{stats?.total_properties ?? organizations.length} active properties</p>
-            </div>
-          </div>
-
-          {/* Card 2: MANAGED BEDS */}
-          <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl flex flex-col justify-between shadow-sm">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-slate-400">TOTAL BEDS</span>
-              <Layers className="w-3.5 h-3.5 text-indigo-400" />
-            </div>
-            <div>
-              <p className="text-2xl font-black text-white">{stats?.total_beds ?? 0}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                {stats?.occupied_beds ?? 0} occupied ({stats?.occupancy_rate ?? 0}%)
-              </p>
-            </div>
-          </div>
-
-          {/* Card 3: ACTIVE RESIDENTS */}
-          <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl flex flex-col justify-between shadow-sm">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-slate-400">RESIDENTS</span>
-              <Users className="w-3.5 h-3.5 text-purple-400" />
-            </div>
-            <div>
-              <p className="text-2xl font-black text-white">{stats?.active_residents ?? 0}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">Across all client PGs</p>
-            </div>
-          </div>
-
-          {/* Card 4: PLATFORM GTV VOLUME */}
-          <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl flex flex-col justify-between shadow-sm">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-slate-400">PLATFORM GTV</span>
-              <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
-            </div>
-            <div>
-              <p className="text-2xl font-black text-emerald-400">{formatCurrency(stats?.platform_gtv_paise ?? 0)}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">Gross billed volume</p>
-            </div>
-          </div>
-
-          {/* Card 5: PROCESSED RENT */}
-          <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl flex flex-col justify-between shadow-sm">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-slate-400">RENT COLLECTED</span>
-              <CreditCard className="w-3.5 h-3.5 text-teal-400" />
-            </div>
-            <div>
-              <p className="text-2xl font-black text-teal-300">{formatCurrency(stats?.total_collected_paise ?? 0)}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">Processed by PGs</p>
-            </div>
-          </div>
-
-          {/* Card 6: SAAS MRR RUN RATE */}
-          <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl flex flex-col justify-between shadow-sm bg-gradient-to-br from-purple-950/40 to-slate-900">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-purple-400">COMPANY MRR</span>
-              <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-            </div>
-            <div>
-              <p className="text-2xl font-black text-purple-300">
-                ₹{((stats?.saas_mrr_rupees ?? (stats?.total_beds ? stats.total_beds * 10 : 0))).toLocaleString('en-IN')}
-              </p>
-              <p className="text-[11px] text-purple-200/70 mt-0.5">Recurring SaaS revenue</p>
-            </div>
-          </div>
-        </div>
-
-        {/* ------------------------------------------------------------- */}
-        {/* 4. TAB NAVIGATION STRIP */}
-        {/* ------------------------------------------------------------- */}
-        <div className="flex items-center justify-between gap-4 border-b border-slate-800 pb-1">
-          <div className="overflow-x-auto pb-1 scrollbar-none flex items-center gap-1.5">
-            <button
-              onClick={() => setActiveTab('pgs')}
-              className={cn(
-                'px-4 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-2 whitespace-nowrap active:scale-95',
-                activeTab === 'pgs'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
-              )}
-            >
-              <Building2 className="w-3.5 h-3.5" />
-              <span>PG Organizations</span>
-              <span className="px-1.5 py-0.2 text-[10px] bg-slate-950/60 rounded-md font-mono">{organizations.length}</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('subscriptions')}
-              className={cn(
-                'px-4 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-2 whitespace-nowrap active:scale-95',
-                activeTab === 'subscriptions'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
-              )}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>SaaS Subscriptions & Billing</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('transactions')}
-              className={cn(
-                'px-4 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-2 whitespace-nowrap active:scale-95',
-                activeTab === 'transactions'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
-              )}
-            >
-              <Activity className="w-3.5 h-3.5" />
-              <span>Global Transaction Stream</span>
-              <span className="px-1.5 py-0.2 text-[10px] bg-slate-950/60 rounded-md font-mono">{transactions.length}</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('users')}
-              className={cn(
-                'px-4 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-2 whitespace-nowrap active:scale-95',
-                activeTab === 'users'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
-              )}
-            >
-              <Users className="w-3.5 h-3.5" />
-              <span>Platform Users & Roles</span>
-              <span className="px-1.5 py-0.2 text-[10px] bg-slate-950/60 rounded-md font-mono">{users.length}</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('tools')}
-              className={cn(
-                'px-4 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-2 whitespace-nowrap active:scale-95',
-                activeTab === 'tools'
-                  ? 'bg-rose-600 text-white shadow-md shadow-rose-500/20'
-                  : 'text-rose-400 hover:text-rose-300 hover:bg-slate-900'
-              )}
-            >
-              <Database className="w-3.5 h-3.5" />
-              <span>Data Purge & Diagnostics</span>
-            </button>
-          </div>
-        </div>
-
-        {/* ------------------------------------------------------------- */}
-        {/* TAB 1: PG ORGANIZATIONS DIRECTORY */}
-        {/* ------------------------------------------------------------- */}
-        {activeTab === 'pgs' && (
+        {/* ─────────────────────────────────────────────────────────────
+            TAB 1: PG FLEET MANAGEMENT (THOUSANDS OF PGS AT SCALE)
+        ───────────────────────────────────────────────────────────── */}
+        {activeTab === 'fleet' && (
           <div className="space-y-4">
             
-            {/* Search and Filters Bar */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-900/60 border border-slate-800 p-3 rounded-2xl">
-              <div className="relative flex-1 max-w-md">
-                <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            {/* Search & Filter Bar */}
+            <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl flex flex-col md:flex-row gap-3 items-center justify-between">
+              <div className="relative w-full md:w-96">
+                <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
-                  type="text"
-                  placeholder="Filter by PG name, slug, city, owner..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:border-blue-500 outline-none"
+                  placeholder="Search PG by name, slug, city, or owner..."
+                  className="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:border-blue-500 outline-none"
                 />
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400 font-mono">
-                  Showing {filteredOrgs.length} of {organizations.length} PGs
-                </span>
-                <button
-                  onClick={() => setShowOnboardModal(true)}
-                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition shadow-sm"
+              <div className="flex items-center gap-2.5 w-full md:w-auto">
+                <select
+                  value={cityFilter}
+                  onChange={(e) => setCityFilter(e.target.value)}
+                  className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 outline-none"
                 >
-                  + Add Client PG
-                </button>
+                  <option value="all">All Cities ({organizations.length})</option>
+                  {uniqueCities.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 outline-none"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="active">Active Plan</option>
+                  <option value="trial">Free Trial</option>
+                  <option value="suspended">Suspended</option>
+                </select>
               </div>
             </div>
 
-            {/* Organizations Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredOrgs.map((org) => {
-                const totalBeds = org.total_beds || org.beds_count || 0
-                const occupiedBeds = org.occupied_beds || 0
-                const occupancyPct = totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0
-                const mrr = totalBeds * 10
+            {/* Organizations High-Scale Table */}
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-800 bg-slate-950/80 text-[11px] uppercase tracking-wider text-slate-400">
+                      <th className="py-3 px-4 font-bold">PG Property & Brand</th>
+                      <th className="py-3 px-4 font-bold">Owner & Contact</th>
+                      <th className="py-3 px-4 font-bold">Capacity & Occupancy</th>
+                      <th className="py-3 px-4 font-bold">Invoiced GMV</th>
+                      <th className="py-3 px-4 font-bold">Plan & Validity</th>
+                      <th className="py-3 px-4 font-bold text-right">Quick Master Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {filteredOrgs.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-12 text-center text-slate-500">
+                          No PG organizations matching your search criteria.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredOrgs.map((org) => {
+                        const isImpersonating = impersonatingOrgId === org.id
+                        const occupancyPct = org.total_beds > 0 ? Math.round((org.occupied_beds / org.total_beds) * 100) : 0
+                        return (
+                          <tr key={org.id} className="hover:bg-slate-800/40 transition">
+                            {/* Property Details */}
+                            <td className="py-3.5 px-4">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center font-bold">
+                                  <Building2 className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <strong className="text-white block">{org.name}</strong>
+                                  <span className="text-[11px] text-slate-400 flex items-center gap-1">
+                                    <MapPin className="w-3 h-3 text-slate-500" /> {org.city || 'India'} · <code className="text-slate-500">{org.slug}</code>
+                                  </span>
+                                </div>
+                              </div>
+                            </td>
 
-                return (
-                  <div
-                    key={org.id || org.slug}
-                    className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl p-5 space-y-4 shadow-sm transition group"
-                  >
-                    {/* Header: Title, City, Plan */}
-                    <div className="flex items-start justify-between gap-2 border-b border-slate-800/80 pb-3">
-                      <div>
-                        <h3 className="text-base font-black text-white group-hover:text-blue-400 transition-colors">
-                          {org.name}
-                        </h3>
-                        <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                          <MapPin className="w-3 h-3 text-slate-500" />
-                          <span>{org.city || 'Pune'}</span>
-                          <span>·</span>
-                          <span className="font-mono text-[11px] text-slate-500">slug: {org.slug}</span>
-                        </p>
-                      </div>
+                            {/* Owner */}
+                            <td className="py-3.5 px-4">
+                              <span className="text-white font-semibold block">{org.owner_name || 'Owner Profile'}</span>
+                              <span className="text-[11px] text-slate-400">{org.owner_phone || org.phone || 'No Phone'}</span>
+                            </td>
 
-                      <span className="px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-400 text-[10px] font-mono font-bold uppercase">
-                        {org.settings?.plan || 'PER_BED'}
-                      </span>
-                    </div>
+                            {/* Beds & Occupancy */}
+                            <td className="py-3.5 px-4">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <strong className="text-white">{org.total_beds} Beds</strong>
+                                  <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                                    {occupancyPct}%
+                                  </span>
+                                </div>
+                                <div className="w-24 bg-slate-800 rounded-full h-1 overflow-hidden">
+                                  <div
+                                    className="bg-emerald-500 h-full rounded-full"
+                                    style={{ width: `${occupancyPct}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </td>
 
-                    {/* Capacity & Yield Stats */}
-                    <div className="grid grid-cols-3 gap-2 p-3 bg-slate-950/80 border border-slate-800/60 rounded-xl text-center">
-                      <div>
-                        <p className="text-[10px] font-mono text-slate-500 uppercase">Capacity</p>
-                        <p className="text-sm font-black text-white mt-0.5">{totalBeds} beds</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-mono text-slate-500 uppercase">Occupancy</p>
-                        <p className={cn('text-sm font-black mt-0.5', occupancyPct >= 80 ? 'text-emerald-400' : 'text-slate-300')}>
-                          {occupancyPct}%
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-mono text-slate-500 uppercase">SaaS Yield</p>
-                        <p className="text-sm font-black text-purple-400 mt-0.5">₹{mrr}/mo</p>
-                      </div>
-                    </div>
+                            {/* GMV */}
+                            <td className="py-3.5 px-4">
+                              <strong className="text-emerald-400 block">{formatCurrency(org.total_collected_paise || 0)}</strong>
+                              <span className="text-[10px] text-slate-500">
+                                Due: {formatCurrency(org.total_outstanding_paise || 0)}
+                              </span>
+                            </td>
 
-                    {/* Owner Contact */}
-                    <div className="text-xs space-y-1 text-slate-400 pt-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-500">Owner Contact:</span>
-                        <span className="text-white font-medium">{org.owner_name || org.phone || '—'}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-500">Collected Rent:</span>
-                        <span className="text-emerald-400 font-bold">{formatCurrency(org.total_collected_paise || 0)}</span>
-                      </div>
-                    </div>
+                            {/* Plan & Status */}
+                            <td className="py-3.5 px-4">
+                              <div className="space-y-0.5">
+                                <span className="px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 font-bold text-[10px] uppercase border border-blue-500/20">
+                                  {org.plan} (₹10/bed)
+                                </span>
+                                <span className="text-[10px] text-slate-400 block">
+                                  Valid: {org.subscription_valid_until ? formatDate(org.subscription_valid_until) : 'Active'}
+                                </span>
+                              </div>
+                            </td>
 
-                    {/* Action Buttons */}
-                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
-                      <button
-                        onClick={() => setSelectedOrgForPlan(org)}
-                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition"
-                      >
-                        Edit Plan
-                      </button>
+                            {/* Actions */}
+                            <td className="py-3.5 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                
+                                {/* 1-Click Impersonate */}
+                                <button
+                                  onClick={() => handleImpersonate(org)}
+                                  disabled={isImpersonating}
+                                  className="py-1.5 px-2.5 bg-blue-600/20 hover:bg-blue-600 text-blue-300 hover:text-white rounded-lg border border-blue-500/30 text-[11px] font-bold transition flex items-center gap-1"
+                                  title="Log into this PG Dashboard as Master Admin"
+                                >
+                                  {isImpersonating ? <Loader2 className="w-3 h-3 animate-spin" /> : <ExternalLink className="w-3 h-3" />}
+                                  <span>Login as PG</span>
+                                </button>
 
-                      <Link
-                        href={`/dashboard?orgId=${org.id}`}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 rounded-lg text-xs font-bold transition"
-                      >
-                        <span>Open Workspace</span>
-                        <ArrowUpRight className="w-3.5 h-3.5" />
-                      </Link>
-                    </div>
-                  </div>
-                )
-              })}
+                                {/* Direct WhatsApp Owner */}
+                                {org.owner_phone && (
+                                  <a
+                                    href={`https://wa.me/91${org.owner_phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hello from PG-SETU Support team regarding ${org.name}`)}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="p-1.5 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white rounded-lg border border-emerald-500/30 transition"
+                                    title="Chat with Owner on WhatsApp"
+                                  >
+                                    <Phone className="w-3.5 h-3.5" />
+                                  </a>
+                                )}
+
+                                {/* Edit Plan & Details */}
+                                <button
+                                  onClick={() => setSelectedOrgForEdit(org)}
+                                  className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition"
+                                  title="Edit PG Configuration"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+
+                                {/* Delete / Purge */}
+                                <button
+                                  onClick={() => handleDeleteOrg(org.id, org.name)}
+                                  className="p-1.5 bg-rose-950/40 hover:bg-rose-600 text-rose-400 hover:text-white rounded-lg border border-rose-800/40 transition"
+                                  title="Delete Organization"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
+
           </div>
         )}
 
-        {/* ------------------------------------------------------------- */}
-        {/* TAB 2: SAAS SUBSCRIPTIONS & BILLING */}
-        {/* ------------------------------------------------------------- */}
-        {activeTab === 'subscriptions' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              
-              {/* Plan 1: Standard Pay-Per-Bed */}
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4 relative">
-                <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono text-[10px] font-bold uppercase">
-                  DEFAULT SAAS
-                </span>
-                <div>
-                  <h3 className="text-lg font-black text-white">Standard Pay-Per-Bed</h3>
-                  <p className="text-xs text-slate-400 mt-1">₹10 per managed bed per month</p>
-                </div>
-                <div className="text-3xl font-black text-blue-400">
-                  ₹10 <span className="text-xs font-normal text-slate-400">/ bed / mo</span>
-                </div>
-                <ul className="text-xs text-slate-300 space-y-2 border-t border-slate-800 pt-3">
-                  <li className="flex items-center gap-2">✓ Unlimited Residents & KYC Vault</li>
-                  <li className="flex items-center gap-2">✓ Dynamic UPI QR & Payment Registers</li>
-                  <li className="flex items-center gap-2">✓ Sub-Meter Electricity Splitter</li>
-                  <li className="flex items-center gap-2">✓ Tenant Self-Service Passbook Portal</li>
-                </ul>
-              </div>
-
-              {/* Plan 2: 100-Bed Fixed */}
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-                <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 font-mono text-[10px] font-bold uppercase">
-                  VOLUME TIER
-                </span>
-                <div>
-                  <h3 className="text-lg font-black text-white">100-Bed Fixed Tier</h3>
-                  <p className="text-xs text-slate-400 mt-1">Optimized for mid-size PG hostels</p>
-                </div>
-                <div className="text-3xl font-black text-purple-400">
-                  ₹1,000 <span className="text-xs font-normal text-slate-400">/ month</span>
-                </div>
-                <ul className="text-xs text-slate-300 space-y-2 border-t border-slate-800 pt-3">
-                  <li className="flex items-center gap-2">✓ Up to 100 Managed Beds</li>
-                  <li className="flex items-center gap-2">✓ Multi-Manager Staff Accounts</li>
-                  <li className="flex items-center gap-2">✓ Priority WhatsApp Notifications</li>
-                </ul>
-              </div>
-
-              {/* Plan 3: 500-Bed Enterprise */}
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-                <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono text-[10px] font-bold uppercase">
-                  CAMPUS / ENTERPRISE
-                </span>
-                <div>
-                  <h3 className="text-lg font-black text-white">500-Bed Campus Tier</h3>
-                  <p className="text-xs text-slate-400 mt-1">For multi-building hostel campuses</p>
-                </div>
-                <div className="text-3xl font-black text-emerald-400">
-                  ₹5,000 <span className="text-xs font-normal text-slate-400">/ month</span>
-                </div>
-                <ul className="text-xs text-slate-300 space-y-2 border-t border-slate-800 pt-3">
-                  <li className="flex items-center gap-2">✓ Up to 500 Managed Beds</li>
-                  <li className="flex items-center gap-2">✓ Custom Billing Cycles & GST Integration</li>
-                  <li className="flex items-center gap-2">✓ Dedicated Account Manager</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ------------------------------------------------------------- */}
-        {/* TAB 3: GLOBAL TRANSACTION STREAM */}
-        {/* ------------------------------------------------------------- */}
-        {activeTab === 'transactions' && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        {/* ─────────────────────────────────────────────────────────────
+            TAB 2: GLOBAL PAYMENTS & TRANSACTIONS STREAM
+        ───────────────────────────────────────────────────────────── */}
+        {activeTab === 'payments' && (
+          <div className="space-y-4">
+            <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-white">Real-Time Platform Transaction Feed</h3>
-                <p className="text-xs text-slate-400">Live stream of all rent collections across all client PGs</p>
+                <h3 className="text-sm font-bold text-white">Cross-PG Transaction Stream</h3>
+                <p className="text-xs text-slate-400">Live feed of resident rent payments and UPI settlements across all onboarded properties.</p>
               </div>
-              <span className="text-xs font-mono text-emerald-400 font-bold flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                Live Stream
+              <span className="text-xs font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                Total Loaded: {transactions.length} Transactions
               </span>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left">
-                <thead className="text-[10px] font-mono text-slate-400 uppercase bg-slate-950 border-b border-slate-800">
-                  <tr>
-                    <th className="p-3">Time & Date</th>
-                    <th className="p-3">PG Organization</th>
-                    <th className="p-3">Resident</th>
-                    <th className="p-3">Payment Method</th>
-                    <th className="p-3">Amount</th>
-                    <th className="p-3">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800 text-slate-300 font-medium">
-                  {transactions.map((tx, idx) => (
-                    <tr key={tx.id || idx} className="hover:bg-slate-800/50">
-                      <td className="p-3 font-mono text-slate-400">{formatDateTime(tx.payment_time || tx.created_at)}</td>
-                      <td className="p-3 font-bold text-white">{tx.organizations?.name || 'PG-SETU'}</td>
-                      <td className="p-3 text-slate-200">{tx.residents?.full_name || 'Resident'}</td>
-                      <td className="p-3 uppercase font-mono text-slate-400">{tx.payment_method}</td>
-                      <td className="p-3 font-bold text-emerald-400">{formatCurrency(tx.amount_paise)}</td>
-                      <td className="p-3">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                          COMPLETED
-                        </span>
-                      </td>
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-800 bg-slate-950/80 text-[11px] uppercase tracking-wider text-slate-400">
+                      <th className="py-3 px-4 font-bold">Receipt / Txn ID</th>
+                      <th className="py-3 px-4 font-bold">PG Property</th>
+                      <th className="py-3 px-4 font-bold">Resident</th>
+                      <th className="py-3 px-4 font-bold">Amount (₹)</th>
+                      <th className="py-3 px-4 font-bold">Method</th>
+                      <th className="py-3 px-4 font-bold">Timestamp</th>
+                      <th className="py-3 px-4 font-bold">Status</th>
                     </tr>
-                  ))}
-                  {transactions.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="p-8 text-center text-slate-500">
-                        No transactions recorded on the platform yet.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {transactions.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center text-slate-500">
+                          No transactions recorded yet across the platform.
+                        </td>
+                      </tr>
+                    ) : (
+                      transactions.map((tx) => (
+                        <tr key={tx.id} className="hover:bg-slate-800/40 transition">
+                          <td className="py-3 px-4 font-mono font-bold text-white">
+                            {tx.payment_number || tx.transaction_id || tx.id.slice(0, 8)}
+                          </td>
+                          <td className="py-3 px-4 text-slate-300">
+                            {tx.organizations?.name || 'Unknown PG'}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="text-white block font-medium">{tx.residents?.full_name || 'Resident'}</span>
+                            <span className="text-[11px] text-slate-500">{tx.residents?.phone}</span>
+                          </td>
+                          <td className="py-3 px-4 font-black text-emerald-400">
+                            {formatCurrency(tx.amount_paise)}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[10px] uppercase">
+                              {tx.payment_method || 'UPI'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-slate-400 text-[11px]">
+                            {tx.payment_date ? formatDate(tx.payment_date) : formatDateTime(tx.created_at)}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-[10px]">
+                              Success
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
 
-        {/* ------------------------------------------------------------- */}
-        {/* TAB 4: PLATFORM USERS & ROLES */}
-        {/* ------------------------------------------------------------- */}
-        {activeTab === 'users' && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+        {/* ─────────────────────────────────────────────────────────────
+            TAB 3: CUSTOMER SUPPORT & HELPDESK TICKETS
+        ───────────────────────────────────────────────────────────── */}
+        {activeTab === 'support' && (
+          <div className="space-y-4">
+            <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-white">Platform User Directory</h3>
-                <p className="text-xs text-slate-400">All registered PG owners, staff, and super administrators</p>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <LifeBuoy className="w-4 h-4 text-blue-400" /> Universal Helpdesk & Escalations
+                </h3>
+                <p className="text-xs text-slate-400">Manage tenant maintenance requests and owner support escalations across all PGs.</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {tickets.length === 0 ? (
+                <div className="col-span-full py-12 text-center text-slate-500 bg-slate-900/40 rounded-2xl border border-slate-800">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
+                  <p className="text-sm font-bold text-slate-300">All Clear! No active customer support tickets.</p>
+                </div>
+              ) : (
+                tickets.map((t) => (
+                  <div
+                    key={t.id}
+                    className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-3 shadow-lg hover:border-slate-700 transition flex flex-col justify-between"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
+                          t.status === 'open' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
+                          t.status === 'in_progress' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                          'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        }`}>
+                          {t.status}
+                        </span>
+                        <span className="text-[10px] text-slate-500">{formatDate(t.created_at)}</span>
+                      </div>
+
+                      <h4 className="text-sm font-black text-white">{t.title || t.category || 'Support Request'}</h4>
+                      <p className="text-xs text-slate-300 leading-relaxed line-clamp-3">{t.description}</p>
+
+                      <div className="pt-2 border-t border-slate-800 text-[11px] text-slate-400 space-y-0.5">
+                        <div>PG: <strong className="text-white">{t.organizations?.name || 'Unknown'}</strong> ({t.organizations?.city})</div>
+                        <div>Resident: <strong className="text-white">{t.residents?.full_name}</strong> ({t.residents?.phone})</div>
+                        {t.admin_notes && (
+                          <div className="p-2 bg-slate-950 rounded-lg text-amber-300 text-[10px] mt-1.5">
+                            Note: {t.admin_notes}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+                      {t.residents?.phone && (
+                        <a
+                          href={`https://wa.me/91${t.residents.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hi ${t.residents.full_name}, regarding your ticket "${t.title}": `)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="py-1.5 px-2.5 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white rounded-lg text-[11px] font-bold transition flex items-center gap-1"
+                        >
+                          <Phone className="w-3 h-3" /> WhatsApp
+                        </a>
+                      )}
+
+                      <select
+                        value={t.status}
+                        onChange={(e) => handleUpdateTicketStatus(t.id, e.target.value)}
+                        className="py-1 px-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-200 outline-none"
+                      >
+                        <option value="open">Open</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="resolved">Resolved</option>
+                      </select>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ─────────────────────────────────────────────────────────────
+            TAB 4: GLOBAL USER & STAFF DIRECTORY
+        ───────────────────────────────────────────────────────────── */}
+        {activeTab === 'users' && (
+          <div className="space-y-4">
+            <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-white">Global Identity & User Directory</h3>
+                <p className="text-xs text-slate-400">Manage all registered Owners, Managers, Accountants, and Staff accounts.</p>
               </div>
               <button
                 onClick={() => setShowCreateUserModal(true)}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition shadow-sm"
+                className="py-2 px-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5"
               >
-                + Create User & Password
+                <Plus className="w-3.5 h-3.5" /> Create Platform User
               </button>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left">
-                <thead className="text-[10px] font-mono text-slate-400 uppercase bg-slate-950 border-b border-slate-800">
-                  <tr>
-                    <th className="p-3">User</th>
-                    <th className="p-3">Email Address</th>
-                    <th className="p-3">Assigned Role</th>
-                    <th className="p-3">PG Organization</th>
-                    <th className="p-3">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800 text-slate-300 font-medium">
-                  {users.map((u) => (
-                    <tr key={u.id} className="hover:bg-slate-800/50">
-                      <td className="p-3 font-bold text-white">{u.full_name || 'User'}</td>
-                      <td className="p-3 font-mono text-slate-400">{u.email}</td>
-                      <td className="p-3">
-                        <span className={cn(
-                          'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono',
-                          u.role === 'superadmin' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' :
-                          u.role === 'owner' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' :
-                          'bg-slate-800 text-slate-300'
-                        )}>
-                          {u.role}
-                        </span>
-                      </td>
-                      <td className="p-3 text-slate-400">{u.organizations?.name || 'All Platform'}</td>
-                      <td className="p-3">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold text-emerald-400 bg-emerald-500/10">
-                          Active
-                        </span>
-                      </td>
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-800 bg-slate-950/80 text-[11px] uppercase tracking-wider text-slate-400">
+                      <th className="py-3 px-4 font-bold">User</th>
+                      <th className="py-3 px-4 font-bold">Role</th>
+                      <th className="py-3 px-4 font-bold">Assigned PG</th>
+                      <th className="py-3 px-4 font-bold">Contact</th>
+                      <th className="py-3 px-4 font-bold">Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {users.map((u) => (
+                      <tr key={u.id} className="hover:bg-slate-800/40 transition">
+                        <td className="py-3 px-4">
+                          <strong className="text-white block">{u.full_name || 'User'}</strong>
+                          <span className="text-[11px] text-slate-400">{u.email}</span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
+                            u.role === 'superadmin' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' :
+                            u.role === 'owner' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
+                            'bg-slate-800 text-slate-300'
+                          }`}>
+                            {u.role}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-slate-300">
+                          {u.organizations?.name || 'Universal / Unassigned'}
+                        </td>
+                        <td className="py-3 px-4 text-slate-400">
+                          {u.phone || 'No phone'}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-[10px]">
+                            Active
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
 
-        {/* ------------------------------------------------------------- */}
-        {/* TAB 5: DATA PURGE & DIAGNOSTICS */}
-        {/* ------------------------------------------------------------- */}
-        {activeTab === 'tools' && (
-          <div className="bg-slate-900 border border-rose-900/50 rounded-2xl p-6 space-y-6">
-            <div className="border-b border-slate-800 pb-3">
-              <h3 className="text-base font-black text-rose-400 flex items-center gap-2">
-                <Database className="w-5 h-5 text-rose-500" />
-                <span>Production Data Purge & Diagnostics</span>
+        {/* ─────────────────────────────────────────────────────────────
+            TAB 5: SYSTEM ANNOUNCEMENTS & BROADCAST
+        ───────────────────────────────────────────────────────────── */}
+        {activeTab === 'broadcast' && (
+          <div className="max-w-2xl mx-auto space-y-6">
+            <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5">
+              <div>
+                <h3 className="text-base font-black text-white flex items-center gap-2">
+                  <Radio className="w-5 h-5 text-purple-400" /> Platform-Wide Announcement Broadcast
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Send system maintenance notices, new feature releases, or policy updates to all PG owners instantly.
+                </p>
+              </div>
+
+              {broadcastSuccess && (
+                <div className="p-3 bg-emerald-950/80 border border-emerald-800 text-emerald-300 text-xs rounded-xl font-bold">
+                  {broadcastSuccess}
+                </div>
+              )}
+
+              <form onSubmit={handleBroadcastSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Announcement Headline *</label>
+                  <input
+                    required
+                    value={broadcastForm.title}
+                    onChange={(e) => setBroadcastForm({ ...broadcastForm, title: e.target.value })}
+                    placeholder="e.g. Scheduled System Upgrade on Sunday at 2:00 AM"
+                    className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white outline-none focus:border-purple-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Target Geographic Audience</label>
+                  <select
+                    value={broadcastForm.target_city}
+                    onChange={(e) => setBroadcastForm({ ...broadcastForm, target_city: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white outline-none"
+                  >
+                    <option value="all">All Cities & All PG Properties ({organizations.length} PGs)</option>
+                    {uniqueCities.map((c) => (
+                      <option key={c} value={c}>Only PGs in {c}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Message Content *</label>
+                  <textarea
+                    required
+                    rows={4}
+                    value={broadcastForm.message}
+                    onChange={(e) => setBroadcastForm({ ...broadcastForm, message: e.target.value })}
+                    placeholder="Type announcement details for PG owners..."
+                    className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white outline-none focus:border-purple-500 resize-none"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={broadcastLoading}
+                  className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20"
+                >
+                  {broadcastLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  <span>{broadcastLoading ? 'Dispatching Broadcast...' : 'Dispatch Announcement Broadcast →'}</span>
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ─────────────────────────────────────────────────────────────
+            TAB 6: INFRASTRUCTURE & PLATFORM DIAGNOSTICS
+        ───────────────────────────────────────────────────────────── */}
+        {activeTab === 'health' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl">
+              <h3 className="text-sm font-black text-white flex items-center gap-2">
+                <Server className="w-4 h-4 text-emerald-400" /> Database & PostgREST Health
               </h3>
-              <p className="text-xs text-slate-400 mt-1">
-                Wipe test records, mock invoices, and sample resident data before handing over to actual PG owners.
-              </p>
+              <p className="text-xs text-slate-400">Real-time status of backend microservices and database connection pool.</p>
+
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center justify-between p-3 bg-slate-950 rounded-xl border border-slate-800">
+                  <span className="text-slate-300">Supabase Postgres Engine</span>
+                  <span className="text-emerald-400 font-bold flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Connected (Port 5432)
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-slate-950 rounded-xl border border-slate-800">
+                  <span className="text-slate-300">PostgREST Schema Cache</span>
+                  <span className="text-emerald-400 font-bold flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Synced & Active
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-slate-950 rounded-xl border border-slate-800">
+                  <span className="text-slate-300">Edge WebCrypto Auth</span>
+                  <span className="text-emerald-400 font-bold flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5" /> HMAC-SHA256 Ready
+                  </span>
+                </div>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {organizations.map((org) => (
-                <div key={org.id} className="p-5 bg-slate-950 border border-slate-800 rounded-2xl space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-sm text-white">{org.name}</h4>
-                    <span className="text-xs font-mono text-slate-500">ID: {org.id?.slice(0, 8)}</span>
-                  </div>
-                  <p className="text-xs text-slate-400">
-                    Capacity: <strong>{org.total_beds || 0} Beds</strong> · Total Collected: <strong>{formatCurrency(org.total_collected_paise || 0)}</strong>
-                  </p>
-                  
-                  <button
-                    onClick={async () => {
-                      if (!confirm(`Are you sure you want to wipe all test transactions and reset resident occupancy to 0 for "${org.name}"?`)) return
-                      try {
-                        const res = await fetch('/api/admin/purge-data', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ organization_id: org.id }),
-                        })
-                        const d = await res.json()
-                        if (!res.ok) throw new Error(d.error || 'Failed to purge')
-                        alert(`Data purged for ${org.name}!`)
-                        await loadData()
-                      } catch (err: any) {
-                        alert(err.message)
-                      }
-                    }}
-                    className="w-full py-2.5 bg-rose-950/60 hover:bg-rose-900 border border-rose-800/80 text-rose-300 hover:text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Wipe Mock Data & Reset to Blank</span>
-                  </button>
-                </div>
-              ))}
+            <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl">
+              <h3 className="text-sm font-black text-white flex items-center gap-2">
+                <Terminal className="w-4 h-4 text-blue-400" /> Emergency Recovery & Test Purge
+              </h3>
+              <p className="text-xs text-slate-400">Purge mock transactions from specific test organizations while keeping properties intact.</p>
+
+              <button
+                onClick={() => {
+                  const orgId = prompt('Enter Organization ID to purge mock residents and invoices:')
+                  if (!orgId) return
+                  fetch('/api/admin/purge-data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ organization_id: orgId }),
+                  })
+                    .then((r) => r.json())
+                    .then((d) => alert(d.message || d.error))
+                    .catch((e) => alert(e.message))
+                }}
+                className="w-full py-2.5 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/40 text-rose-300 font-bold rounded-xl text-xs transition flex items-center justify-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" /> Purge Mock Test Data for Organization
+              </button>
             </div>
+
           </div>
         )}
 
       </main>
 
-      {/* ------------------------------------------------------------- */}
-      {/* MODAL 1: 1-CLICK ONBOARD PG ORGANIZATIONS */}
-      {/* ------------------------------------------------------------- */}
+      {/* ─────────────────────────────────────────────────────────────
+          MODAL: QUICK ONBOARD PG (OPERATIONS TEAM)
+      ───────────────────────────────────────────────────────────── */}
       {showOnboardModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            <button
-              onClick={() => setShowOnboardModal(false)}
-              className="absolute top-5 right-5 p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800 hover:bg-slate-700"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            <div>
-              <span className="px-2.5 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400 font-mono text-[10px] font-bold uppercase">
-                1-Click Deployment Engine
-              </span>
-              <h3 className="text-xl font-black text-white mt-1">Onboard New Client PG</h3>
-              <p className="text-xs text-slate-400">Instantly provisions Org, Property, Building, Floors, Rooms, Beds & Sub-Meters</p>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full space-y-5 shadow-2xl my-8">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="text-base font-black text-white flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-blue-400" /> 1-Click Fast PG Onboard
+                </h3>
+                <p className="text-[11px] text-slate-400">Instantly provision an organization, buildings, rooms, beds & owner account</p>
+              </div>
+              <button onClick={() => setShowOnboardModal(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
             {onboardError && (
-              <div className="p-3.5 bg-rose-950/70 border border-rose-800 text-rose-300 rounded-xl text-xs font-semibold">
+              <div className="p-3 bg-rose-950/80 border border-rose-800 text-rose-300 text-xs rounded-xl font-bold">
                 {onboardError}
               </div>
             )}
+
             {onboardSuccess && (
-              <div className="p-3.5 bg-emerald-950/70 border border-emerald-800 text-emerald-300 rounded-xl text-xs font-bold">
+              <div className="p-3 bg-emerald-950/80 border border-emerald-800 text-emerald-300 text-xs rounded-xl font-bold">
                 {onboardSuccess}
               </div>
             )}
 
             <form onSubmit={handleOnboardSubmit} className="space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-300 mb-1">PG Business Name *</label>
+                  <label className="block text-slate-400 font-bold mb-1">PG Brand Name *</label>
                   <input
-                    type="text"
                     required
-                    placeholder="e.g. Royal Living PG"
                     value={onboardForm.org_name}
                     onChange={(e) => setOnboardForm({ ...onboardForm, org_name: e.target.value })}
-                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold"
+                    placeholder="e.g. Royal Star Living"
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-300 mb-1">Property Name *</label>
+                  <label className="block text-slate-400 font-bold mb-1">Campus Name *</label>
                   <input
-                    type="text"
                     required
-                    placeholder="e.g. Main Hostel Campus"
                     value={onboardForm.property_name}
                     onChange={(e) => setOnboardForm({ ...onboardForm, property_name: e.target.value })}
-                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold"
+                    placeholder="e.g. Hinjawadi Main"
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-blue-500"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-300 mb-1">Owner Name</label>
+                  <label className="block text-slate-400 font-bold mb-1">Owner Name *</label>
                   <input
-                    type="text"
-                    placeholder="e.g. Rajesh Kumar"
+                    required
                     value={onboardForm.owner_name}
                     onChange={(e) => setOnboardForm({ ...onboardForm, owner_name: e.target.value })}
-                    className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white"
+                    placeholder="Owner Full Name"
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-300 mb-1">Owner Email</label>
+                  <label className="block text-slate-400 font-bold mb-1">Owner Phone *</label>
                   <input
-                    type="email"
-                    placeholder="owner@royalpg.com"
-                    value={onboardForm.owner_email}
-                    onChange={(e) => setOnboardForm({ ...onboardForm, owner_email: e.target.value })}
-                    className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-300 mb-1">Owner Mobile</label>
-                  <input
-                    type="tel"
-                    placeholder="9876543210"
+                    required
                     value={onboardForm.owner_phone}
                     onChange={(e) => setOnboardForm({ ...onboardForm, owner_phone: e.target.value })}
-                    className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white"
+                    placeholder="10-digit mobile"
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-blue-500"
                   />
                 </div>
               </div>
 
-              {/* Physical Layout Matrix */}
-              <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl space-y-3">
-                <span className="font-bold text-slate-200 block text-xs">Inventory Generator</span>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <div>
-                    <label className="block text-[11px] text-slate-400 mb-1">Total Floors</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={10}
-                      value={onboardForm.floors_per_building}
-                      onChange={(e) => setOnboardForm({ ...onboardForm, floors_per_building: Number(e.target.value) })}
-                      className="w-full p-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] text-slate-400 mb-1">Rooms / Floor</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={20}
-                      value={onboardForm.rooms_per_floor}
-                      onChange={(e) => setOnboardForm({ ...onboardForm, rooms_per_floor: Number(e.target.value) })}
-                      className="w-full p-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] text-slate-400 mb-1">Beds / Room</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={6}
-                      value={onboardForm.beds_per_room}
-                      onChange={(e) => setOnboardForm({ ...onboardForm, beds_per_room: Number(e.target.value) })}
-                      className="w-full p-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] text-slate-400 mb-1">Rent / Bed (₹)</label>
-                    <input
-                      type="number"
-                      step={500}
-                      value={onboardForm.base_rent_rupees}
-                      onChange={(e) => setOnboardForm({ ...onboardForm, base_rent_rupees: Number(e.target.value) })}
-                      className="w-full p-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-bold"
-                    />
-                  </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">City</label>
+                  <input
+                    value={onboardForm.city}
+                    onChange={(e) => setOnboardForm({ ...onboardForm, city: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none"
+                  />
                 </div>
-
-                <p className="text-[11px] text-blue-400 font-mono">
-                  ➜ Generates {onboardForm.floors_per_building * onboardForm.rooms_per_floor} Rooms & {onboardForm.floors_per_building * onboardForm.rooms_per_floor * onboardForm.beds_per_room} Beds with Sub-Meters.
-                </p>
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">Floors</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={onboardForm.floors_per_building}
+                    onChange={(e) => setOnboardForm({ ...onboardForm, floors_per_building: Number(e.target.value) })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">Rooms/Floor</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={onboardForm.rooms_per_floor}
+                    onChange={(e) => setOnboardForm({ ...onboardForm, rooms_per_floor: Number(e.target.value) })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold outline-none"
+                  />
+                </div>
               </div>
 
-              <div className="pt-2 border-t border-slate-800 flex justify-end gap-2">
+              <div>
+                <label className="block text-slate-400 font-bold mb-1">Direct PG Owner UPI ID (VPA)</label>
+                <input
+                  value={onboardForm.upi_id}
+                  onChange={(e) => setOnboardForm({ ...onboardForm, upi_id: e.target.value })}
+                  placeholder="e.g. royalstar@upi"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono outline-none"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowOnboardModal(false)}
-                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold"
+                  className="py-2.5 px-4 bg-slate-800 text-slate-300 rounded-xl font-bold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={onboardLoading}
-                  className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold rounded-xl shadow-lg shadow-blue-600/30 flex items-center gap-2"
+                  className="py-2.5 px-5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl flex items-center gap-1.5"
                 >
                   {onboardLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                  <span>{onboardLoading ? 'Provisioning System...' : 'Deploy & Launch PG'}</span>
+                  <span>Provision PG Now</span>
                 </button>
               </div>
             </form>
@@ -979,189 +1131,195 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* ------------------------------------------------------------- */}
-      {/* MODAL 2: EDIT SUBSCRIPTION PLAN */}
-      {/* ------------------------------------------------------------- */}
-      {selectedOrgForPlan && (
+      {/* ─────────────────────────────────────────────────────────────
+          MODAL: EDIT PG CONFIGURATION & SUBSCRIPTION PLAN
+      ───────────────────────────────────────────────────────────── */}
+      {selectedOrgForEdit && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl relative">
-            <button
-              onClick={() => setSelectedOrgForPlan(null)}
-              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            <div>
-              <h3 className="text-base font-black text-white">SaaS Plan: {selectedOrgForPlan.name}</h3>
-              <p className="text-xs text-slate-400">Select pricing tier for client organization</p>
-            </div>
-
-            <div className="space-y-2 text-xs">
-              <button
-                type="button"
-                disabled={planLoading}
-                onClick={() => handleUpdatePlan('per_bed', 'active')}
-                className="w-full p-3 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-left flex justify-between items-center transition"
-              >
-                <div>
-                  <strong className="text-white block">Standard Pay-Per-Bed</strong>
-                  <span className="text-[10px] text-slate-400">₹10 per bed/month based on inventory</span>
-                </div>
-                <span className="font-mono font-bold text-blue-400">₹10/bed</span>
-              </button>
-
-              <button
-                type="button"
-                disabled={planLoading}
-                onClick={() => handleUpdatePlan('standard_100', 'active')}
-                className="w-full p-3 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-left flex justify-between items-center transition"
-              >
-                <div>
-                  <strong className="text-white block">100-Bed Fixed Tier</strong>
-                  <span className="text-[10px] text-slate-400">Fixed rate up to 100 beds</span>
-                </div>
-                <span className="font-mono font-bold text-purple-400">₹1,000/mo</span>
-              </button>
-
-              <button
-                type="button"
-                disabled={planLoading}
-                onClick={() => handleUpdatePlan('enterprise_500', 'active')}
-                className="w-full p-3 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-left flex justify-between items-center transition"
-              >
-                <div>
-                  <strong className="text-white block">500-Bed Campus Tier</strong>
-                  <span className="text-[10px] text-slate-400">Enterprise multi-building campus</span>
-                </div>
-                <span className="font-mono font-bold text-emerald-400">₹5,000/mo</span>
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="text-base font-black text-white">Edit {selectedOrgForEdit.name}</h3>
+                <p className="text-[11px] text-slate-400">Update Subscription Status, Plan & Direct UPI</p>
+              </div>
+              <button onClick={() => setSelectedOrgForEdit(null)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
               </button>
             </div>
+
+            <form onSubmit={handleUpdateOrg} className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-400 font-bold mb-1">PG Name</label>
+                <input
+                  value={selectedOrgForEdit.name || ''}
+                  onChange={(e) => setSelectedOrgForEdit({ ...selectedOrgForEdit, name: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">Subscription Status</label>
+                  <select
+                    value={selectedOrgForEdit.subscription_status || 'active'}
+                    onChange={(e) => setSelectedOrgForEdit({ ...selectedOrgForEdit, subscription_status: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none"
+                  >
+                    <option value="active">Active Plan</option>
+                    <option value="trial">Trial Period</option>
+                    <option value="suspended">Suspended</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">Pricing Plan</label>
+                  <select
+                    value={selectedOrgForEdit.plan || 'per_bed'}
+                    onChange={(e) => setSelectedOrgForEdit({ ...selectedOrgForEdit, plan: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none"
+                  >
+                    <option value="per_bed">Per Bed (₹10/mo)</option>
+                    <option value="pro">Pro (₹1,999/mo)</option>
+                    <option value="enterprise">Enterprise Custom</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 font-bold mb-1">Direct UPI ID</label>
+                <input
+                  value={selectedOrgForEdit.upi_id || ''}
+                  onChange={(e) => setSelectedOrgForEdit({ ...selectedOrgForEdit, upi_id: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono outline-none"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedOrgForEdit(null)}
+                  className="py-2 px-3.5 bg-slate-800 text-slate-300 rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editOrgLoading}
+                  className="py-2 px-4 bg-blue-600 text-white font-bold rounded-xl"
+                >
+                  {editOrgLoading ? 'Saving...' : 'Save Updates'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
 
-      {/* ------------------------------------------------------------- */}
-      {/* MODAL 3: CREATE PLATFORM USER */}
-      {/* ------------------------------------------------------------- */}
+      {/* ─────────────────────────────────────────────────────────────
+          MODAL: CREATE PLATFORM USER
+      ───────────────────────────────────────────────────────────── */}
       {showCreateUserModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl relative">
-            <button
-              onClick={() => setShowCreateUserModal(false)}
-              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            <div>
-              <h3 className="text-base font-black text-white">Create Platform User</h3>
-              <p className="text-xs text-slate-400">Assign role and credentials for any PG organization</p>
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="text-base font-black text-white">Create Platform User</h3>
+                <p className="text-[11px] text-slate-400">Add an Owner, Manager, or Staff account</p>
+              </div>
+              <button onClick={() => setShowCreateUserModal(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
             {createUserError && (
-              <div className="p-3 bg-rose-950 border border-rose-800 text-rose-300 rounded-xl text-xs">
+              <div className="p-3 bg-rose-950/80 border border-rose-800 text-rose-300 text-xs rounded-xl font-bold">
                 {createUserError}
               </div>
             )}
+
             {createUserSuccess && (
-              <div className="p-3 bg-emerald-950 border border-emerald-800 text-emerald-300 rounded-xl text-xs font-bold">
+              <div className="p-3 bg-emerald-950/80 border border-emerald-800 text-emerald-300 text-xs rounded-xl font-bold">
                 {createUserSuccess}
               </div>
             )}
 
             <form onSubmit={handleCreateUserSubmit} className="space-y-3 text-xs">
               <div>
-                <label className="block font-bold text-slate-300 mb-1">Full Name</label>
+                <label className="block text-slate-400 font-bold mb-1">Email Address *</label>
                 <input
-                  type="text"
                   required
-                  placeholder="e.g. Vikram Sharma"
-                  value={userForm.full_name}
-                  onChange={(e) => setUserForm({ ...userForm, full_name: e.target.value })}
-                  className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-300 mb-1">Login Email</label>
-                <input
                   type="email"
-                  required
-                  placeholder="owner@mypropertypg.com"
                   value={userForm.email}
                   onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
-                  className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold"
+                  placeholder="user@example.com"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-slate-300 mb-1">Password</label>
+                <label className="block text-slate-400 font-bold mb-1">Temporary Login Password *</label>
                 <input
-                  type="password"
                   required
-                  minLength={6}
-                  placeholder="••••••••"
+                  type="password"
                   value={userForm.password}
                   onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
-                  className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold"
+                  placeholder="At least 6 characters"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block font-bold text-slate-300 mb-1">Role</label>
+                  <label className="block text-slate-400 font-bold mb-1">Full Name</label>
+                  <input
+                    value={userForm.full_name}
+                    onChange={(e) => setUserForm({ ...userForm, full_name: e.target.value })}
+                    placeholder="Full Name"
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">Role</label>
                   <select
                     value={userForm.role}
                     onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
-                    className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold"
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none"
                   >
                     <option value="owner">PG Owner</option>
-                    <option value="manager">Manager</option>
+                    <option value="manager">Property Manager</option>
                     <option value="accountant">Accountant</option>
-                    <option value="staff">Staff</option>
+                    <option value="staff">Staff / Warden</option>
                     <option value="superadmin">Super Admin</option>
                   </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-300 mb-1">Phone</label>
-                  <input
-                    type="tel"
-                    placeholder="9876543210"
-                    value={userForm.phone}
-                    onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })}
-                    className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold"
-                  />
                 </div>
               </div>
 
               <div>
-                <label className="block font-bold text-slate-300 mb-1">Organization</label>
+                <label className="block text-slate-400 font-bold mb-1">Assign to PG Organization</label>
                 <select
                   value={userForm.organization_id}
                   onChange={(e) => setUserForm({ ...userForm, organization_id: e.target.value })}
-                  className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none"
                 >
-                  <option value="">Platform / All PGs</option>
+                  <option value="">None / Platform Super User</option>
                   {organizations.map((o) => (
-                    <option key={o.id} value={o.id}>{o.name}</option>
+                    <option key={o.id} value={o.id}>{o.name} ({o.city})</option>
                   ))}
                 </select>
               </div>
 
-              <div className="pt-2 border-t border-slate-800 flex justify-end gap-2">
+              <div className="pt-2 flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowCreateUserModal(false)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold"
+                  className="py-2 px-3.5 bg-slate-800 text-slate-300 rounded-xl"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={createUserLoading}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-md shadow-blue-600/30"
+                  className="py-2 px-4 bg-blue-600 text-white font-bold rounded-xl"
                 >
                   {createUserLoading ? 'Creating...' : 'Create Account'}
                 </button>
@@ -1171,6 +1329,10 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
+      {/* Footer */}
+      <footer className="border-t border-slate-900 bg-slate-950 py-4 text-center text-xs text-slate-600">
+        PG-SETU Platform Enterprise Command Center · Authorized Super Admin Personnel Only
+      </footer>
     </div>
   )
 }

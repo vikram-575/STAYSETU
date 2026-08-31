@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { getAdminSessionFromCookies, SUPER_ADMIN_EMAIL } from '@/lib/admin-auth'
 
@@ -19,14 +20,41 @@ export interface AuthSessionUser {
 /**
  * Server-side helper to retrieve current authenticated user.
  * Supports Supabase JWT sessions & HMAC SuperAdmin sessions.
+ * Also supports Super Admin PG Impersonation.
  */
 export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
   try {
+    const cookieStore = await cookies()
+    const impersonatedOrgId = cookieStore.get('impersonated_org_id')?.value
+
     // 1. Check SuperAdmin token session
     const adminSession = await getAdminSessionFromCookies()
     if (adminSession) {
+      const serviceClient = await createServiceClient()
+
+      // Check if impersonating a specific PG
+      if (impersonatedOrgId) {
+        try {
+          const { data: impOrg } = await serviceClient
+            .from('organizations')
+            .select('*')
+            .eq('id', impersonatedOrgId)
+            .single()
+
+          if (impOrg) {
+            return {
+              id: 'superadmin_master',
+              email: SUPER_ADMIN_EMAIL,
+              full_name: 'Vikram Tomar (Super Admin)',
+              role: 'superadmin',
+              organization_id: impOrg.id,
+              organizations: impOrg,
+            }
+          }
+        } catch {}
+      }
+
       try {
-        const serviceClient = await createServiceClient()
         const { data: adminProfile } = await serviceClient
           .from('users')
           .select('*, organizations(*)')
@@ -69,7 +97,6 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
 
     const serviceClient = await createServiceClient()
 
-    // Look up user profile by Supabase user ID (primary) or email (fallback for newly created users)
     let profile: any = null
 
     const { data: byId } = await serviceClient
@@ -101,7 +128,6 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
       }
     }
 
-    // User authenticated but profile not yet created (just registered)
     return {
       id: sbUser.id,
       email: sbUser.email || '',
