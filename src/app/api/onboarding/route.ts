@@ -2,181 +2,383 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { rupeesToPaise } from '@/lib/money'
 import { cookies } from 'next/headers'
+import { getAdminSessionFromCookies, SUPER_ADMIN_EMAIL } from '@/lib/admin-auth'
 
 /**
  * POST /api/onboarding
- * Unified Onboarding: Creates organization, property, building, floors, rooms, beds & meters in Supabase
- * (Firebase sync removed — Supabase is single source of truth)
+ * Comprehensive Enterprise PG Onboarding:
+ * Creates organization, full property address, building, floors, rooms, beds,
+ * electricity sub-meters, bank/UPI settlement settings, and staff user accounts.
  */
 export async function POST(request: NextRequest) {
   try {
     const cookieStore = await cookies()
     const authEmail = cookieStore.get('auth_email')?.value
+    const adminSession = await getAdminSessionFromCookies()
 
     const body = await request.json()
     const {
+      // Step 1: PG Identity & Address
       org_name,
       property_name,
-      property_city,
-      property_address,
+      pg_type = 'coliving',
+      address_line1,
+      address_line2,
+      landmark,
+      city,
+      state,
+      pincode,
+      map_link,
+
+      // Step 2: Owner & Contact
+      owner_name,
       phone,
+      email,
+      emergency_phone,
+      gst_enabled = false,
+      gstin,
+
+      // Step 3: Inventory & Floor Architecture
+      num_buildings = 1,
       num_floors = 2,
       rooms_per_floor = 4,
-      beds_per_room = 2,
-      default_rent_rupees = 6000,
+      default_beds_per_room = 2,
+      default_rent_rupees = 6500,
+      single_rent_rupees = 9000,
+      double_rent_rupees = 6500,
+      triple_rent_rupees = 5000,
+      four_rent_rupees = 4000,
+      deposit_policy = 'one_month',
+      deposit_fixed_rupees = 5000,
+      billing_cycle_day = 1,
+      notice_period_days = 30,
+
+      // Step 4: Utility & Electricity
+      electricity_billing_type = 'sub_meter',
+      rate_per_unit_rupees = 9,
+      maintenance_fee_rupees = 0,
+
+      // Step 5: UPI, Autopay & Bank Settlement
+      upi_id,
+      bank_account_no,
+      bank_ifsc,
+      bank_account_holder,
+      bank_name,
+      late_fee_daily_rupees = 50,
+
+      // Step 6: Initial Staff (Optional)
+      staff_members = [],
     } = body
 
     if (!org_name || !property_name) {
-      return NextResponse.json({ error: 'PG organization name and property name are required.' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'PG Brand/Organization name and Property name are required.' },
+        { status: 400 }
+      )
     }
 
     const serviceClient = await createServiceClient()
-    const slug = org_name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-') + '-' + Math.random().toString(36).substring(2, 6)
+    const effectiveEmail = email || authEmail || (adminSession ? SUPER_ADMIN_EMAIL : null)
 
-    const initialSettings = {
+    // Generate unique organization slug
+    const slug =
+      org_name
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '-')
+        .replace(/-+/g, '-')
+        .slice(0, 30) +
+      '-' +
+      Math.random().toString(36).substring(2, 6)
+
+    // Construct full address string
+    const fullAddressParts = [
+      address_line1,
+      address_line2,
+      landmark ? `Near ${landmark}` : null,
+      city,
+      state ? `${state} - ${pincode || ''}` : pincode,
+    ].filter(Boolean)
+    const combinedAddress = fullAddressParts.join(', ')
+
+    // Default rates in paise
+    const singleRentPaise = rupeesToPaise(Number(single_rent_rupees) || 9000)
+    const doubleRentPaise = rupeesToPaise(Number(double_rent_rupees) || 6500)
+    const tripleRentPaise = rupeesToPaise(Number(triple_rent_rupees) || 5000)
+    const fourRentPaise = rupeesToPaise(Number(four_rent_rupees) || 4000)
+    const defaultRentPaise = rupeesToPaise(Number(default_rent_rupees) || 6500)
+    const ratePerUnitPaise = Math.round(Number(rate_per_unit_rupees) * 100) || 900
+    const maintenanceFeePaise = rupeesToPaise(Number(maintenance_fee_rupees) || 0)
+    const lateFeeDailyPaise = rupeesToPaise(Number(late_fee_daily_rupees) || 50)
+    const depositFixedPaise = rupeesToPaise(Number(deposit_fixed_rupees) || 5000)
+
+    const effectiveUpiId = upi_id?.trim() || `${slug}@upi`
+
+    // Rich organization settings JSON
+    const organizationSettings = {
       plan: 'per_bed',
       rate_per_bed: 10,
       subscription_status: 'active',
       subscription_valid_until: new Date(Date.now() + 86400000 * 365).toISOString().split('T')[0],
-      upi_id: `${slug}@upi`,
+      pg_type,
       currency: 'INR',
+      upi_id: effectiveUpiId,
+      bank_settlement: {
+        account_holder: bank_account_holder?.trim() || owner_name || org_name,
+        account_no: bank_account_no?.trim() || null,
+        ifsc: bank_ifsc?.trim()?.toUpperCase() || null,
+        bank_name: bank_name?.trim() || null,
+        upi_id: effectiveUpiId,
+      },
+      billing: {
+        billing_cycle_day: Number(billing_cycle_day) || 1,
+        notice_period_days: Number(notice_period_days) || 30,
+        late_fee_daily_paise: lateFeeDailyPaise,
+        deposit_policy,
+        deposit_fixed_paise: depositFixedPaise,
+      },
+      utilities: {
+        electricity_type: electricity_billing_type,
+        rate_per_unit_paise: ratePerUnitPaise,
+        maintenance_fee_paise: maintenanceFeePaise,
+      },
+      contacts: {
+        emergency_phone: emergency_phone?.trim() || null,
+        owner_phone: phone?.trim() || null,
+        map_link: map_link?.trim() || null,
+      },
     }
 
-    // 1. Create Organization
+    // 1. Create Organization in Supabase
     const { data: org, error: orgError } = await serviceClient
       .from('organizations')
       .insert({
-        name: org_name,
+        name: org_name.trim(),
         slug,
-        phone: phone || null,
-        email: authEmail || null,
-        city: property_city || null,
-        address: property_address || null,
-        settings: initialSettings,
+        phone: phone?.trim() || null,
+        email: effectiveEmail,
+        city: city?.trim() || null,
+        state: state?.trim() || null,
+        pincode: pincode?.trim() || null,
+        address: combinedAddress || address_line1 || null,
+        gst_enabled: Boolean(gst_enabled),
+        gstin: gstin?.trim() || null,
+        settings: organizationSettings,
       })
       .select()
       .single()
 
     if (orgError || !org) {
-      throw new Error(orgError?.message || 'Failed to create organization')
+      throw new Error(orgError?.message || 'Failed to create organization record in database.')
     }
 
     const orgId = org.id
 
-    // 2. Link user if email present
-    if (authEmail) {
-      await serviceClient.from('users').update({
-        organization_id: orgId,
-        phone: phone || null,
-      }).eq('email', authEmail)
+    // 2. Initialize sequences
+    try {
+      await serviceClient.from('organization_sequences').insert({ organization_id: orgId, last_seq: 0 })
+      await serviceClient.from('invoice_sequences').insert({ organization_id: orgId, last_seq: 0 })
+      await serviceClient.from('payment_sequences').insert({ organization_id: orgId, last_seq: 0 })
+    } catch {}
+
+    // 3. Link or Upsert Owner User Profile
+    if (effectiveEmail) {
+      const { data: existingUser } = await serviceClient
+        .from('users')
+        .select('id')
+        .eq('email', effectiveEmail.toLowerCase())
+        .single()
+
+      if (existingUser) {
+        await serviceClient
+          .from('users')
+          .update({
+            organization_id: orgId,
+            full_name: owner_name?.trim() || org_name,
+            phone: phone?.trim() || null,
+            role: 'owner',
+          })
+          .eq('id', existingUser.id)
+      } else {
+        try {
+          await serviceClient.from('users').insert({
+            organization_id: orgId,
+            email: effectiveEmail.toLowerCase(),
+            full_name: owner_name?.trim() || 'PG Owner',
+            phone: phone?.trim() || null,
+            role: 'owner',
+            is_active: true,
+          })
+        } catch {}
+      }
     }
 
-    // 3. Create Property
-    const { data: property } = await serviceClient
+    // 4. Create Staff / Warden / Manager Accounts if specified
+    if (Array.isArray(staff_members) && staff_members.length > 0) {
+      for (const staff of staff_members) {
+        if (staff.name && (staff.phone || staff.email)) {
+          const staffEmail = (staff.email?.trim() || `${staff.name.toLowerCase().replace(/[^a-z0-9]/g, '')}_${slug}@pgsetu.com`).toLowerCase()
+          try {
+            await serviceClient
+              .from('users')
+              .insert({
+                organization_id: orgId,
+                email: staffEmail,
+                full_name: staff.name.trim(),
+                phone: staff.phone?.trim() || null,
+                role: staff.role || 'manager',
+                is_active: true,
+              })
+          } catch {}
+        }
+      }
+    }
+
+    // 5. Create Property Record
+    const { data: property, error: propError } = await serviceClient
       .from('properties')
       .insert({
         organization_id: orgId,
-        name: property_name,
-        address: property_address || null,
-        city: property_city || null,
-        phone: phone || null,
+        name: property_name.trim(),
+        address: combinedAddress || address_line1 || null,
+        city: city?.trim() || null,
+        state: state?.trim() || null,
+        pincode: pincode?.trim() || null,
+        phone: phone?.trim() || null,
       })
       .select()
       .single()
 
-    const propId = property?.id
+    if (propError || !property) {
+      throw new Error(propError?.message || 'Failed to create property campus record.')
+    }
 
-    // 4. Create Building
-    const { data: building } = await serviceClient
-      .from('buildings')
-      .insert({
-        organization_id: orgId,
-        property_id: propId,
-        name: 'Main Building',
-        total_floors: Number(num_floors) || 2,
-      })
-      .select()
-      .single()
+    const propId = property.id
 
-    const bldgId = building?.id
-
-    // 5. Generate Floors, Rooms, Beds & Sub-Meters
-    const baseRentPaise = rupeesToPaise(Number(default_rent_rupees) || 6000)
+    // 6. Create Buildings, Floors, Rooms, Beds & Sub-Meters
     const bedLabels = ['A', 'B', 'C', 'D', 'E', 'F']
+    let totalRoomsCreated = 0
+    let totalBedsCreated = 0
 
-    if (bldgId) {
-      for (let f = 0; f < (Number(num_floors) || 2); f++) {
-        const floorName = f === 0 ? 'Ground Floor' : `${f}${f === 1 ? 'st' : f === 2 ? 'nd' : 'rd'} Floor`
-        const { data: floor } = await serviceClient
-          .from('floors')
-          .insert({
-            organization_id: orgId,
-            building_id: bldgId,
-            floor_number: f,
-            name: floorName,
-          })
-          .select()
-          .single()
+    const buildingsCount = Math.min(Math.max(Number(num_buildings) || 1, 1), 5)
+    const floorsCount = Math.min(Math.max(Number(num_floors) || 2, 1), 10)
+    const roomsCount = Math.min(Math.max(Number(rooms_per_floor) || 4, 1), 20)
+    const bedsPerRoomCount = Math.min(Math.max(Number(default_beds_per_room) || 2, 1), 6)
 
-        if (floor) {
-          for (let r = 1; r <= (Number(rooms_per_floor) || 4); r++) {
-            const roomNo = `${f}${String(r).padStart(2, '0')}`
-            const sharingType = beds_per_room === 1 ? 'single' : beds_per_room === 2 ? 'double' : beds_per_room === 3 ? 'triple' : 'four'
+    for (let b = 1; b <= buildingsCount; b++) {
+      const bldgName = buildingsCount > 1 ? `Building ${b}` : 'Main Building'
+      const { data: building } = await serviceClient
+        .from('buildings')
+        .insert({
+          organization_id: orgId,
+          property_id: propId,
+          name: bldgName,
+          total_floors: floorsCount,
+        })
+        .select()
+        .single()
 
-            const { data: room } = await serviceClient
-              .from('rooms')
-              .insert({
-                organization_id: orgId,
-                floor_id: floor.id,
-                room_number: roomNo,
-                name: `Room ${roomNo}`,
-                room_type: sharingType,
-                base_rent_paise: baseRentPaise,
-                capacity: Number(beds_per_room) || 2,
-              })
-              .select()
-              .single()
+      if (building) {
+        for (let f = 0; f < floorsCount; f++) {
+          const floorName = f === 0 ? 'Ground Floor' : `${f}${f === 1 ? 'st' : f === 2 ? 'nd' : 'rd'} Floor`
+          const { data: floor } = await serviceClient
+            .from('floors')
+            .insert({
+              organization_id: orgId,
+              building_id: building.id,
+              floor_number: f,
+              name: floorName,
+            })
+            .select()
+            .single()
 
-            if (room) {
-              const { data: meter } = await serviceClient
-                .from('electricity_meters')
+          if (floor) {
+            for (let r = 1; r <= roomsCount; r++) {
+              const roomNo = `${f}${String(r).padStart(2, '0')}`
+
+              let roomSharing = 'double'
+              let roomRentPaise = doubleRentPaise
+              let bedCount = bedsPerRoomCount
+
+              if (bedCount === 1) {
+                roomSharing = 'single'
+                roomRentPaise = singleRentPaise
+              } else if (bedCount === 2) {
+                roomSharing = 'double'
+                roomRentPaise = doubleRentPaise
+              } else if (bedCount === 3) {
+                roomSharing = 'triple'
+                roomRentPaise = tripleRentPaise
+              } else if (bedCount >= 4) {
+                roomSharing = 'four'
+                roomRentPaise = fourRentPaise
+              } else {
+                roomRentPaise = defaultRentPaise
+              }
+
+              const { data: room } = await serviceClient
+                .from('rooms')
                 .insert({
                   organization_id: orgId,
-                  property_id: propId,
-                  room_id: room.id,
-                  meter_number: `MTR-${roomNo}`,
-                  meter_type: 'sub',
-                  allocation_method: 'equal_split',
+                  floor_id: floor.id,
+                  room_number: roomNo,
+                  name: `Room ${roomNo}`,
+                  room_type: roomSharing,
+                  base_rent_paise: roomRentPaise,
+                  capacity: bedCount,
                 })
                 .select()
                 .single()
 
-              if (meter) {
-                await serviceClient.from('electricity_readings').insert({
-                  organization_id: orgId,
-                  meter_id: meter.id,
-                  reading_date: new Date().toISOString().split('T')[0],
-                  previous_reading: 0,
-                  current_reading: 0,
-                  rate_per_unit_paise: 900,
-                  period_month: new Date().getMonth() + 1,
-                  period_year: new Date().getFullYear(),
-                })
-              }
+              if (room) {
+                totalRoomsCreated++
 
-              for (let bIdx = 0; bIdx < (Number(beds_per_room) || 2); bIdx++) {
-                const bedLabel = bedLabels[bIdx] || String(bIdx + 1)
-                await serviceClient
-                  .from('beds')
-                  .insert({
-                    organization_id: orgId,
-                    room_id: room.id,
-                    bed_label: bedLabel,
-                    status: 'available',
-                    base_rent_paise: baseRentPaise,
-                  })
-                  .select()
-                  .single()
+                // Sub-meter registration
+                if (electricity_billing_type === 'sub_meter') {
+                  const { data: meter } = await serviceClient
+                    .from('electricity_meters')
+                    .insert({
+                      organization_id: orgId,
+                      property_id: propId,
+                      room_id: room.id,
+                      meter_number: `MTR-${roomNo}`,
+                      meter_type: 'sub',
+                      allocation_method: 'equal_split',
+                    })
+                    .select()
+                    .single()
+
+                  if (meter) {
+                    try {
+                      await serviceClient.from('electricity_readings').insert({
+                        organization_id: orgId,
+                        meter_id: meter.id,
+                        reading_date: new Date().toISOString().split('T')[0],
+                        previous_reading: 0,
+                        current_reading: 0,
+                        rate_per_unit_paise: ratePerUnitPaise,
+                        period_month: new Date().getMonth() + 1,
+                        period_year: new Date().getFullYear(),
+                      })
+                    } catch {}
+                  }
+                }
+
+                // Create Beds
+                for (let bIdx = 0; bIdx < bedCount; bIdx++) {
+                  const bedLabel = bedLabels[bIdx] || String(bIdx + 1)
+                  try {
+                    await serviceClient
+                      .from('beds')
+                      .insert({
+                        organization_id: orgId,
+                        room_id: room.id,
+                        bed_label: bedLabel,
+                        status: 'available',
+                        base_rent_paise: roomRentPaise,
+                      })
+                  } catch {}
+                  totalBedsCreated++
+                }
               }
             }
           }
@@ -184,8 +386,53 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, org_id: orgId })
+    // 7. Seed Default Catalog & Message Templates
+    try {
+      await serviceClient.from('charge_catalog').insert([
+        { organization_id: orgId, name: 'Monthly Rent', category: 'rent', default_price_paise: defaultRentPaise, is_system: true },
+        { organization_id: orgId, name: 'Electricity Charges', category: 'electricity', default_price_paise: 0, is_system: true },
+        { organization_id: orgId, name: 'Security Deposit', category: 'security_deposit', default_price_paise: depositFixedPaise, is_system: true },
+        { organization_id: orgId, name: 'Guest Stay (Per Night)', category: 'guest', default_price_paise: 50000, is_system: false },
+        { organization_id: orgId, name: 'Late Payment Fee', category: 'late_fee', default_price_paise: lateFeeDailyPaise, is_system: false },
+        { organization_id: orgId, name: 'Room Cleaning Service', category: 'cleaning', default_price_paise: 20000, is_system: false },
+      ])
+
+      await serviceClient.from('message_templates').insert([
+        {
+          organization_id: orgId,
+          name: 'Monthly Rent Invoice',
+          event_type: 'invoice_created',
+          channel: 'whatsapp',
+          template_body: `Hello {{resident_name}},\n\nYour rent invoice *{{invoice_number}}* for *₹{{total_amount}}* has been generated for {{period}}.\nDue Date: {{due_date}}.\n\nPay online instantly via UPI: {{payment_link}}\n\nThank you,\n{{organization_name}}`,
+          is_system: true,
+        },
+        {
+          organization_id: orgId,
+          name: 'Payment Receipt',
+          event_type: 'payment_received',
+          channel: 'whatsapp',
+          template_body: `Dear {{resident_name}},\n\nWe have received your payment of *₹{{amount}}* (Receipt: {{payment_number}}).\nRemaining balance: ₹{{remaining_balance}}.\n\nView your live digital passbook at: {{portal_link}}\n\nRegards,\n{{organization_name}}`,
+          is_system: true,
+        },
+      ])
+    } catch {}
+
+    return NextResponse.json({
+      success: true,
+      org_id: orgId,
+      summary: {
+        organization_name: org.name,
+        slug: org.slug,
+        property_name: property.name,
+        city: org.city,
+        upi_id: effectiveUpiId,
+        total_rooms: totalRoomsCreated,
+        total_beds: totalBedsCreated,
+        total_floors: floorsCount,
+      },
+    })
   } catch (err: any) {
+    console.error('[Onboarding Error]:', err)
     return NextResponse.json({ error: err.message || 'Onboarding failed' }, { status: 500 })
   }
 }
