@@ -16,6 +16,7 @@ interface Props {
 
 import { getAuthenticatedUser } from '@/lib/auth-session'
 import { createServiceClient } from '@/lib/supabase/server'
+import { TenantProfileKYCCard } from '@/components/kyc/tenant-profile-kyc-card'
 
 export default async function ResidentDetailPage({ params, searchParams }: Props) {
   const { id: residentId } = await params
@@ -83,6 +84,15 @@ export default async function ResidentDetailPage({ params, searchParams }: Props
     .select('*')
     .eq('resident_id', residentId)
     .order('created_at', { ascending: false })
+
+  // Tenant KYC Record
+  const { data: kycRecord } = await supabase
+    .from('tenant_kyc')
+    .select('*')
+    .eq('tenant_id', residentId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
   // Pre-filled WhatsApp message with Portal Passbook Link
   const waMsg = `Hello ${resident.full_name}, your PG balance is ${formatCurrency(resident.total_outstanding_paise)} (Reg: ${resident.registration_number}). View your itemized bills, payment receipts & passbook online at: ${typeof window !== 'undefined' ? window.location.origin : ''}/portal (Login with your Phone and Date of Birth).`
@@ -287,10 +297,22 @@ export default async function ResidentDetailPage({ params, searchParams }: Props
             )}
           </div>
 
-          {/* Personal & KYC */}
+          {/* 🌟 KYC & Aadhaar Verification Card */}
+          <TenantProfileKYCCard
+            tenantId={residentId}
+            residentName={resident.full_name}
+            residentPhone={resident.phone}
+            residentDob={fullResident?.date_of_birth}
+            residentGender={fullResident?.gender}
+            idType={fullResident?.id_type}
+            idNumber={fullResident?.id_number}
+            kycRecord={kycRecord}
+          />
+
+          {/* Personal & Identification Details */}
           <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-4 sm:p-5 space-y-3 sm:space-y-4 shadow-xs">
             <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-              <UserCheck className="w-4 h-4 text-green-600 shrink-0" /> Personal & KYC Details
+              <UserCheck className="w-4 h-4 text-green-600 shrink-0" /> Personal Details & Address
             </h3>
             <div className="space-y-2 text-xs">
               <div className="flex justify-between py-1.5 border-b border-gray-100">

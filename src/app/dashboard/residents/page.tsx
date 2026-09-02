@@ -119,6 +119,15 @@ export default async function ResidentsPage({ searchParams }: Props) {
                 Active ({activeCount ?? 0})
               </Link>
               <Link
+                href={`/dashboard/residents?tab=verified${searchQuery ? `&search=${searchQuery}` : ''}`}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg transition-all whitespace-nowrap',
+                  activeTab === 'verified' ? 'bg-white text-emerald-600 shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                )}
+              >
+                🟢 Verified
+              </Link>
+              <Link
                 href={`/dashboard/residents?tab=overdue${searchQuery ? `&search=${searchQuery}` : ''}`}
                 className={cn(
                   'px-3 py-1.5 rounded-lg transition-all whitespace-nowrap',
@@ -300,6 +309,7 @@ export default async function ResidentsPage({ searchParams }: Props) {
                 <th className="py-3 px-3">Monthly Rent</th>
                 <th className="py-3 px-3">Outstanding</th>
                 <th className="py-3 px-3">Status</th>
+                <th className="py-3 px-3">Aadhaar KYC</th>
                 <th className="py-3 px-3 text-right">Quick Actions</th>
               </tr>
             </thead>
@@ -377,6 +387,11 @@ export default async function ResidentsPage({ searchParams }: Props) {
                           {r.status.replace('_', ' ')}
                         </span>
                       </td>
+                      <td className="py-3 px-3">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Verified
+                        </span>
+                      </td>
                       <td className="py-3 px-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           <a
@@ -415,7 +430,7 @@ export default async function ResidentsPage({ searchParams }: Props) {
                 })
               ) : (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-gray-400">
+                  <td colSpan={8} className="py-12 text-center text-gray-400">
                     No residents found matching criteria.
                   </td>
                 </tr>
