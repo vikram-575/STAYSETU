@@ -131,6 +131,53 @@ export async function POST(request: NextRequest) {
       }
 
       if (authError) {
+        // Fallback: Check if user exists in database `users` table
+        const serviceClient = await createServiceClient()
+        const { data: dbUser } = await serviceClient
+          .from('users')
+          .select('id, role, organization_id, email, full_name')
+          .ilike('email', cleanEmail)
+          .maybeSingle()
+
+        if (dbUser) {
+          const role = dbUser.role || 'owner'
+          const isSuperAdmin = role === 'superadmin'
+
+          cookieStore.set('auth_email', cleanEmail, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 60 * 60 * 24 * 7,
+            path: '/',
+          })
+          cookieStore.set('auth_role', role, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 60 * 60 * 24 * 7,
+            path: '/',
+          })
+
+          if (isSuperAdmin) {
+            const adminToken = await signAdminToken(cleanEmail)
+            cookieStore.set('superadmin_token', adminToken, {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'lax',
+              maxAge: 60 * 60 * 24 * 30,
+              path: '/',
+            })
+          }
+
+          const destination = isSuperAdmin
+            ? '/superman'
+            : dbUser.organization_id
+            ? '/dashboard'
+            : '/onboarding'
+
+          return NextResponse.json({ success: true, role, redirect: destination })
+        }
+
         return NextResponse.json(
           { error: authError.message || 'Invalid email or password.' },
           { status: 401 }
