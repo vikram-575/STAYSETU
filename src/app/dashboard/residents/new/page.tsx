@@ -10,7 +10,6 @@ import {
 } from 'lucide-react'
 import { formatCurrency, rupeesToPaise } from '@/lib/money'
 import { FirebaseFileUploader } from '@/components/ui/firebase-file-uploader'
-import { AadhaarVerificationModal } from '@/components/kyc/aadhaar-verification-modal'
 
 export default function CheckInResidentPage() {
   const router = useRouter()
@@ -20,12 +19,6 @@ export default function CheckInResidentPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [successData, setSuccessData] = useState<{ registration_number: string; resident_id: string } | null>(null)
-
-  // Aadhaar KYC State
-  const [showAadhaarModal, setShowAadhaarModal] = useState(false)
-  const [kycVerified, setKycVerified] = useState(false)
-  const [kycVerificationId, setKycVerificationId] = useState('')
-  const [kycMaskedAadhaar, setKycMaskedAadhaar] = useState('')
 
   // Cascading location states
   const [properties, setProperties] = useState<any[]>([])
@@ -462,60 +455,10 @@ export default function CheckInResidentPage() {
           </div>
         )}
 
-        {/* Step 3: KYC Details */}
+        {/* Step 3: Identity Proof Details */}
         {currentStep === 3 && (
           <div className="space-y-4">
-            <h3 className="text-sm sm:text-base font-bold text-gray-900 border-b border-gray-100 pb-2">3. Identity Proof & Aadhaar KYC</h3>
-
-            {/* 🌟 AADHAAR VERIFICATION CARD */}
-            <div className={`p-4 rounded-2xl border transition-all ${
-              kycVerified
-                ? 'bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-300'
-                : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200'
-            }`}>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-black text-xs sm:text-sm text-slate-900">Aadhaar Verification</span>
-                    {kycVerified ? (
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" /> Verified ({kycVerificationId})
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-black uppercase tracking-wider">
-                        KYC Pending
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-600">
-                    {kycVerified
-                      ? `Cryptographic signature & tamper check passed for ${kycMaskedAadhaar}. Identity confirmed.`
-                      : "Verify the tenant's identity through authorized e-KYC before completing admission."}
-                  </p>
-                </div>
-
-                <div>
-                  {kycVerified ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowAadhaarModal(true)}
-                      className="py-2 px-3.5 bg-white text-slate-700 hover:bg-slate-50 border border-emerald-300 rounded-xl text-xs font-bold transition shadow-xs"
-                    >
-                      Re-verify Aadhaar
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setShowAadhaarModal(true)}
-                      className="py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 text-white font-black text-xs rounded-xl shadow-md shadow-blue-500/20 transition flex items-center gap-1.5 active:scale-95 shrink-0"
-                    >
-                      <Shield className="w-3.5 h-3.5" />
-                      <span>START AADHAAR VERIFICATION</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
+            <h3 className="text-sm sm:text-base font-bold text-gray-900 border-b border-gray-100 pb-2">3. Identity Proof Document</h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
               <div>
@@ -761,32 +704,6 @@ export default function CheckInResidentPage() {
           )}
         </div>
       </div>
-
-      {/* Aadhaar Verification Modal */}
-      <AadhaarVerificationModal
-        isOpen={showAadhaarModal}
-        onClose={() => setShowAadhaarModal(false)}
-        tenantData={{
-          full_name: form.full_name,
-          phone: form.phone,
-          date_of_birth: form.date_of_birth,
-          gender: form.gender,
-        }}
-        onVerificationSuccess={(result) => {
-          setKycVerified(true)
-          setKycVerificationId(result.verification_id)
-          setKycMaskedAadhaar(result.masked_aadhaar)
-          setForm((prev) => ({
-            ...prev,
-            id_type: 'aadhaar',
-            id_number: result.masked_aadhaar,
-            full_name: prev.full_name || result.extracted_data?.name || prev.full_name,
-            date_of_birth: prev.date_of_birth || result.extracted_data?.date_of_birth || prev.date_of_birth,
-            gender: result.extracted_data?.gender === 'F' ? 'female' : prev.gender,
-            permanent_address: prev.permanent_address || result.extracted_data?.address?.full_address || prev.permanent_address,
-          }))
-        }}
-      />
     </div>
   )
 }

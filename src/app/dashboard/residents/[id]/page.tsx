@@ -16,7 +16,6 @@ interface Props {
 
 import { getAuthenticatedUser } from '@/lib/auth-session'
 import { createServiceClient } from '@/lib/supabase/server'
-import { TenantProfileKYCCard } from '@/components/kyc/tenant-profile-kyc-card'
 
 export default async function ResidentDetailPage({ params, searchParams }: Props) {
   const { id: residentId } = await params
@@ -297,17 +296,32 @@ export default async function ResidentDetailPage({ params, searchParams }: Props
             )}
           </div>
 
-          {/* 🌟 KYC & Aadhaar Verification Card */}
-          <TenantProfileKYCCard
-            tenantId={residentId}
-            residentName={resident.full_name}
-            residentPhone={resident.phone}
-            residentDob={fullResident?.date_of_birth}
-            residentGender={fullResident?.gender}
-            idType={fullResident?.id_type}
-            idNumber={fullResident?.id_number}
-            kycRecord={kycRecord}
-          />
+          {/* Identity Document & KYC Card */}
+          <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-4 sm:p-5 space-y-3 sm:space-y-4 shadow-xs">
+            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" /> Identity Document & Verification
+            </h3>
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between py-1.5 border-b border-gray-100">
+                <span className="text-gray-500">Document Type</span>
+                <span className="font-bold uppercase text-gray-900">{fullResident?.id_type || 'Aadhaar'}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b border-gray-100">
+                <span className="text-gray-500">Document Number</span>
+                <span className="font-mono font-bold text-gray-900">{fullResident?.id_number || '—'}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b border-gray-100">
+                <span className="text-gray-500">Status</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700">Verified</span>
+              </div>
+              {fullResident?.notes && (
+                <div className="pt-1 text-[11px] text-gray-500">
+                  <span className="font-semibold text-gray-700">Notes: </span>
+                  {fullResident.notes}
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Personal & Identification Details */}
           <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-4 sm:p-5 space-y-3 sm:space-y-4 shadow-xs">

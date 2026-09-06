@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   Building2, Eye, EyeOff, Loader2, KeyRound, Sparkles,
@@ -14,9 +14,16 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [redirectTo, setRedirectTo] = useState('/dashboard')
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const redirectTo = searchParams.get('redirectTo') || '/dashboard'
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const target = params.get('redirectTo')
+      if (target) setRedirectTo(target)
+    }
+  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -199,9 +206,7 @@ export default function LoginPage() {
         </div>
 
         {/* Owner & Staff Login Box */}
-        <Suspense fallback={<div className="bg-white p-8 rounded-3xl text-center text-xs text-slate-400">Loading secure login...</div>}>
-          <LoginForm />
-        </Suspense>
+        <LoginForm />
 
         {/* 🌟 HIGH-VISIBILITY HIGHLIGHTED TENANT PASSBOOK CARD */}
         <div className="relative overflow-hidden p-5 rounded-3xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white shadow-xl shadow-emerald-900/30 border border-emerald-400/40 space-y-3">
