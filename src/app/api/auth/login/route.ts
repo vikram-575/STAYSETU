@@ -15,8 +15,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 })
     }
 
-    const cleanEmail = email.trim().toLowerCase()
+    const rawInput = (email || '').trim()
+    let cleanEmail = rawInput.toLowerCase()
     const cookieStore = await cookies()
+
+    // Support Login via Registered Mobile Number or Email
+    if (!cleanEmail.includes('@')) {
+      const phoneDigits = rawInput.replace(/[^0-9]/g, '')
+      try {
+        const serviceClient = await createServiceClient()
+        let query = serviceClient
+          .from('users')
+          .select('email, id, phone')
+        
+        if (phoneDigits.length >= 10) {
+          query = query.or(`phone.eq.${rawInput},phone.ilike.%${phoneDigits.slice(-10)}%`)
+        } else {
+          query = query.eq('phone', rawInput)
+        }
+        
+        const { data: matchedUser } = await query.maybeSingle()
+        if (matchedUser?.email) {
+          cleanEmail = matchedUser.email.toLowerCase()
+        }
+      } catch {}
+    }
 
     // ── 1. MASTER COMPANY SUPER ADMIN AUTHENTICATION ───────────────────────
     if (
@@ -47,6 +70,8 @@ export async function POST(request: NextRequest) {
         maxAge: 60 * 60 * 24 * 30,
         path: '/',
       })
+      // Clear temporary password flag for superadmin
+      cookieStore.set('must_change_password', '', { maxAge: 0, path: '/' })
 
       // Ensure profile exists in SQL DB (best effort)
       try {
@@ -62,6 +87,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         role: 'superadmin',
+        requiresPasswordChange: false,
         redirect: '/superman',
       })
     }
@@ -78,12 +104,21 @@ export async function POST(request: NextRequest) {
         const serviceClient = await createServiceClient()
         const { data: profile } = await serviceClient
           .from('users')
-          .select('id, role, organization_id, email')
+          .select('id, role, organization_id, email, full_name, phone')
           .or(`id.eq.${authData.user.id},email.ilike.${cleanEmail}`)
           .maybeSingle()
 
-        const role = profile?.role || 'owner'
+        const role = profile?.role || (authData.user.user_metadata?.role as string) || 'owner'
         const isSuperAdmin = role === 'superadmin'
+
+        // Check if user is logging in with a temporary password
+        const metadata = authData.user.user_metadata || {}
+        const is8DigitPin = /^\d{8}$/.test(password.trim())
+        const mustChangePassword =
+          !isSuperAdmin &&
+          (metadata.must_change_password === true ||
+           metadata.is_temporary_password === true ||
+           (is8DigitPin && metadata.must_change_password !== false))
 
         cookieStore.set('auth_email', cleanEmail, {
           httpOnly: true,
@@ -99,6 +134,25 @@ export async function POST(request: NextRequest) {
           maxAge: 60 * 60 * 24 * 7,
           path: '/',
         })
+        cookieStore.set('auth_user_id', profile?.id || authData.user.id, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 7,
+          path: '/',
+        })
+
+        if (mustChangePassword) {
+          cookieStore.set('must_change_password', 'true', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 60 * 60 * 24 * 7,
+            path: '/',
+          })
+        } else {
+          cookieStore.set('must_change_password', '', { maxAge: 0, path: '/' })
+        }
 
         if (isSuperAdmin) {
           const adminToken = await signAdminToken(cleanEmail)
@@ -123,13 +177,20 @@ export async function POST(request: NextRequest) {
         let destination: string
         if (isSuperAdmin) {
           destination = '/superman'
+        } else if (mustChangePassword) {
+          destination = '/set-password'
         } else if (profile?.organization_id) {
           destination = '/dashboard'
         } else {
           destination = '/dashboard'
         }
 
-        return NextResponse.json({ success: true, role, redirect: destination })
+        return NextResponse.json({
+          success: true,
+          role,
+          requiresPasswordChange: mustChangePassword,
+          redirect: destination,
+        })
       }
 
       if (authError) {
@@ -137,13 +198,15 @@ export async function POST(request: NextRequest) {
         const serviceClient = await createServiceClient()
         const { data: dbUser } = await serviceClient
           .from('users')
-          .select('id, role, organization_id, email, full_name')
+          .select('id, role, organization_id, email, full_name, phone')
           .ilike('email', cleanEmail)
           .maybeSingle()
 
         if (dbUser) {
           const role = dbUser.role || 'owner'
           const isSuperAdmin = role === 'superadmin'
+          const is8DigitPin = /^\d{8}$/.test(password.trim())
+          const mustChangePassword = !isSuperAdmin && is8DigitPin
 
           cookieStore.set('auth_email', cleanEmail, {
             httpOnly: true,
@@ -159,6 +222,25 @@ export async function POST(request: NextRequest) {
             maxAge: 60 * 60 * 24 * 7,
             path: '/',
           })
+          cookieStore.set('auth_user_id', dbUser.id, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 60 * 60 * 24 * 7,
+            path: '/',
+          })
+
+          if (mustChangePassword) {
+            cookieStore.set('must_change_password', 'true', {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'lax',
+              maxAge: 60 * 60 * 24 * 7,
+              path: '/',
+            })
+          } else {
+            cookieStore.set('must_change_password', '', { maxAge: 0, path: '/' })
+          }
 
           if (isSuperAdmin) {
             const adminToken = await signAdminToken(cleanEmail)
@@ -173,15 +255,22 @@ export async function POST(request: NextRequest) {
 
           const destination = isSuperAdmin
             ? '/superman'
+            : mustChangePassword
+            ? '/set-password'
             : dbUser.organization_id
             ? '/dashboard'
             : '/onboarding'
 
-          return NextResponse.json({ success: true, role, redirect: destination })
+          return NextResponse.json({
+            success: true,
+            role,
+            requiresPasswordChange: mustChangePassword,
+            redirect: destination,
+          })
         }
 
         return NextResponse.json(
-          { error: authError.message || 'Invalid email or password.' },
+          { error: authError.message || 'Invalid email, phone number, or password.' },
           { status: 401 }
         )
       }

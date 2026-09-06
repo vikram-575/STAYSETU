@@ -44,7 +44,14 @@ function LoginForm() {
         throw new Error(data.error || 'Invalid email or password')
       }
 
-      const destination = redirectTo !== '/dashboard' ? redirectTo : (data.redirect || '/dashboard')
+      // If temporary password is used, direct jump to set permanent password
+      let destination: string
+      if (data.requiresPasswordChange || data.redirect === '/set-password') {
+        destination = '/set-password'
+      } else {
+        destination = redirectTo !== '/dashboard' ? redirectTo : (data.redirect || '/dashboard')
+      }
+
       router.push(destination)
       router.refresh()
     } catch (err: any) {
@@ -71,15 +78,15 @@ function LoginForm() {
       <form onSubmit={handleLogin} className="space-y-4">
         <div>
           <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-            Registered Email
+            Registered Email or Mobile Number
           </label>
           <input
-            type="email"
+            type="text"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 font-medium focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition"
-            placeholder="e.g. owner@example.com"
+            placeholder="e.g. owner@example.com or 9876543210"
           />
         </div>
 

@@ -212,6 +212,8 @@ export async function POST(request: NextRequest) {
           full_name: owner_name?.trim() || org_name,
           role: 'owner',
           organization_id: orgId,
+          must_change_password: true,
+          is_temporary_password: true,
         },
       })
 
@@ -292,6 +294,8 @@ export async function POST(request: NextRequest) {
                 full_name: staff.name.trim(),
                 role: staff.role || 'manager',
                 organization_id: orgId,
+                must_change_password: true,
+                is_temporary_password: true,
               },
             })
             if (createdStaff?.user) staffAuthId = createdStaff.user.id

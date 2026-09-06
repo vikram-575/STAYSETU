@@ -52,6 +52,8 @@ export async function middleware(request: NextRequest) {
 
   const isAuthenticated = Boolean(isSuperAdmin || sbUser)
 
+  const mustChangePassword = request.cookies.get('must_change_password')?.value === 'true'
+
   // If already logged in and visiting login pages, redirect to home
   if (
     isAuthenticated &&
@@ -60,6 +62,20 @@ export async function middleware(request: NextRequest) {
       pathname === '/superman/login' ||
       pathname === '/admin/login')
   ) {
+    const targetUrl = request.nextUrl.clone()
+    targetUrl.pathname = mustChangePassword ? '/set-password' : isSuperAdmin ? '/superman' : '/dashboard'
+    return NextResponse.redirect(targetUrl)
+  }
+
+  // Force redirect to /set-password if temporary password must be changed
+  if (isAuthenticated && mustChangePassword && pathname.startsWith('/dashboard')) {
+    const targetUrl = request.nextUrl.clone()
+    targetUrl.pathname = '/set-password'
+    return NextResponse.redirect(targetUrl)
+  }
+
+  // If user visits /set-password but does not have a temporary password
+  if (isAuthenticated && !mustChangePassword && pathname === '/set-password') {
     const targetUrl = request.nextUrl.clone()
     targetUrl.pathname = isSuperAdmin ? '/superman' : '/dashboard'
     return NextResponse.redirect(targetUrl)
@@ -75,6 +91,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/portal') ||
     pathname.startsWith('/forgot-password') ||
     pathname.startsWith('/reset-password') ||
+    pathname.startsWith('/set-password') ||
     pathname.startsWith('/api/')
 
   if (isPublicRoute) {

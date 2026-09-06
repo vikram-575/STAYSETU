@@ -74,13 +74,18 @@ export async function POST(request: NextRequest) {
     const cleanEmail = email.trim().toLowerCase()
     const supabase = await createServiceClient()
 
-    // 1. Create in Supabase Auth
+    // 1. Create in Supabase Auth with temporary password flag
     let userId: string | null = null
     const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
       email: cleanEmail,
       password,
       email_confirm: true,
-      user_metadata: { full_name, role },
+      user_metadata: {
+        full_name,
+        role,
+        must_change_password: true,
+        is_temporary_password: true,
+      },
     })
 
     if (!authError && authUser?.user) {
@@ -92,7 +97,12 @@ export async function POST(request: NextRequest) {
         userId = found.id
         await supabase.auth.admin.updateUserById(found.id, {
           password,
-          user_metadata: { full_name, role },
+          user_metadata: {
+            full_name,
+            role,
+            must_change_password: true,
+            is_temporary_password: true,
+          },
         })
       }
     }
