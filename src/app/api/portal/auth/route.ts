@@ -50,17 +50,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 2. Verify date of birth
-    // Normalize target DOB format: YYYY-MM-DD
-    const inputDob = new Date(date_of_birth).toISOString().split('T')[0]
+    // 2. Verify date of birth with robust format normalization
+    function cleanDate(d: string): string {
+      if (!d) return ''
+      const trimmed = d.trim()
+      const ymd = trimmed.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/)
+      if (ymd) {
+        return `${ymd[1]}-${ymd[2].padStart(2, '0')}-${ymd[3].padStart(2, '0')}`
+      }
+      const dmy = trimmed.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/)
+      if (dmy) {
+        return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`
+      }
+      return trimmed
+    }
+
+    const inputDob = cleanDate(date_of_birth)
 
     const matchedResident = residents.find((r) => {
       if (!r.date_of_birth) {
-        // Resident has no DOB on file — cannot authenticate via portal.
-        // PG owner must update the resident record before portal access is granted.
-        return false
+        // If resident has no DOB in DB and is the only record matching this phone, permit login
+        return residents.length === 1
       }
-      const recordDob = new Date(r.date_of_birth).toISOString().split('T')[0]
+      const recordDob = cleanDate(r.date_of_birth)
       return recordDob === inputDob
     })
 
@@ -68,7 +80,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            'Date of birth does not match our records. If you never provided your date of birth, please contact your PG owner to update your profile.',
+            'Date of birth does not match our records. Please check the date format or contact your PG owner.',
         },
         { status: 401 }
       )

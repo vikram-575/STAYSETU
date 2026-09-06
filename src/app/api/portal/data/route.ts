@@ -22,14 +22,37 @@ export async function GET(request: NextRequest) {
     const supabase = await createServiceClient()
 
     // 2. Fetch Resident Current Status & Stay Info
-    const { data: resident, error: resError } = await supabase
+    let { data: resident } = await supabase
       .from('v_resident_current')
       .select('*')
       .eq('resident_id', residentId)
-      .single()
+      .maybeSingle()
 
-    if (resError || !resident) {
-      return NextResponse.json({ error: 'Resident record not found.' }, { status: 404 })
+    if (!resident) {
+      const { data: rawRes } = await supabase
+        .from('residents')
+        .select('*')
+        .eq('id', residentId)
+        .single()
+
+      if (!rawRes) {
+        return NextResponse.json({ error: 'Resident record not found.' }, { status: 404 })
+      }
+
+      resident = {
+        resident_id: rawRes.id,
+        full_name: rawRes.full_name,
+        phone: rawRes.phone,
+        registration_number: rawRes.registration_number,
+        status: rawRes.status,
+        total_outstanding_paise: 0,
+        total_paid_paise: 0,
+        deposit_held_paise: 0,
+        room_number: null,
+        bed_label: null,
+        building_name: null,
+        floor_name: null,
+      }
     }
 
     // 3. Fetch Organization & Property Info

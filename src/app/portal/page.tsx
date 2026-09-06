@@ -180,14 +180,74 @@ export default function ResidentPortalPage() {
               <button
                 type="submit"
                 disabled={loginLoading}
-                className="w-full py-3.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-95 disabled:bg-blue-300 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-blue-500/25 transition flex items-center justify-center gap-2"
+                className="w-full py-3.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-95 disabled:bg-blue-300 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-blue-500/25 transition flex items-center justify-center gap-2 cursor-pointer"
               >
                 {loginLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
                 {loginLoading ? 'Verifying Details...' : 'View My Bills & Passbook'}
               </button>
             </form>
 
-            <div className="pt-4 border-t border-gray-100 text-center space-y-2">
+            {/* Quick Demo Tenant Login Chips */}
+            <div className="pt-3 border-t border-gray-100 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase font-extrabold tracking-wider text-gray-400">
+                  ⚡ Quick Demo 1-Click Fill:
+                </span>
+                <span className="text-[10px] text-blue-600 font-bold">Select any tenant</span>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5 text-left">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPhone('9871100101')
+                    setDob('1998-05-14')
+                    setLoginError('')
+                  }}
+                  className="p-2 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition text-[11px] text-slate-700 hover:text-blue-800 text-left font-semibold cursor-pointer"
+                >
+                  👤 <strong className="font-bold">Rahul Sharma</strong>
+                  <span className="block text-[9px] text-slate-400">Stanza · 101-1</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPhone('9821100201')
+                    setDob('1997-04-12')
+                    setLoginError('')
+                  }}
+                  className="p-2 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition text-[11px] text-slate-700 hover:text-blue-800 text-left font-semibold cursor-pointer"
+                >
+                  👤 <strong className="font-bold">Rohan Kulkarni</strong>
+                  <span className="block text-[9px] text-slate-400">Zolo · 101-1</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPhone('9811100301')
+                    setDob('1996-06-30')
+                    setLoginError('')
+                  }}
+                  className="p-2 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition text-[11px] text-slate-700 hover:text-blue-800 text-left font-semibold cursor-pointer"
+                >
+                  👤 <strong className="font-bold">Abhinav Gupta</strong>
+                  <span className="block text-[9px] text-slate-400">Olive · 101-1</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPhone('9981100401')
+                    setDob('1997-03-24')
+                    setLoginError('')
+                  }}
+                  className="p-2 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition text-[11px] text-slate-700 hover:text-blue-800 text-left font-semibold cursor-pointer"
+                >
+                  👤 <strong className="font-bold">Harish Rao</strong>
+                  <span className="block text-[9px] text-slate-400">Sri Balaji · 101-1</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-gray-100 text-center space-y-1">
               <p className="text-[11px] text-gray-400 font-medium">
                 Not a tenant or need to manage your PG?
               </p>

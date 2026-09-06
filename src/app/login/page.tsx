@@ -102,14 +102,74 @@ function LoginForm() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:via-indigo-500 hover:to-blue-600 active:scale-[0.99] disabled:opacity-50 text-white font-black py-3.5 px-4 rounded-xl text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25"
+          className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:via-indigo-500 hover:to-blue-600 active:scale-[0.99] disabled:opacity-50 text-white font-black py-3.5 px-4 rounded-xl text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 cursor-pointer"
         >
           {loading && <Loader2 className="w-4 h-4 animate-spin" />}
           <span>{loading ? 'Authenticating...' : 'Sign In to Dashboard →'}</span>
         </button>
       </form>
 
-      <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
+      {/* Quick Demo Login Preset Pills */}
+      <div className="pt-3 border-t border-slate-100 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-400">
+            ⚡ Quick Demo 1-Click Login:
+          </span>
+          <span className="text-[10px] text-blue-600 font-bold">Auto-fills credentials</span>
+        </div>
+        <div className="grid grid-cols-2 gap-1.5 text-left">
+          <button
+            type="button"
+            onClick={() => {
+              setEmail('vikram.rathore@stanzaliving.com')
+              setPassword('84920183')
+              setError('')
+            }}
+            className="p-2 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition text-[11px] text-slate-700 hover:text-blue-800 text-left font-semibold cursor-pointer"
+          >
+            🏢 <strong className="font-bold">Stanza Living</strong>
+            <span className="block text-[9px] text-slate-400 font-mono">vikram.rathore@...</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEmail('ananya.deshmukh@zolostays.com')
+              setPassword('73910482')
+              setError('')
+            }}
+            className="p-2 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition text-[11px] text-slate-700 hover:text-blue-800 text-left font-semibold cursor-pointer"
+          >
+            🏢 <strong className="font-bold">Zolo Stays</strong>
+            <span className="block text-[9px] text-slate-400 font-mono">ananya.deshmukh@...</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEmail('rajesh.khurana@olivepg.com')
+              setPassword('62849103')
+              setError('')
+            }}
+            className="p-2 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition text-[11px] text-slate-700 hover:text-blue-800 text-left font-semibold cursor-pointer"
+          >
+            🏢 <strong className="font-bold">Olive PG</strong>
+            <span className="block text-[9px] text-slate-400 font-mono">rajesh.khurana@...</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEmail('venkatesh.reddy@balajipg.com')
+              setPassword('51938204')
+              setError('')
+            }}
+            className="p-2 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition text-[11px] text-slate-700 hover:text-blue-800 text-left font-semibold cursor-pointer"
+          >
+            🏢 <strong className="font-bold">Sri Balaji PG</strong>
+            <span className="block text-[9px] text-slate-400 font-mono">venkatesh.reddy@...</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
         <Link href="/forgot-password" className="text-slate-500 hover:text-blue-600 font-medium transition">
           Forgot password?
         </Link>
