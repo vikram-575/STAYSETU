@@ -7,7 +7,7 @@ import {
   Search, Bell, Plus, Menu, X, LogOut,
   LayoutDashboard, Users, BedDouble, FileText, CreditCard,
   Zap, ArrowLeftRight, TrendingUp, DollarSign, MessageSquare,
-  FileBarChart, Settings, Building2, Sparkles, ChevronDown
+  FileBarChart, Settings, Building2, Sparkles, ChevronDown, ShieldCheck
 } from 'lucide-react'
 import { User as UserType } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -116,6 +116,18 @@ export default function AppHeader({ user }: Props) {
           >
             <Search className="w-4 h-4 stroke-[2.2]" />
           </button>
+
+          {/* Super Admin Command Center Link (Direct Switcher) */}
+          {user.role === 'superadmin' && (
+            <Link
+              href="/superadmin"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-black shadow-sm shadow-purple-500/25 transition active:scale-95"
+              title="Open Super Admin Fleet Command Center"
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Super Admin</span>
+            </Link>
+          )}
 
           {/* Quick Action Button (Desktop) */}
           <button

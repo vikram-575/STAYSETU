@@ -181,6 +181,28 @@ function LoginForm() {
             <span className="block text-[9px] text-slate-400 font-mono">venkatesh.reddy@...</span>
           </button>
         </div>
+
+        {/* 1-Click Super Admin Pill */}
+        <button
+          type="button"
+          onClick={() => {
+            setEmail('vikramtomar0505@gmail.com')
+            setPassword('qwerty123')
+            setError('')
+          }}
+          className="w-full p-2 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 hover:border-purple-300 transition text-[11px] text-purple-900 text-left font-semibold cursor-pointer flex items-center justify-between"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-sm">🛡️</span>
+            <div>
+              <strong className="font-bold text-purple-950">Super Admin (Central Command)</strong>
+              <span className="block text-[9px] text-purple-600 font-mono">vikramtomar0505@gmail.com</span>
+            </div>
+          </div>
+          <span className="px-2 py-0.5 rounded-md bg-purple-200/60 text-purple-800 text-[10px] font-bold">
+            Root Admin
+          </span>
+        </button>
       </div>
 
       <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
@@ -197,9 +219,30 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-blue-950 flex flex-col justify-between p-4 sm:p-6 selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-blue-950 flex flex-col justify-between p-4 sm:p-6 selection:bg-blue-600 selection:text-white relative">
       {/* Background Glow */}
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-80 bg-gradient-to-b from-blue-600/20 to-transparent blur-3xl pointer-events-none" />
+
+      {/* Top Bar with Prominent Super Admin Access in Corner */}
+      <header className="w-full max-w-5xl mx-auto flex items-center justify-between z-20 pt-2 pb-4">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-xl bg-blue-600/30 border border-blue-500/40 flex items-center justify-center text-white">
+            <Building2 className="w-4 h-4 text-blue-400" />
+          </div>
+          <span className="text-sm font-black text-white tracking-tight">PG-SETU CLOUD</span>
+        </div>
+
+        {/* Super Admin Direct Button in Corner */}
+        <Link
+          href="/superadmin/login"
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-800 border border-purple-500/40 hover:border-purple-400 text-purple-300 hover:text-white text-xs font-bold transition shadow-lg shadow-purple-900/20 cursor-pointer group"
+          title="Direct Access to Central Platform Super Admin"
+        >
+          <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
+          <span className="font-extrabold">Super Admin Portal</span>
+          <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform text-purple-400" />
+        </Link>
+      </header>
 
       <div className="w-full max-w-md mx-auto my-auto relative z-10 space-y-6">
         
@@ -242,8 +285,19 @@ export default function LoginPage() {
           </Link>
         </div>
 
-        {/* Discreet Footer Note without any visible super admin link */}
-        <p className="text-center text-[11px] text-slate-500 font-medium pt-2">
+        {/* Clear Super Admin Link at bottom */}
+        <div className="text-center pt-1">
+          <Link
+            href="/superadmin/login"
+            className="text-[11.5px] font-semibold text-slate-400 hover:text-purple-300 transition inline-flex items-center gap-1.5 py-1 px-3 rounded-full hover:bg-slate-900/60 border border-transparent hover:border-slate-800"
+          >
+            <span>🛡️ Super Admin Command Center</span>
+            <span>(`/superadmin`) →</span>
+          </Link>
+        </div>
+
+        {/* Footer Note */}
+        <p className="text-center text-[11px] text-slate-500 font-medium">
           © 2026 PG-SETU. Enterprise 256-bit SSL encrypted.
         </p>
       </div>

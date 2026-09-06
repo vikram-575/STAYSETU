@@ -60,7 +60,8 @@ export async function middleware(request: NextRequest) {
     (pathname === '/login' ||
       pathname === '/register' ||
       pathname === '/superman/login' ||
-      pathname === '/admin/login')
+      pathname === '/admin/login' ||
+      pathname === '/superadmin/login')
   ) {
     const targetUrl = request.nextUrl.clone()
     targetUrl.pathname = mustChangePassword ? '/set-password' : isSuperAdmin ? '/superman' : '/dashboard'
@@ -88,6 +89,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/register') ||
     pathname.startsWith('/superman/login') ||
     pathname.startsWith('/admin/login') ||
+    pathname.startsWith('/superadmin/login') ||
     pathname.startsWith('/portal') ||
     pathname.startsWith('/forgot-password') ||
     pathname.startsWith('/reset-password') ||
@@ -98,8 +100,8 @@ export async function middleware(request: NextRequest) {
     return response
   }
 
-  // Protect /superman and /admin routes (Super Admin only)
-  if (pathname.startsWith('/superman') || pathname.startsWith('/admin')) {
+  // Protect /superman, /admin, and /superadmin routes (Super Admin only)
+  if (pathname.startsWith('/superman') || pathname.startsWith('/admin') || pathname.startsWith('/superadmin')) {
     if (!isSuperAdmin && (!sbUser || sbUser.user_metadata?.role !== 'superadmin')) {
       const redirectUrl = request.nextUrl.clone()
       redirectUrl.pathname = '/superman/login'
