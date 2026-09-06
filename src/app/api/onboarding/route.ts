@@ -190,9 +190,21 @@ export async function POST(request: NextRequest) {
     } catch {}
 
     // 3. Create or Update Owner in Supabase Auth & Users table with 8-digit password
+    let authUserId = ''
     try {
-      // Try creating in Supabase Auth
-      const { data: authUser, error: authCreateErr } = await serviceClient.auth.admin.createUser({
+      const { data: userList } = await serviceClient.auth.admin.listUsers()
+      const existingAuth = userList?.users?.find(
+        (u) => u.email?.toLowerCase() === effectiveEmail.toLowerCase()
+      )
+
+      if (existingAuth) {
+        // Delete existing auth user and recreate to ensure clean password synchronization
+        try {
+          await serviceClient.auth.admin.deleteUser(existingAuth.id)
+        } catch {}
+      }
+
+      const { data: createdAuth, error: authCreateErr } = await serviceClient.auth.admin.createUser({
         email: effectiveEmail,
         password: ownerTemporaryPassword,
         email_confirm: true,
@@ -203,33 +215,54 @@ export async function POST(request: NextRequest) {
         },
       })
 
-      if (authCreateErr && authCreateErr.message.includes('already registered')) {
-        // Find existing user and update password
-        const { data: existingUser } = await serviceClient
-          .from('users')
-          .select('id')
-          .eq('email', effectiveEmail)
-          .single()
+      if (createdAuth?.user) {
+        authUserId = createdAuth.user.id
+      } else if (authCreateErr) {
+        console.error('[Owner Auth Create Error]:', authCreateErr)
+      }
+    } catch (authErr) {
+      console.warn('[Owner Auth Setup Warning]:', authErr)
+    }
 
-        if (existingUser) {
-          await serviceClient.auth.admin.updateUserById(existingUser.id, {
-            password: ownerTemporaryPassword,
-            user_metadata: { organization_id: orgId },
-          }).catch(() => {})
-        }
+    // Determine target UUID for users table
+    const targetOwnerUserId = authUserId || crypto.randomUUID()
+
+    // Upsert profile in users table with explicit ID
+    try {
+      const { data: existingDbUser } = await serviceClient
+        .from('users')
+        .select('id')
+        .ilike('email', effectiveEmail)
+        .maybeSingle()
+
+      if (existingDbUser && existingDbUser.id !== targetOwnerUserId) {
+        await serviceClient.from('users').delete().eq('id', existingDbUser.id)
       }
 
-      // Upsert profile in users table
-      await serviceClient.from('users').upsert({
-        organization_id: orgId,
-        email: effectiveEmail,
-        full_name: owner_name?.trim() || org_name,
-        phone: phone?.trim() || null,
-        role: 'owner',
-        is_active: true,
-      }, { onConflict: 'email' })
+      const { error: userUpsertErr } = await serviceClient.from('users').upsert(
+        {
+          id: targetOwnerUserId,
+          organization_id: orgId,
+          email: effectiveEmail,
+          full_name: owner_name?.trim() || org_name,
+          phone: phone?.trim() || null,
+          role: 'owner',
+          is_active: true,
+        },
+        { onConflict: 'id' }
+      )
+
+      if (userUpsertErr) {
+        console.error('[User upsert error]:', userUpsertErr)
+      }
+
+      // Link owner_user_id in organization
+      await serviceClient
+        .from('organizations')
+        .update({ owner_user_id: targetOwnerUserId })
+        .eq('id', orgId)
     } catch (userErr) {
-      console.warn('[Owner Auth Setup Warning]:', userErr)
+      console.warn('[User Record Setup Warning]:', userErr)
     }
 
     // 4. Create Staff / Warden / Manager Accounts with 8-Digit Passwords
@@ -241,9 +274,17 @@ export async function POST(request: NextRequest) {
           const staffEmail = (staff.email?.trim() || `${staff.name.toLowerCase().replace(/[^a-z0-9]/g, '')}_${slug}@pgsetu.com`).toLowerCase()
           const staffTemporaryPassword = generate8DigitPassword()
 
+          let staffAuthId = ''
           try {
-            // Create in Supabase Auth
-            await serviceClient.auth.admin.createUser({
+            const { data: userList } = await serviceClient.auth.admin.listUsers()
+            const existingAuth = userList?.users?.find((u) => u.email?.toLowerCase() === staffEmail)
+            if (existingAuth) {
+              try {
+                await serviceClient.auth.admin.deleteUser(existingAuth.id)
+              } catch {}
+            }
+
+            const { data: createdStaff } = await serviceClient.auth.admin.createUser({
               email: staffEmail,
               password: staffTemporaryPassword,
               email_confirm: true,
@@ -252,25 +293,42 @@ export async function POST(request: NextRequest) {
                 role: staff.role || 'manager',
                 organization_id: orgId,
               },
-            }).catch(() => {})
-
-            // Upsert in users table
-            await serviceClient.from('users').upsert({
-              organization_id: orgId,
-              email: staffEmail,
-              full_name: staff.name.trim(),
-              phone: staff.phone?.trim() || null,
-              role: staff.role || 'manager',
-              is_active: true,
-            }, { onConflict: 'email' })
-
-            createdStaffCredentials.push({
-              name: staff.name.trim(),
-              email: staffEmail,
-              temporary_password: staffTemporaryPassword,
-              role: staff.role || 'manager',
             })
+            if (createdStaff?.user) staffAuthId = createdStaff.user.id
           } catch {}
+
+          const targetStaffId = staffAuthId || crypto.randomUUID()
+          try {
+            const { data: existingStaffDb } = await serviceClient
+              .from('users')
+              .select('id')
+              .ilike('email', staffEmail)
+              .maybeSingle()
+
+            if (existingStaffDb && existingStaffDb.id !== targetStaffId) {
+              await serviceClient.from('users').delete().eq('id', existingStaffDb.id)
+            }
+
+            await serviceClient.from('users').upsert(
+              {
+                id: targetStaffId,
+                organization_id: orgId,
+                email: staffEmail,
+                full_name: staff.name.trim(),
+                phone: staff.phone?.trim() || null,
+                role: staff.role || 'manager',
+                is_active: true,
+              },
+              { onConflict: 'id' }
+            )
+          } catch {}
+
+          createdStaffCredentials.push({
+            name: staff.name.trim(),
+            email: staffEmail,
+            temporary_password: staffTemporaryPassword,
+            role: staff.role || 'manager',
+          })
         }
       }
     }

@@ -78,9 +78,9 @@ export async function POST(request: NextRequest) {
         const serviceClient = await createServiceClient()
         const { data: profile } = await serviceClient
           .from('users')
-          .select('role, organization_id')
-          .eq('id', authData.user.id)
-          .single()
+          .select('id, role, organization_id, email')
+          .or(`id.eq.${authData.user.id},email.ilike.${cleanEmail}`)
+          .maybeSingle()
 
         const role = profile?.role || 'owner'
         const isSuperAdmin = role === 'superadmin'
@@ -112,11 +112,13 @@ export async function POST(request: NextRequest) {
         }
 
         // Update last_login_at
-        serviceClient
-          .from('users')
-          .update({ last_login_at: new Date().toISOString() })
-          .eq('id', authData.user.id)
-          .then(() => {})
+        if (profile?.id) {
+          serviceClient
+            .from('users')
+            .update({ last_login_at: new Date().toISOString() })
+            .eq('id', profile.id)
+            .then(() => {})
+        }
 
         let destination: string
         if (isSuperAdmin) {
@@ -124,7 +126,7 @@ export async function POST(request: NextRequest) {
         } else if (profile?.organization_id) {
           destination = '/dashboard'
         } else {
-          destination = '/onboarding'
+          destination = '/dashboard'
         }
 
         return NextResponse.json({ success: true, role, redirect: destination })
