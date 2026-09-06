@@ -305,7 +305,7 @@ export async function POST() {
       },
     ]
 
-    const seededOrganizations = []
+    const seededOrganizations: any[] = []
 
     for (const pg of pgData) {
       const slug = pg.orgName.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 30)
@@ -483,7 +483,7 @@ export async function POST() {
       }
 
       // 9. Create 5 Tenants per PG
-      const seededTenants = []
+      const seededTenants: any[] = []
 
       for (let idx = 0; idx < pg.tenants.length; idx++) {
         const t = pg.tenants[idx]
