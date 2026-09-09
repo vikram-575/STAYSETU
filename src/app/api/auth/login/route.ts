@@ -163,6 +163,9 @@ export async function POST(request: NextRequest) {
             maxAge: 60 * 60 * 24 * 30,
             path: '/',
           })
+        } else {
+          // Clear any stale superadmin token from a previous session
+          cookieStore.set('superadmin_token', '', { maxAge: 0, path: '/' })
         }
 
         // Update last_login_at
@@ -205,6 +208,8 @@ export async function POST(request: NextRequest) {
         if (dbUser) {
           const role = dbUser.role || 'owner'
           const isSuperAdmin = role === 'superadmin'
+          // Only force password change if db record says so OR an 8-digit pin was used
+          // (never for superadmin — superadmin always has a real password)
           const is8DigitPin = /^\d{8}$/.test(password.trim())
           const mustChangePassword = !isSuperAdmin && is8DigitPin
 
@@ -251,15 +256,16 @@ export async function POST(request: NextRequest) {
               maxAge: 60 * 60 * 24 * 30,
               path: '/',
             })
+          } else {
+            // Ensure stale superadmin_token is cleared for non-superadmin users
+            cookieStore.set('superadmin_token', '', { maxAge: 0, path: '/' })
           }
 
           const destination = isSuperAdmin
             ? '/superman'
             : mustChangePassword
             ? '/set-password'
-            : dbUser.organization_id
-            ? '/dashboard'
-            : '/onboarding'
+            : '/dashboard'
 
           return NextResponse.json({
             success: true,

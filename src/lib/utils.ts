@@ -7,7 +7,7 @@ export function cn(...inputs: ClassValue[]) {
 
 /** Return 2-char initials from a full name */
 export function initials(name: string): string {
-  if (!name) return 'PG'
+  if (!name || typeof name !== 'string' || !name.trim()) return 'PG'
   const parts = name.trim().split(/\s+/)
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
@@ -16,8 +16,10 @@ export function initials(name: string): string {
 /** Format ISO date string as DD MMM YYYY */
 export function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return dateStr
   try {
-    return new Date(dateStr).toLocaleDateString('en-IN', {
+    return d.toLocaleDateString('en-IN', {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
@@ -30,8 +32,10 @@ export function formatDate(dateStr: string | null | undefined): string {
 /** Format ISO date-time string as DD MMM YYYY, HH:MM */
 export function formatDateTime(dateStr: string | null | undefined): string {
   if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return dateStr
   try {
-    return new Date(dateStr).toLocaleString('en-IN', {
+    return d.toLocaleString('en-IN', {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
@@ -49,15 +53,17 @@ export function formatDateTime(dateStr: string | null | undefined): string {
  * Opens directly on device with owner's WhatsApp application.
  */
 export function buildWhatsAppLink(phone: string, message: string): string {
-  const digits = (phone || '').replace(/\D/g, '')
+  const rawDigits = (phone || '').replace(/\D/g, '')
+  const digits = rawDigits.replace(/^0+/, '')
+  if (!digits) return `https://wa.me/?text=${encodeURIComponent(message || '')}`
   const intl = digits.startsWith('91') ? digits : `91${digits}`
-  return `https://wa.me/${intl}?text=${encodeURIComponent(message)}`
+  return `https://wa.me/${intl}?text=${encodeURIComponent(message || '')}`
 }
 
 /** Build an SMS link with a pre-filled message body */
 export function buildSmsLink(phone: string, message: string): string {
   const digits = (phone || '').replace(/\D/g, '')
-  return `sms:${digits}?body=${encodeURIComponent(message)}`
+  return `sms:${digits}?body=${encodeURIComponent(message || '')}`
 }
 
 /** Generate a unique idempotency key for preventing duplicate payments/submissions */

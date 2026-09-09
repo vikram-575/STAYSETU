@@ -46,8 +46,12 @@ export function verifyPortalToken(token: string): PortalTokenPayload | null {
       .update(payloadB64)
       .digest('base64url')
 
-    // Constant-time comparison
-    if (signature !== expectedSignature) return null
+    // Constant-time comparison to prevent timing attacks
+    const sigBuf = Buffer.from(signature)
+    const expectedBuf = Buffer.from(expectedSignature)
+    if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) {
+      return null
+    }
 
     const payload: PortalTokenPayload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf-8'))
     const now = Math.floor(Date.now() / 1000)

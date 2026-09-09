@@ -99,7 +99,16 @@ export default function MasterCompanyAdminPage() {
     }
   }
 
+  // Guard: redirect non-superadmin users away immediately
   useEffect(() => {
+    // If there's no superadmin_token cookie (client-side check as last resort),
+    // the middleware should have already redirected. But if somehow we reach here,
+    // bail out fast before making 6 unauthorized API calls.
+    const hasSuperadminToken = document.cookie.split(';').some(c => c.trim().startsWith('superadmin_token='))
+    if (!hasSuperadminToken) {
+      router.replace('/superman/login')
+      return
+    }
     loadData()
   }, [])
 

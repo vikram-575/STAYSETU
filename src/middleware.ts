@@ -82,6 +82,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(targetUrl)
   }
 
+  // Redirect authenticated non-superadmin users away from the root landing page
+  if (pathname === '/' && sbUser && !isSuperAdmin) {
+    const targetUrl = request.nextUrl.clone()
+    targetUrl.pathname = mustChangePassword ? '/set-password' : '/dashboard'
+    return NextResponse.redirect(targetUrl)
+  }
+
   // Public routes allowed without login
   const isPublicRoute =
     pathname === '/' ||
