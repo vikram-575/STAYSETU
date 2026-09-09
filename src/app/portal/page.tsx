@@ -35,11 +35,30 @@ export default function ResidentPortalPage() {
   const [qrNote, setQrNote] = useState<string>('')
   const [copiedUpi, setCopiedUpi] = useState(false)
 
-  // 1. Check existing session on mount
+  // 1. Check existing session on mount or via token/resident query param
   useEffect(() => {
     async function loadPortalData() {
       try {
-        const res = await fetch('/api/portal/data')
+        const urlParams = new URLSearchParams(window.location.search)
+        const token = urlParams.get('token')
+        const tab = urlParams.get('tab')
+        const residentId = urlParams.get('resident_id') || urlParams.get('id')
+
+        if (tab && ['invoices', 'payments', 'ledger', 'electricity', 'stay'].includes(tab)) {
+          setActiveTab(tab as any)
+        }
+
+        const queryParts: string[] = []
+        if (token) queryParts.push(`token=${encodeURIComponent(token)}`)
+        if (residentId) queryParts.push(`resident_id=${encodeURIComponent(residentId)}`)
+        const queryString = queryParts.length > 0 ? `?${queryParts.join('&')}` : ''
+
+        const headers: HeadersInit = {}
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`
+        }
+
+        const res = await fetch(`/api/portal/data${queryString}`, { headers })
         if (res.ok) {
           const data = await res.json()
           setPortalData(data)
@@ -75,9 +94,14 @@ export default function ResidentPortalPage() {
         throw new Error(data.error || 'Authentication failed. Please verify your details.')
       }
 
-      // Re-fetch portal data
+      // Re-fetch portal data using authenticated session/token
       setLoadingData(true)
-      const dataRes = await fetch('/api/portal/data')
+      const token = data.token
+      const headers: HeadersInit = {}
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const endpoint = token ? `/api/portal/data?token=${encodeURIComponent(token)}` : '/api/portal/data'
+
+      const dataRes = await fetch(endpoint, { headers })
       if (dataRes.ok) {
         const fullData = await dataRes.json()
         setPortalData(fullData)
@@ -606,8 +630,49 @@ export default function ResidentPortalPage() {
         {/* TAB 3: DIGITAL PASSBOOK (LEDGER) */}
         {/* --------------------------------------------------------- */}
         {activeTab === 'ledger' && (
-          <div className="space-y-3">
-            <h3 className="text-sm font-black text-gray-900 px-1">Digital Account Passbook</h3>
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+              <div>
+                <h3 className="text-sm sm:text-base font-black text-gray-900">Official Resident Passbook</h3>
+                <p className="text-[11px] text-gray-500">Live itemized audit ledger of all rents, deposits, charges & payments.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="self-start sm:self-auto flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-xl border border-blue-200 transition active:scale-95"
+              >
+                <Printer className="w-3.5 h-3.5" /> Print Statement
+              </button>
+            </div>
+
+            {/* Passbook Balance Header Card */}
+            <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-2xs grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-2.5 bg-gray-50 rounded-xl border border-gray-100">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Billed</span>
+                <span className="text-sm sm:text-base font-black text-red-600 block mt-0.5">
+                  {formatCurrency(ledger.reduce((acc: number, cur: any) => acc + (cur.debit_paise || 0), 0))}
+                </span>
+              </div>
+              <div className="p-2.5 bg-gray-50 rounded-xl border border-gray-100">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Paid</span>
+                <span className="text-sm sm:text-base font-black text-green-600 block mt-0.5">
+                  {formatCurrency(ledger.reduce((acc: number, cur: any) => acc + (cur.credit_paise || 0), 0))}
+                </span>
+              </div>
+              <div className="p-2.5 bg-gray-50 rounded-xl border border-gray-100">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Deposit in Trust</span>
+                <span className="text-sm sm:text-base font-black text-purple-700 block mt-0.5">
+                  {formatCurrency(depositHeldPaise)}
+                </span>
+              </div>
+              <div className="p-2.5 bg-gray-50 rounded-xl border border-gray-100">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Net Balance</span>
+                <span className={cn('text-sm sm:text-base font-black block mt-0.5', hasOutstandingDue ? 'text-red-600' : 'text-green-700')}>
+                  {formatCurrency(totalOutstandingPaise)}
+                </span>
+              </div>
+            </div>
+
             {ledger.length === 0 ? (
               <div className="bg-white p-8 rounded-2xl border border-gray-200 text-center text-xs text-gray-400">
                 No ledger transactions recorded yet.
@@ -615,30 +680,47 @@ export default function ResidentPortalPage() {
             ) : (
               <div className="space-y-2">
                 {ledger.map((entry: any) => {
-                  const isDebit = entry.entry_type === 'debit'
+                  const isDebit = Boolean(entry.is_debit ?? (entry.debit_paise > 0 || entry.entry_type === 'charge' || entry.entry_type === 'debit'))
+                  const amount = entry.amount_paise ?? (entry.debit_paise > 0 ? entry.debit_paise : (entry.credit_paise > 0 ? entry.credit_paise : 0))
+                  const balance = entry.running_balance_paise !== undefined ? entry.running_balance_paise : (entry.balance_after_paise || 0)
+
                   return (
                     <div
                       key={entry.id}
-                      className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs flex items-center justify-between text-xs"
+                      className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
                     >
-                      <div className="space-y-0.5">
-                        <p className="font-bold text-gray-900 text-xs">{entry.description}</p>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-gray-900 text-xs sm:text-sm">{entry.description}</p>
+                          <span className={cn(
+                            'px-2 py-0.5 rounded-md text-[10px] font-bold uppercase',
+                            isDebit ? 'bg-red-50 text-red-700 border border-red-200/60' : 'bg-green-50 text-green-700 border border-green-200/60'
+                          )}>
+                            {isDebit ? 'Charge' : 'Credit'}
+                          </span>
+                          {entry.category && (
+                            <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] font-semibold capitalize">
+                              {entry.category.replace('_', ' ')}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[10px] text-gray-400">
-                          {formatDate(entry.entry_date)} · {formatDateTime(entry.created_at)}
+                          Date: {formatDate(entry.entry_date)} {entry.entry_time ? `· ${formatDateTime(entry.entry_time).split(',')[1] || ''}` : ''}
+                          {entry.reference_no && ` · Ref: ${entry.reference_no}`}
                         </p>
                       </div>
 
-                      <div className="text-right space-y-0.5">
+                      <div className="text-left sm:text-right space-y-0.5 pt-1 sm:pt-0 border-t sm:border-t-0 border-gray-100 flex sm:block items-center justify-between">
                         <span
                           className={cn(
-                            'font-black text-xs sm:text-sm block',
+                            'font-black text-xs sm:text-base block',
                             isDebit ? 'text-red-600' : 'text-green-600'
                           )}
                         >
-                          {isDebit ? '+' : '-'}{formatCurrency(entry.amount_paise)}
+                          {isDebit ? '+' : '-'}{formatCurrency(amount)}
                         </span>
                         <span className="text-[10px] text-gray-500 font-semibold block">
-                          Balance: {formatCurrency(entry.balance_after_paise)}
+                          Running Balance: {formatCurrency(balance)}
                         </span>
                       </div>
                     </div>

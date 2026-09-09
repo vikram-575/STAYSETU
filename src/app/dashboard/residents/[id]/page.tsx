@@ -6,8 +6,10 @@ import { cn, formatDate, formatDateTime, buildWhatsAppLink, buildSmsLink, initia
 import {
   MessageCircle, Phone, CreditCard, PlusCircle, ArrowLeft,
   ShieldCheck, FileText, ArrowRightLeft, LogOut, CheckCircle2,
-  Calendar, Home, UserCheck, AlertCircle, Clock, FileBadge
+  Calendar, Home, UserCheck, AlertCircle, Clock, FileBadge,
+  BookOpen, Printer
 } from 'lucide-react'
+import { signPortalToken } from '@/lib/portal-auth'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -63,12 +65,63 @@ export default async function ResidentDetailPage({ params, searchParams }: Props
     .order('payment_date', { ascending: false })
 
   // Ledger
-  const { data: ledgerEntries } = await supabase
+  let { data: ledgerEntries } = await supabase
     .from('ledger_entries')
     .select('*')
     .eq('resident_id', residentId)
     .order('entry_date', { ascending: false })
     .order('entry_time', { ascending: false })
+
+  // If no ledger entries exist yet, auto-provision initial rent & deposit charges
+  if (!ledgerEntries || ledgerEntries.length === 0) {
+    if (resident.monthly_rent_paise && resident.monthly_rent_paise > 0) {
+      const checkIn = resident.check_in_date || new Date().toISOString().split('T')[0]
+      const depositAmount = resident.deposit_held_paise || (resident.monthly_rent_paise * 2)
+
+      await supabase.from('ledger_entries').insert([
+        {
+          organization_id: orgId,
+          resident_id: residentId,
+          entry_date: checkIn,
+          description: 'Security Deposit Held (Bank / UPI)',
+          category: 'security_deposit',
+          entry_type: 'deposit',
+          debit_paise: 0,
+          credit_paise: depositAmount,
+          running_balance_paise: 0,
+          payment_method: 'upi',
+        },
+        {
+          organization_id: orgId,
+          resident_id: residentId,
+          entry_date: checkIn,
+          description: `Monthly Bed Rent (${checkIn})`,
+          category: 'rent',
+          entry_type: 'charge',
+          debit_paise: resident.monthly_rent_paise,
+          credit_paise: 0,
+          running_balance_paise: resident.monthly_rent_paise,
+        },
+      ])
+
+      const { data: freshLedger } = await supabase
+        .from('ledger_entries')
+        .select('*')
+        .eq('resident_id', residentId)
+        .order('entry_date', { ascending: false })
+        .order('entry_time', { ascending: false })
+
+      ledgerEntries = freshLedger || []
+    }
+  }
+
+  // Generate secure direct token for live passbook view
+  const portalToken = signPortalToken({
+    residentId: residentId,
+    orgId: orgId || '',
+    phone: resident.phone || '',
+  })
+  const passbookLiveUrl = `/portal?token=${portalToken}&tab=ledger`
 
   // Assignment history
   const { data: assignments } = await supabase
@@ -93,8 +146,9 @@ export default async function ResidentDetailPage({ params, searchParams }: Props
     .limit(1)
     .maybeSingle()
 
-  // Pre-filled WhatsApp message with Portal Passbook Link
-  const waMsg = `Hello ${resident.full_name}, your PG balance is ${formatCurrency(resident.total_outstanding_paise)} (Reg: ${resident.registration_number}). View your itemized bills, payment receipts & passbook online at: ${typeof window !== 'undefined' ? window.location.origin : ''}/portal (Login with your Phone and Date of Birth).`
+  // Pre-filled WhatsApp message with Direct Live Passbook Link
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const waMsg = `Hello ${resident.full_name}, your PG account passbook & statement is available (Reg: ${resident.registration_number}). View your real-time balance, bills & official receipts directly at: ${baseUrl}/portal?token=${portalToken}&tab=ledger`
   const waLink = buildWhatsAppLink(resident.phone, waMsg)
   const smsLink = buildSmsLink(resident.phone, waMsg)
 
@@ -110,11 +164,11 @@ export default async function ResidentDetailPage({ params, searchParams }: Props
         </Link>
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           <Link
-            href="/portal"
+            href={passbookLiveUrl}
             target="_blank"
-            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 active:scale-95 text-indigo-700 border border-indigo-200 text-xs font-bold px-3 py-2 rounded-xl transition shadow-2xs"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition shadow-xs"
           >
-            <FileText className="w-4 h-4" /> Tenant Passbook
+            <BookOpen className="w-4 h-4" /> Live Passbook View ↗
           </Link>
           <a
             href={waLink}
@@ -230,7 +284,7 @@ export default async function ResidentDetailPage({ params, searchParams }: Props
         <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl text-xs font-bold w-max">
           {[
             { key: 'overview', label: 'Overview & KYC' },
-            { key: 'ledger', label: `Digital Ledger (${ledgerEntries?.length ?? 0})` },
+            { key: 'ledger', label: `Passbook & Ledger (${ledgerEntries?.length ?? 0})` },
             { key: 'invoices', label: `Invoices (${invoices?.length ?? 0})` },
             { key: 'payments', label: `Payments (${payments?.length ?? 0})` },
             { key: 'documents', label: `Documents (${documents?.length ?? 0})` },
@@ -298,28 +352,59 @@ export default async function ResidentDetailPage({ params, searchParams }: Props
 
           {/* Identity Document & KYC Card */}
           <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-4 sm:p-5 space-y-3 sm:space-y-4 shadow-xs">
-            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" /> Identity Document & Verification
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <FileBadge className="w-4 h-4 text-blue-600 shrink-0" /> KYC Verification
+              </h3>
+              {kycRecord ? (
+                <span className={cn(
+                  'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase',
+                  kycRecord.status === 'verified'
+                    ? 'bg-green-100 text-green-800'
+                    : kycRecord.status === 'rejected'
+                    ? 'bg-red-100 text-red-800'
+                    : 'bg-yellow-100 text-yellow-800'
+                )}>
+                  {kycRecord.status}
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-gray-100 text-gray-600">
+                  Pending
+                </span>
+              )}
+            </div>
+
             <div className="space-y-2 text-xs">
               <div className="flex justify-between py-1.5 border-b border-gray-100">
                 <span className="text-gray-500">Document Type</span>
-                <span className="font-bold uppercase text-gray-900">{fullResident?.id_type || 'Aadhaar'}</span>
+                <span className="font-bold uppercase text-gray-900">
+                  {fullResident?.id_type ? fullResident.id_type.replace('_', ' ') : '—'}
+                </span>
               </div>
               <div className="flex justify-between py-1.5 border-b border-gray-100">
                 <span className="text-gray-500">Document Number</span>
-                <span className="font-mono font-bold text-gray-900">{fullResident?.id_number || '—'}</span>
+                <span className="font-mono font-bold text-gray-900">
+                  {fullResident?.id_number || '—'}
+                </span>
               </div>
               <div className="flex justify-between py-1.5 border-b border-gray-100">
-                <span className="text-gray-500">Status</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700">Verified</span>
+                <span className="text-gray-500">Gender / DOB</span>
+                <span className="font-medium text-gray-900 capitalize">
+                  {fullResident?.gender ?? '—'} · {formatDate(fullResident?.date_of_birth)}
+                </span>
               </div>
-              {fullResident?.notes && (
-                <div className="pt-1 text-[11px] text-gray-500">
-                  <span className="font-semibold text-gray-700">Notes: </span>
-                  {fullResident.notes}
-                </div>
-              )}
+              <div className="flex justify-between py-1.5 border-b border-gray-100">
+                <span className="text-gray-500">Permanent Address</span>
+                <span className="font-medium text-right text-gray-900 max-w-[180px] truncate">
+                  {fullResident?.permanent_address ?? '—'}
+                </span>
+              </div>
+              <div className="flex justify-between py-1.5">
+                <span className="text-gray-500">City / State</span>
+                <span className="font-bold text-gray-900">
+                  {fullResident?.permanent_city ?? '—'}, {fullResident?.permanent_state ?? ''}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -391,20 +476,59 @@ export default async function ResidentDetailPage({ params, searchParams }: Props
         </div>
       )}
 
-      {/* Digital Ledger Tab */}
+      {/* Digital Passbook & Ledger Tab */}
       {activeTab === 'ledger' && (
         <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-3.5 sm:p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
             <div>
-              <h3 className="text-sm font-bold text-gray-900">Complete Financial Ledger</h3>
-              <p className="text-[11px] text-gray-500">Append-only audit trail.</p>
+              <h3 className="text-sm sm:text-base font-black text-gray-900">Official Resident Passbook</h3>
+              <p className="text-[11px] text-gray-500">
+                Immutable, append-only financial accounting trail · Rents, security deposits & adjustments.
+              </p>
             </div>
-            <Link
-              href={`/dashboard/billing/add-charge?resident=${residentId}`}
-              className="px-3 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 active:scale-95 transition"
-            >
-              + Add Entry
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                href={passbookLiveUrl}
+                target="_blank"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition border border-indigo-200 active:scale-95"
+              >
+                <BookOpen className="w-3.5 h-3.5" /> Live Passbook View ↗
+              </Link>
+              <Link
+                href={`/dashboard/billing/add-charge?resident=${residentId}`}
+                className="px-3 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 active:scale-95 transition"
+              >
+                + Add Entry
+              </Link>
+            </div>
+          </div>
+
+          {/* Passbook Financial Summary Strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+            <div className="p-3 bg-red-50/70 border border-red-100 rounded-xl">
+              <span className="text-[10px] uppercase font-bold text-red-600 block">Total Billed</span>
+              <span className="text-sm sm:text-base font-black text-red-700 block mt-0.5">
+                {formatCurrency(ledgerEntries?.reduce((s, e) => s + (e.debit_paise || 0), 0) || 0)}
+              </span>
+            </div>
+            <div className="p-3 bg-green-50/70 border border-green-100 rounded-xl">
+              <span className="text-[10px] uppercase font-bold text-green-600 block">Total Received</span>
+              <span className="text-sm sm:text-base font-black text-green-700 block mt-0.5">
+                {formatCurrency(ledgerEntries?.reduce((s, e) => s + (e.credit_paise || 0), 0) || 0)}
+              </span>
+            </div>
+            <div className="p-3 bg-purple-50/70 border border-purple-100 rounded-xl">
+              <span className="text-[10px] uppercase font-bold text-purple-600 block">Deposit in Trust</span>
+              <span className="text-sm sm:text-base font-black text-purple-700 block mt-0.5">
+                {formatCurrency(resident.deposit_held_paise || 0)}
+              </span>
+            </div>
+            <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-xl">
+              <span className="text-[10px] uppercase font-bold text-blue-600 block">Net Balance Due</span>
+              <span className="text-sm sm:text-base font-black text-blue-700 block mt-0.5">
+                {formatCurrency(resident.total_outstanding_paise || 0)}
+              </span>
+            </div>
           </div>
 
           {/* 1. Mobile Cards View */}

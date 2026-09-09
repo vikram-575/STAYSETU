@@ -14,24 +14,32 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Clean phone number: take digits only (last 10 digits for Indian standard numbers)
-    const digitsOnly = String(phone).replace(/\D/g, '')
+    // Clean phone/identifier: take digits or registration ID
+    const rawInput = String(phone).trim()
+    const digitsOnly = rawInput.replace(/\D/g, '')
     const searchPhone = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly
 
-    if (searchPhone.length < 10) {
+    if (searchPhone.length < 10 && rawInput.length < 3) {
       return NextResponse.json(
-        { error: 'Please enter a valid 10-digit mobile number.' },
+        { error: 'Please enter a valid 10-digit mobile number or registration number.' },
         { status: 400 }
       )
     }
 
     const supabase = await createServiceClient()
 
-    // 1. First, search for the resident by phone number
-    const { data: residents, error: queryError } = await supabase
+    // 1. Search for resident by phone, alternate phone, or registration number
+    let query = supabase
       .from('residents')
       .select('id, organization_id, full_name, registration_number, phone, alternate_phone, date_of_birth, status')
-      .or(`phone.ilike.%${searchPhone}%,alternate_phone.ilike.%${searchPhone}%`)
+
+    if (searchPhone.length >= 10) {
+      query = query.or(`phone.ilike.%${searchPhone}%,alternate_phone.ilike.%${searchPhone}%,registration_number.ilike.%${rawInput}%`)
+    } else {
+      query = query.ilike('registration_number', `%${rawInput}%`)
+    }
+
+    const { data: residents, error: queryError } = await query
 
     if (queryError) {
       return NextResponse.json(
@@ -44,7 +52,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            'No resident record found with this mobile number. Please check the number or contact your PG owner.',
+            'No resident record found with this mobile number or registration ID. Please check the details or contact your PG owner.',
         },
         { status: 404 }
       )
@@ -53,7 +61,7 @@ export async function POST(request: NextRequest) {
     // 2. Verify date of birth with robust format normalization
     function cleanDate(d: string): string {
       if (!d) return ''
-      const trimmed = d.trim()
+      const trimmed = d.trim().split('T')[0]
       const ymd = trimmed.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/)
       if (ymd) {
         return `${ymd[1]}-${ymd[2].padStart(2, '0')}-${ymd[3].padStart(2, '0')}`
@@ -69,7 +77,7 @@ export async function POST(request: NextRequest) {
 
     const matchedResident = residents.find((r) => {
       if (!r.date_of_birth) {
-        // If resident has no DOB in DB and is the only record matching this phone, permit login
+        // If resident has no DOB in DB and is the only record matching this identifier, permit login
         return residents.length === 1
       }
       const recordDob = cleanDate(r.date_of_birth)
@@ -80,7 +88,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            'Date of birth does not match our records. Please check the date format or contact your PG owner.',
+            'Date of birth does not match our records. Please check the date or contact your PG owner.',
         },
         { status: 401 }
       )

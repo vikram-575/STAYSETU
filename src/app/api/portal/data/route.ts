@@ -1,16 +1,40 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getPortalSession, verifyPortalToken } from '@/lib/portal-auth'
+import { getAuthenticatedUser } from '@/lib/auth-session'
 
 export async function GET(request: NextRequest) {
   try {
-    // 1. Authenticate via cookie or header
+    // 1. Authenticate via cookie, header, token query param, or staff session
     let session = await getPortalSession()
+    let tokenFromParam = request.nextUrl.searchParams.get('token')
+
+    if (!session && tokenFromParam) {
+      session = verifyPortalToken(tokenFromParam)
+    }
 
     if (!session) {
       const authHeader = request.headers.get('Authorization')
       if (authHeader?.startsWith('Bearer ')) {
-        session = verifyPortalToken(authHeader.substring(7))
+        const hToken = authHeader.substring(7)
+        session = verifyPortalToken(hToken)
+        if (session && !tokenFromParam) tokenFromParam = hToken
+      }
+    }
+
+    // Allow logged-in PG owner/staff to view resident passbook
+    if (!session) {
+      const authUser = await getAuthenticatedUser()
+      if (authUser) {
+        const residentParam = request.nextUrl.searchParams.get('resident_id') || request.nextUrl.searchParams.get('id')
+        if (residentParam) {
+          session = {
+            residentId: residentParam,
+            orgId: authUser.organization_id || '',
+            phone: '',
+            exp: Math.floor(Date.now() / 1000) + 86400,
+          }
+        }
       }
     }
 
@@ -55,15 +79,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const effectiveOrgId = orgId || resident.organization_id
+
     // 3. Fetch Organization & Property Info
     const { data: org } = await supabase
       .from('organizations')
       .select('name, phone, email, address, city, state, pincode, settings')
-      .eq('id', orgId)
-      .single()
+      .eq('id', effectiveOrgId)
+      .maybeSingle()
 
     const { data: prop } = resident.property_id
-      ? await supabase.from('properties').select('*').eq('id', resident.property_id).single()
+      ? await supabase.from('properties').select('*').eq('id', resident.property_id).maybeSingle()
       : { data: null }
 
     // 4. Fetch Invoices with Items
@@ -81,11 +107,72 @@ export async function GET(request: NextRequest) {
       .order('payment_date', { ascending: false })
 
     // 6. Fetch Complete Digital Passbook (Ledger Entries)
-    const { data: ledger } = await supabase
+    let { data: ledger } = await supabase
       .from('ledger_entries')
       .select('*')
       .eq('resident_id', residentId)
       .order('entry_date', { ascending: false })
+      .order('entry_time', { ascending: false })
+
+    // If no ledger entries exist yet, auto-provision initial rent & deposit charges
+    if (!ledger || ledger.length === 0) {
+      if (resident.monthly_rent_paise && resident.monthly_rent_paise > 0) {
+        const checkIn = resident.check_in_date || new Date().toISOString().split('T')[0]
+        const depositAmount = resident.deposit_held_paise || (resident.monthly_rent_paise * 2)
+
+        const defaultEntries = [
+          {
+            organization_id: effectiveOrgId,
+            resident_id: residentId,
+            entry_date: checkIn,
+            description: 'Security Deposit Held (Bank / UPI)',
+            category: 'security_deposit',
+            entry_type: 'deposit',
+            debit_paise: 0,
+            credit_paise: depositAmount,
+            running_balance_paise: 0,
+            payment_method: 'upi',
+          },
+          {
+            organization_id: effectiveOrgId,
+            resident_id: residentId,
+            entry_date: checkIn,
+            description: `Monthly Bed Rent (${checkIn})`,
+            category: 'rent',
+            entry_type: 'charge',
+            debit_paise: resident.monthly_rent_paise,
+            credit_paise: 0,
+            running_balance_paise: resident.monthly_rent_paise,
+          },
+        ]
+
+        await supabase.from('ledger_entries').insert(defaultEntries)
+
+        const { data: freshLedger } = await supabase
+          .from('ledger_entries')
+          .select('*')
+          .eq('resident_id', residentId)
+          .order('entry_date', { ascending: false })
+
+        ledger = freshLedger || []
+      }
+    }
+
+    // Normalize ledger entries with explicit amount_paise and balance_after_paise
+    const formattedLedger = (ledger || []).map((entry: any) => {
+      const isDebit = entry.debit_paise > 0 || entry.entry_type === 'charge' || entry.entry_type === 'debit'
+      const amount = entry.debit_paise > 0 ? entry.debit_paise : (entry.credit_paise > 0 ? entry.credit_paise : entry.amount_paise || 0)
+      const balance = entry.running_balance_paise !== undefined ? entry.running_balance_paise : (entry.balance_after_paise || 0)
+      return {
+        ...entry,
+        is_debit: isDebit,
+        amount_paise: amount,
+        debit_paise: isDebit ? amount : 0,
+        credit_paise: !isDebit ? amount : 0,
+        running_balance_paise: balance,
+        balance_after_paise: balance,
+      }
+    })
 
     // 7. Fetch Sub-Meter Electricity Readings (if assigned to a room)
     let electricityReadings: any[] = []
@@ -127,7 +214,7 @@ export async function GET(request: NextRequest) {
         )}`
       : ''
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       resident: {
         id: resident.resident_id,
@@ -164,9 +251,21 @@ export async function GET(request: NextRequest) {
       },
       invoices: invoices || [],
       payments: payments || [],
-      ledger: ledger || [],
+      ledger: formattedLedger,
       electricity_readings: electricityReadings,
     })
+
+    if (tokenFromParam) {
+      response.cookies.set('resident_portal_token', tokenFromParam, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 86400 * 30,
+        path: '/',
+      })
+    }
+
+    return response
   } catch (err: any) {
     return NextResponse.json(
       { error: err.message || 'Failed to retrieve portal data' },

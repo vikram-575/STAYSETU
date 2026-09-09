@@ -4,9 +4,10 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { formatCurrency } from '@/lib/money'
 import { cn, formatDate, formatDateTime, initials } from '@/lib/utils'
+import { signPortalToken } from '@/lib/portal-auth'
 import {
   BookOpen, PlusCircle, ArrowLeft, Search, Filter,
-  TrendingDown, TrendingUp, CheckCircle2, AlertCircle, FileText
+  TrendingDown, TrendingUp, CheckCircle2, AlertCircle, FileText, Printer
 } from 'lucide-react'
 
 interface Props {
@@ -64,17 +65,33 @@ export default async function DigitalLedgerPage({ searchParams }: Props) {
   const totalCreditsPaise = entries?.reduce((s, e) => s + e.credit_paise, 0) || 0
   const currentBalancePaise = currentResident?.total_outstanding_paise || 0
 
+  const portalToken = currentResident ? signPortalToken({
+    residentId: currentResident.resident_id,
+    orgId: orgId || '',
+    phone: currentResident.phone || '',
+  }) : null
+  const passbookLiveUrl = portalToken ? `/portal?token=${portalToken}&tab=ledger` : '#'
+
   return (
     <div className="space-y-4 sm:space-y-6 max-w-screen-2xl">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">Resident Digital Ledger</h1>
+          <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">Resident Passbook & Digital Ledger</h1>
           <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
-            Immutable, append-only financial accounting trail · Adjustments & Reversals
+            Immutable, append-only financial accounting trail · Rents, security deposits & receipts
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {portalToken && (
+            <Link
+              href={passbookLiveUrl}
+              target="_blank"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold px-3.5 py-2.5 rounded-xl transition shadow-xs"
+            >
+              <BookOpen className="w-4 h-4" /> Live Passbook View ↗
+            </Link>
+          )}
           <Link
             href={`/dashboard/billing/add-charge${currentResidentId ? `?resident=${currentResidentId}` : ''}`}
             className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-orange-600 hover:bg-orange-700 active:scale-95 text-white text-xs font-bold px-3.5 py-2.5 rounded-xl transition shadow-xs"
