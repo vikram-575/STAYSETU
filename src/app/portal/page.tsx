@@ -126,21 +126,39 @@ export default function ResidentPortalPage() {
   // -------------------------------------------------------------
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex items-center justify-center p-4 sm:p-6">
-        <div className="w-full max-w-md space-y-6">
+      <div className="min-h-screen bg-[#0B0F19] text-slate-100 flex flex-col justify-between p-4 sm:p-6 selection:bg-blue-600 selection:text-white relative overflow-hidden">
+        {/* Subtle Professional Ambient Gradients & Architectural Grid */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-15%,rgba(59,130,246,0.15),transparent_70%)] pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_120%,rgba(99,102,241,0.08),transparent_70%)] pointer-events-none" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b14_1px,transparent_1px),linear-gradient(to_bottom,#1e293b14_1px,transparent_1px)] bg-[size:3.5rem_3.5rem] [mask-image:radial-gradient(ellipse_70%_70%_at_50%_40%,#000_60%,transparent_100%)] pointer-events-none" />
+
+        {/* Top Header */}
+        <header className="w-full max-w-5xl mx-auto flex items-center justify-between z-20 pt-2 pb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-white shadow-sm">
+              <Building2 className="w-4 h-4 text-blue-400" />
+            </div>
+            <span className="text-sm font-black tracking-tight text-white">PG-SETU</span>
+            <span className="px-2 py-0.5 rounded-full bg-slate-800 text-[10px] font-mono text-slate-400 border border-slate-700">
+              Resident Self-Service
+            </span>
+          </div>
+        </header>
+
+        <div className="w-full max-w-md mx-auto my-auto relative z-10 space-y-6">
           {/* Header */}
           <div className="text-center space-y-2">
-            <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-2xl shadow-xl shadow-blue-500/20 text-white mb-2">
+            <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl shadow-xl shadow-blue-500/20 text-white mb-2 border border-blue-400/30">
               <Building2 className="w-7 h-7" />
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Resident Passbook</h1>
-            <p className="text-xs sm:text-sm text-blue-200/80 font-medium">
+            <p className="text-xs sm:text-sm text-slate-400 font-medium">
               View your rent bills, payment receipts, electricity charges & ledger in 1 tap.
             </p>
           </div>
 
           {/* Form Card */}
-          <div className="bg-white rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5 border border-white/20">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5 border border-slate-200/80">
             <div className="border-b border-gray-100 pb-3">
               <span className="text-xs font-bold uppercase tracking-wider text-blue-600 block">Resident Self-Service Login</span>
               <p className="text-[11px] text-gray-500 mt-0.5">Enter your check-in phone number and date of birth</p>
@@ -165,7 +183,7 @@ export default function ResidentPortalPage() {
                     placeholder="10-digit phone number"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none transition"
+                    className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 font-medium focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition"
                   />
                 </div>
                 <p className="text-[10px] text-gray-400 mt-1">The mobile number registered during your check-in.</p>
@@ -178,7 +196,7 @@ export default function ResidentPortalPage() {
                   required
                   value={dob}
                   onChange={(e) => setDob(e.target.value)}
-                  className="w-full px-3.5 py-3 border border-gray-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none transition"
+                  className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 font-medium focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition"
                 />
                 <p className="text-[10px] text-gray-400 mt-1">Used to verify your identity securely.</p>
               </div>
@@ -186,74 +204,14 @@ export default function ResidentPortalPage() {
               <button
                 type="submit"
                 disabled={loginLoading}
-                className="w-full py-3.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-95 disabled:bg-blue-300 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-blue-500/25 transition flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3.5 px-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:via-indigo-500 hover:to-blue-600 active:scale-[0.99] disabled:opacity-50 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-lg shadow-blue-500/25 transition flex items-center justify-center gap-2 cursor-pointer"
               >
                 {loginLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
                 {loginLoading ? 'Verifying Details...' : 'View My Bills & Passbook'}
               </button>
             </form>
 
-            {/* Quick Demo Tenant Login Chips */}
-            <div className="pt-3 border-t border-gray-100 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] uppercase font-extrabold tracking-wider text-gray-400">
-                  ⚡ Quick Demo 1-Click Fill:
-                </span>
-                <span className="text-[10px] text-blue-600 font-bold">Select any tenant</span>
-              </div>
-              <div className="grid grid-cols-2 gap-1.5 text-left">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPhone('9871100101')
-                    setDob('1998-05-14')
-                    setLoginError('')
-                  }}
-                  className="p-2 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition text-[11px] text-slate-700 hover:text-blue-800 text-left font-semibold cursor-pointer"
-                >
-                  👤 <strong className="font-bold">Rahul Sharma</strong>
-                  <span className="block text-[9px] text-slate-400">Stanza · 101-1</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPhone('9821100201')
-                    setDob('1997-04-12')
-                    setLoginError('')
-                  }}
-                  className="p-2 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition text-[11px] text-slate-700 hover:text-blue-800 text-left font-semibold cursor-pointer"
-                >
-                  👤 <strong className="font-bold">Rohan Kulkarni</strong>
-                  <span className="block text-[9px] text-slate-400">Zolo · 101-1</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPhone('9811100301')
-                    setDob('1996-06-30')
-                    setLoginError('')
-                  }}
-                  className="p-2 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition text-[11px] text-slate-700 hover:text-blue-800 text-left font-semibold cursor-pointer"
-                >
-                  👤 <strong className="font-bold">Abhinav Gupta</strong>
-                  <span className="block text-[9px] text-slate-400">Olive · 101-1</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPhone('9981100401')
-                    setDob('1997-03-24')
-                    setLoginError('')
-                  }}
-                  className="p-2 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition text-[11px] text-slate-700 hover:text-blue-800 text-left font-semibold cursor-pointer"
-                >
-                  👤 <strong className="font-bold">Harish Rao</strong>
-                  <span className="block text-[9px] text-slate-400">Sri Balaji · 101-1</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="pt-2 border-t border-gray-100 text-center space-y-1">
+            <div className="pt-3 border-t border-gray-100 text-center space-y-1">
               <p className="text-[11px] text-gray-400 font-medium">
                 Not a tenant or need to manage your PG?
               </p>
@@ -266,10 +224,12 @@ export default function ResidentPortalPage() {
             </div>
           </div>
 
-          <p className="text-center text-[11px] text-blue-200/50 font-medium">
-            © 2026 PG-SETU · Real-time Transparent Tenant Billing
+          <p className="text-center text-[11px] text-slate-500 font-medium">
+            © 2026 PG-SETU Platform Enterprise · Strict 256-bit TLS Security
           </p>
         </div>
+
+        <div />
       </div>
     )
   }

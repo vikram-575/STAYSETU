@@ -4,7 +4,7 @@ import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
-  ShieldAlert, ShieldCheck, KeyRound, Lock, Eye, EyeOff,
+  ShieldAlert, ShieldCheck, Lock, Eye, EyeOff,
   Loader2, Sparkles, Terminal, ArrowRight, CheckCircle2,
   AlertTriangle, Building2, Server
 } from 'lucide-react'
@@ -51,16 +51,12 @@ function CompanyAdminLoginForm() {
     }
   }
 
-  const fillMasterCredentials = () => {
-    setEmail('vikramtomar0505@gmail.com')
-    setPassword('qwerty123')
-  }
-
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden selection:bg-blue-500 selection:text-white">
-      {/* Subtle Background Glows */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-10 right-10 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-screen bg-[#0B0F19] text-slate-100 flex flex-col justify-between py-8 px-4 sm:px-6 lg:px-8 relative overflow-hidden selection:bg-blue-500 selection:text-white">
+      {/* Subtle Professional Ambient Gradients & Architectural Grid */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-15%,rgba(59,130,246,0.15),transparent_70%)] pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_120%,rgba(99,102,241,0.08),transparent_70%)] pointer-events-none" />
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b14_1px,transparent_1px),linear-gradient(to_bottom,#1e293b14_1px,transparent_1px)] bg-[size:3.5rem_3.5rem] [mask-image:radial-gradient(ellipse_70%_70%_at_50%_40%,#000_60%,transparent_100%)] pointer-events-none" />
 
       {/* Header Brand */}
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 text-center space-y-3 px-4">
@@ -146,17 +142,6 @@ function CompanyAdminLoginForm() {
             </button>
           </form>
 
-          {/* Quick Demo Credentials Autofill Pill */}
-          <div className="pt-2 border-t border-slate-800/80">
-            <button
-              type="button"
-              onClick={fillMasterCredentials}
-              className="w-full py-2 bg-slate-950/80 hover:bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200 rounded-xl text-[11px] font-semibold transition flex items-center justify-center gap-2"
-            >
-              <KeyRound className="w-3.5 h-3.5 text-blue-400" />
-              <span>Fill Master Credentials (Vikram Tomar)</span>
-            </button>
-          </div>
 
           {/* Security & Isolation Footnote */}
           <div className="pt-2 text-center space-y-3">

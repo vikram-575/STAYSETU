@@ -27,17 +27,35 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-950 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-tr from-indigo-600 to-indigo-500 rounded-2xl mb-3 shadow-lg shadow-indigo-500/20 border border-indigo-400/20">
-            <Building2 className="w-7 h-7 text-white" />
+    <div className="min-h-screen bg-[#0B0F19] text-slate-100 flex flex-col justify-between p-4 sm:p-6 selection:bg-blue-600 selection:text-white relative overflow-hidden">
+      {/* Subtle Professional Ambient Gradients & Architectural Grid */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-15%,rgba(59,130,246,0.15),transparent_70%)] pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_120%,rgba(99,102,241,0.08),transparent_70%)] pointer-events-none" />
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b14_1px,transparent_1px),linear-gradient(to_bottom,#1e293b14_1px,transparent_1px)] bg-[size:3.5rem_3.5rem] [mask-image:radial-gradient(ellipse_70%_70%_at_50%_40%,#000_60%,transparent_100%)] pointer-events-none" />
+
+      {/* Top Header */}
+      <header className="w-full max-w-5xl mx-auto flex items-center justify-between z-20 pt-2 pb-4">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-white shadow-sm">
+            <Building2 className="w-4 h-4 text-blue-400" />
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">PG-SETU</h1>
-          <p className="text-xs text-neutral-400 mt-1">Firebase Password Recovery</p>
+          <span className="text-sm font-black tracking-tight text-white">PG-SETU</span>
+          <span className="px-2 py-0.5 rounded-full bg-slate-800 text-[10px] font-mono text-slate-400 border border-slate-700">
+            Account Recovery
+          </span>
+        </div>
+      </header>
+
+      <div className="w-full max-w-md mx-auto my-auto relative z-10 space-y-6">
+        <div className="text-center space-y-2">
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl shadow-xl shadow-blue-500/25 text-white mb-1 border border-blue-400/30">
+            <Building2 className="w-7 h-7" />
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">PG-SETU</h1>
+          <p className="text-xs sm:text-sm text-slate-400 font-medium">Password Recovery</p>
         </div>
 
-        <div className="bg-neutral-900/80 border border-neutral-800/80 rounded-2xl shadow-2xl p-8 backdrop-blur-xl">
+        <div className="bg-slate-900/90 border border-slate-800 rounded-3xl shadow-2xl p-6 sm:p-8 backdrop-blur-xl">
           {sent ? (
             <div className="text-center space-y-4">
               <div className="w-12 h-12 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center mx-auto text-emerald-400">
@@ -102,6 +120,7 @@ export default function ForgotPasswordPage() {
           )}
         </div>
       </div>
+      <div />
     </div>
   )
 }

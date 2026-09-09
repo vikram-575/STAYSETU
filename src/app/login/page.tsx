@@ -135,71 +135,11 @@ function LoginForm() {
         </button>
       </form>
 
-      {/* Quick Demo Login Preset Pills */}
-      <div className="pt-3 border-t border-slate-100 space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-400">
-            ⚡ Quick Demo 1-Click Login:
-          </span>
-          <span className="text-[10px] text-blue-600 font-bold">Auto-fills credentials</span>
-        </div>
-        <div className="grid grid-cols-2 gap-1.5 text-left">
-          <button
-            type="button"
-            onClick={() => {
-              setEmail('vikram.rathore@stanzaliving.com')
-              setPassword('84920183')
-              setError('')
-            }}
-            className="p-2 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition text-[11px] text-slate-700 hover:text-blue-800 text-left font-semibold cursor-pointer"
-          >
-            🏢 <strong className="font-bold">Stanza Living</strong>
-            <span className="block text-[9px] text-slate-400 font-mono">vikram.rathore@...</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setEmail('ananya.deshmukh@zolostays.com')
-              setPassword('73910482')
-              setError('')
-            }}
-            className="p-2 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition text-[11px] text-slate-700 hover:text-blue-800 text-left font-semibold cursor-pointer"
-          >
-            🏢 <strong className="font-bold">Zolo Stays</strong>
-            <span className="block text-[9px] text-slate-400 font-mono">ananya.deshmukh@...</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setEmail('rajesh.khurana@olivepg.com')
-              setPassword('62849103')
-              setError('')
-            }}
-            className="p-2 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition text-[11px] text-slate-700 hover:text-blue-800 text-left font-semibold cursor-pointer"
-          >
-            🏢 <strong className="font-bold">Olive PG</strong>
-            <span className="block text-[9px] text-slate-400 font-mono">rajesh.khurana@...</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setEmail('venkatesh.reddy@balajipg.com')
-              setPassword('51938204')
-              setError('')
-            }}
-            className="p-2 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition text-[11px] text-slate-700 hover:text-blue-800 text-left font-semibold cursor-pointer"
-          >
-            🏢 <strong className="font-bold">Sri Balaji PG</strong>
-            <span className="block text-[9px] text-slate-400 font-mono">venkatesh.reddy@...</span>
-          </button>
-        </div>
-      </div>
-
-      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-        <Link href="/forgot-password" className="text-slate-500 hover:text-blue-600 font-medium transition">
+      <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
+        <Link href="/forgot-password" className="text-slate-400 hover:text-blue-400 font-medium transition">
           Forgot password?
         </Link>
-        <Link href="/register" className="text-blue-600 hover:text-blue-700 font-bold transition">
+        <Link href="/register" className="text-blue-400 hover:text-blue-300 font-bold transition">
           Register New PG →
         </Link>
       </div>
@@ -209,64 +149,63 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-blue-950 flex flex-col justify-between p-4 sm:p-6 selection:bg-blue-600 selection:text-white relative">
-      {/* Background Glow */}
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-80 bg-gradient-to-b from-blue-600/20 to-transparent blur-3xl pointer-events-none" />
+    <div className="min-h-screen bg-[#0B0F19] text-slate-100 flex flex-col justify-between p-4 sm:p-6 selection:bg-blue-600 selection:text-white relative overflow-hidden">
+      {/* Subtle Professional Ambient Gradients & Architectural Grid */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-15%,rgba(59,130,246,0.15),transparent_70%)] pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_120%,rgba(99,102,241,0.08),transparent_70%)] pointer-events-none" />
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b14_1px,transparent_1px),linear-gradient(to_bottom,#1e293b14_1px,transparent_1px)] bg-[size:3.5rem_3.5rem] [mask-image:radial-gradient(ellipse_70%_70%_at_50%_40%,#000_60%,transparent_100%)] pointer-events-none" />
 
-      {/* Top Bar */}
+      {/* Top Header */}
       <header className="w-full max-w-5xl mx-auto flex items-center justify-between z-20 pt-2 pb-4">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-blue-600/30 border border-blue-500/40 flex items-center justify-center text-white">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-white shadow-sm">
             <Building2 className="w-4 h-4 text-blue-400" />
           </div>
-          <span className="text-sm font-black text-white tracking-tight">PG-SETU CLOUD</span>
+          <span className="text-sm font-black tracking-tight text-white">PG-SETU</span>
+          <span className="px-2 py-0.5 rounded-full bg-slate-800 text-[10px] font-mono text-slate-400 border border-slate-700">
+            Enterprise Cloud
+          </span>
         </div>
       </header>
 
-      <div className="w-full max-w-md mx-auto my-auto relative z-10 space-y-6">
-        
+      {/* Center Container */}
+      <div className="w-full max-w-md mx-auto my-auto relative z-10 space-y-5">
         {/* Brand Header */}
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl shadow-xl shadow-blue-500/25 text-white mb-1">
-            <Building2 className="w-7 h-7" />
+        <div className="text-center space-y-1.5">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/20 mb-1 border border-blue-400/30">
+            <Building2 className="w-6 h-6" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">PG-SETU</h1>
-          <p className="text-xs sm:text-sm text-blue-200/80 font-medium">PG Operations & Revenue Management System</p>
+          <h1 className="text-2xl font-black text-white tracking-tight">PG-SETU Property Cloud</h1>
+          <p className="text-xs text-slate-400 font-medium">Operations & Revenue Management System</p>
         </div>
 
         {/* Owner & Staff Login Box */}
         <LoginForm />
 
-        {/* 🌟 HIGH-VISIBILITY HIGHLIGHTED TENANT PASSBOOK CARD */}
-        <div className="relative overflow-hidden p-5 rounded-3xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white shadow-xl shadow-emerald-900/30 border border-emerald-400/40 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="px-2.5 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-black uppercase tracking-wider backdrop-blur-md flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-amber-300" /> Tenant Self-Service
-            </span>
-            <span className="text-[11px] text-emerald-100 font-bold">Phone + DOB Login</span>
-          </div>
-
-          <div className="space-y-1">
-            <h3 className="text-base font-black text-white leading-tight">
-              Resident & Tenant Passbook Portal
-            </h3>
-            <p className="text-xs text-emerald-50 leading-relaxed font-medium">
-              View your rent receipts, check live electricity dues, download bills & pay rent directly via UPI.
-            </p>
+        {/* Professional Tenant Passbook Card */}
+        <div className="p-4 rounded-2xl bg-slate-900/80 backdrop-blur-xl border border-slate-800 shadow-lg flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
+          <div className="space-y-0.5 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <span className="text-[10px] uppercase font-extrabold tracking-wider text-emerald-400">
+                Tenant Portal
+              </span>
+            </div>
+            <p className="text-xs font-bold text-white truncate">Looking for your Stay Passbook?</p>
+            <p className="text-[11px] text-slate-400 truncate">View rent bills, electricity & pay via UPI</p>
           </div>
 
           <Link
             href="/portal"
-            className="w-full py-3 px-4 bg-white text-emerald-800 hover:bg-emerald-50 active:scale-[0.99] font-black text-xs sm:text-sm rounded-xl shadow-md transition flex items-center justify-center gap-2 group"
+            className="w-full sm:w-auto px-4 py-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-bold text-xs rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5 shrink-0"
           >
-            <FileText className="w-4 h-4 text-emerald-600" />
-            <span>Open Resident Digital Passbook →</span>
+            <span>Tenant Login →</span>
           </Link>
         </div>
 
         {/* Footer Note */}
-        <p className="text-center text-[11px] text-slate-500 font-medium">
-          © 2026 PG-SETU. Enterprise 256-bit SSL encrypted.
+        <p className="text-center text-[10px] text-slate-500 font-medium">
+          © 2026 PG-SETU Platform Enterprise · Strict 256-bit TLS Security
         </p>
       </div>
 

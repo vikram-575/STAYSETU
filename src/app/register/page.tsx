@@ -50,18 +50,33 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-blue-950 flex flex-col justify-between p-4 sm:p-6 selection:bg-blue-600 selection:text-white">
-      {/* Background Glow */}
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-80 bg-gradient-to-b from-blue-600/20 to-transparent blur-3xl pointer-events-none" />
+    <div className="min-h-screen bg-[#0B0F19] text-slate-100 flex flex-col justify-between p-4 sm:p-6 selection:bg-blue-600 selection:text-white relative overflow-hidden">
+      {/* Subtle Professional Ambient Gradients & Architectural Grid */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-15%,rgba(59,130,246,0.15),transparent_70%)] pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_120%,rgba(99,102,241,0.08),transparent_70%)] pointer-events-none" />
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b14_1px,transparent_1px),linear-gradient(to_bottom,#1e293b14_1px,transparent_1px)] bg-[size:3.5rem_3.5rem] [mask-image:radial-gradient(ellipse_70%_70%_at_50%_40%,#000_60%,transparent_100%)] pointer-events-none" />
+
+      {/* Top Header */}
+      <header className="w-full max-w-5xl mx-auto flex items-center justify-between z-20 pt-2 pb-4">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-white shadow-sm">
+            <Building2 className="w-4 h-4 text-blue-400" />
+          </div>
+          <span className="text-sm font-black tracking-tight text-white">PG-SETU</span>
+          <span className="px-2 py-0.5 rounded-full bg-slate-800 text-[10px] font-mono text-slate-400 border border-slate-700">
+            Owner Registration
+          </span>
+        </div>
+      </header>
 
       <div className="w-full max-w-md mx-auto my-auto relative z-10 space-y-6">
         {/* Brand Header */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl shadow-xl shadow-blue-500/25 text-white mb-1">
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl shadow-xl shadow-blue-500/25 text-white mb-1 border border-blue-400/30">
             <Building2 className="w-7 h-7" />
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">PG-SETU</h1>
-          <p className="text-xs sm:text-sm text-blue-200/80 font-medium">Create Your Owner & Property Manager Account</p>
+          <p className="text-xs sm:text-sm text-slate-400 font-medium">Create Your Owner & Property Manager Account</p>
         </div>
 
         <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-200/80 p-7 sm:p-8 space-y-5">
