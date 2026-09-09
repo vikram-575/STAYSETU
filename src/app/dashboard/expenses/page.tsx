@@ -206,8 +206,16 @@ export default async function ExpensesPage({ searchParams }: Props) {
                 })
               ) : (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-gray-400">
-                    No expense records found.
+                  <td colSpan={6} className="py-16 text-center text-gray-400">
+                    <DollarSign className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                    <p className="font-bold text-gray-800 text-xs">No Expenses Logged</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">Track maintenance, groceries, electricity, and staff salaries.</p>
+                    <Link
+                      href="/dashboard/expenses/new"
+                      className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-xl text-xs font-bold transition shadow-xs"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Record Expense
+                    </Link>
                   </td>
                 </tr>
               )}

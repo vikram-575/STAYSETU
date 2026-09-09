@@ -292,8 +292,20 @@ export default async function ResidentsPage({ searchParams }: Props) {
               )
             })
           ) : (
-            <div className="py-12 text-center text-gray-400 text-xs bg-gray-50 rounded-2xl border border-gray-200">
-              No residents found matching criteria.
+            <div className="py-12 text-center bg-gray-50 rounded-2xl border border-gray-200 p-6 space-y-3">
+              <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+                <UserPlus className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-gray-800">No Residents Found</h4>
+                <p className="text-[11px] text-gray-400 mt-0.5">Check in your first resident or adjust search filters.</p>
+              </div>
+              <Link
+                href="/dashboard/residents/new"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-xs active:scale-95"
+              >
+                <UserPlus className="w-3.5 h-3.5" /> Check-in New Resident
+              </Link>
             </div>
           )}
         </div>
@@ -428,13 +440,25 @@ export default async function ResidentsPage({ searchParams }: Props) {
                     </tr>
                   )
                 })
-              ) : (
-                <tr>
-                  <td colSpan={8} className="py-12 text-center text-gray-400">
-                    No residents found matching criteria.
-                  </td>
-                </tr>
-              )}
+                ) : (
+                  <tr>
+                    <td colSpan={8} className="py-16 text-center text-gray-400">
+                      <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-2.5">
+                        <UserPlus className="w-6 h-6" />
+                      </div>
+                      <p className="font-bold text-gray-800 text-sm">No Residents Found</p>
+                      <p className="text-xs text-gray-400 mt-1 max-w-sm mx-auto">
+                        Get started by registering your first resident, or try clearing your search/filter parameters.
+                      </p>
+                      <Link
+                        href="/dashboard/residents/new"
+                        className="mt-3.5 inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-xs active:scale-95"
+                      >
+                        <UserPlus className="w-3.5 h-3.5" /> Check-in New Resident
+                      </Link>
+                    </td>
+                  </tr>
+                )}
             </tbody>
           </table>
         </div>

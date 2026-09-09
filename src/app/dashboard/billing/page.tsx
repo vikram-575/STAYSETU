@@ -5,8 +5,9 @@ import { formatCurrency } from '@/lib/money'
 import { cn, formatDate, buildWhatsAppLink, buildSmsLink, initials } from '@/lib/utils'
 import {
   FileText, Plus, Search, MessageCircle, Phone,
-  CheckCircle2, Clock, AlertTriangle, ArrowRight, UserCheck, DollarSign
+  CheckCircle2, Clock, AlertTriangle, ArrowRight, UserCheck, DollarSign, Sparkles
 } from 'lucide-react'
+import GenerateInvoicesModal from '@/components/dashboard/generate-invoices-modal'
 
 interface Props {
   searchParams: Promise<{
@@ -75,18 +76,19 @@ export default async function BillingPage({ searchParams }: Props) {
             Automated monthly invoices · Consumption tracking · Overdue recovery
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <GenerateInvoicesModal />
           <Link
             href="/dashboard/billing/add-charge"
-            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-orange-600 hover:bg-orange-700 active:scale-95 text-white text-xs font-bold px-3.5 py-2.5 rounded-xl transition shadow-xs"
+            className="flex items-center justify-center gap-1.5 bg-orange-600 hover:bg-orange-700 active:scale-95 text-white text-xs font-bold px-3.5 py-2.5 rounded-xl transition shadow-xs"
           >
             + Add Charge
           </Link>
           <Link
             href="/dashboard/billing/new"
-            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition shadow-xs"
+            className="flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition shadow-xs"
           >
-            <Plus className="w-4 h-4" /> Generate Invoice
+            <Plus className="w-4 h-4" /> Single Invoice
           </Link>
         </div>
       </div>
@@ -357,8 +359,12 @@ export default async function BillingPage({ searchParams }: Props) {
                 )
               })
             ) : (
-              <div className="py-12 text-center text-gray-400 text-xs bg-gray-50 rounded-2xl border border-gray-200">
-                No invoices found.
+              <div className="py-12 text-center bg-gray-50 rounded-2xl border border-gray-200 p-6 space-y-2">
+                <FileText className="w-8 h-8 text-gray-300 mx-auto" />
+                <h4 className="text-xs font-bold text-gray-700">No Invoices Found</h4>
+                <p className="text-[11px] text-gray-400">
+                  Click &quot;Generate Monthly Bills&quot; above to auto-create invoices for all active residents.
+                </p>
               </div>
             )}
           </div>
@@ -425,8 +431,10 @@ export default async function BillingPage({ searchParams }: Props) {
                   })
                 ) : (
                   <tr>
-                    <td colSpan={9} className="py-12 text-center text-gray-400">
-                      No invoices found.
+                    <td colSpan={9} className="py-16 text-center text-gray-400">
+                      <FileText className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                      <p className="font-bold text-gray-700 text-xs">No invoices found</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">Use &quot;Generate Monthly Bills&quot; above to auto-bill your active residents.</p>
                     </td>
                   </tr>
                 )}

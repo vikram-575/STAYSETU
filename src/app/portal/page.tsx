@@ -7,7 +7,7 @@ import {
   AlertCircle, DollarSign, Zap, FileText, CreditCard,
   BookOpen, Sparkles, Loader2, LogOut, ArrowLeft,
   ExternalLink, Download, Printer, User, Shield, MessageSquare,
-  QrCode, X
+  QrCode, X, Copy, Check
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/money'
 import { formatDate, formatDateTime, cn } from '@/lib/utils'
@@ -28,6 +28,12 @@ export default function ResidentPortalPage() {
   // Receipt Modal State
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null)
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null)
+
+  // UPI QR Modal State
+  const [showQrModal, setShowQrModal] = useState(false)
+  const [qrAmountRupees, setQrAmountRupees] = useState<number>(0)
+  const [qrNote, setQrNote] = useState<string>('')
+  const [copiedUpi, setCopiedUpi] = useState(false)
 
   // 1. Check existing session on mount
   useEffect(() => {
@@ -365,12 +371,23 @@ export default function ResidentPortalPage() {
 
             {/* Quick Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setQrAmountRupees(totalOutstandingPaise / 100)
+                  setQrNote(`Rent ${resident.full_name || ''} ${resident.registration_number || ''}`)
+                  setShowQrModal(true)
+                }}
+                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-white hover:bg-slate-50 text-red-700 rounded-xl text-xs font-black transition shadow-sm active:scale-95 cursor-pointer"
+              >
+                <QrCode className="w-4 h-4 text-red-600" /> Pay ₹{(totalOutstandingPaise / 100).toLocaleString('en-IN')} via UPI QR
+              </button>
               {pgInfo.upi_pay_link && (
                 <a
                   href={pgInfo.upi_pay_link}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-white hover:bg-slate-50 text-red-700 rounded-xl text-xs font-black transition shadow-sm active:scale-95"
+                  className="flex items-center justify-center gap-2 py-3 px-4 bg-white/20 hover:bg-white/30 text-white rounded-xl text-xs font-bold transition shadow-sm active:scale-95 backdrop-blur-md"
                 >
-                  <CreditCard className="w-4 h-4 text-red-600" /> Pay ₹{(totalOutstandingPaise / 100).toLocaleString('en-IN')} via UPI (GPay / PhonePe)
+                  <CreditCard className="w-4 h-4" /> Open UPI App
                 </a>
               )}
               {pgInfo.manager_whatsapp_link && (
@@ -380,7 +397,7 @@ export default function ResidentPortalPage() {
                   rel="noopener noreferrer"
                   className="flex items-center justify-center gap-2 py-3 px-4 bg-red-800/80 hover:bg-red-800 text-white rounded-xl text-xs font-bold transition active:scale-95"
                 >
-                  <MessageSquare className="w-4 h-4" /> WhatsApp Manager
+                  <MessageSquare className="w-4 h-4" /> Manager
                 </a>
               )}
             </div>
@@ -545,13 +562,28 @@ export default function ResidentPortalPage() {
                         </p>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedInvoice(inv)}
-                      className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 active:scale-95 text-blue-700 rounded-xl text-xs font-bold transition flex items-center gap-1"
-                    >
-                      <Printer className="w-3.5 h-3.5" /> View Receipt
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      {inv.balance_paise > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setQrAmountRupees(inv.balance_paise / 100)
+                            setQrNote(`Bill ${inv.invoice_number} ${resident.full_name || ''}`)
+                            setShowQrModal(true)
+                          }}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 shadow-xs cursor-pointer"
+                        >
+                          <QrCode className="w-3.5 h-3.5" /> Pay ₹{(inv.balance_paise / 100).toLocaleString('en-IN')}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedInvoice(inv)}
+                        className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 active:scale-95 text-blue-700 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                      >
+                        <Printer className="w-3.5 h-3.5" /> View Bill
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))
@@ -920,6 +952,97 @@ export default function ResidentPortalPage() {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* --------------------------------------------------------- */}
+      {/* MODAL 3: INSTANT UPI PAYMENT QR MODAL */}
+      {/* --------------------------------------------------------- */}
+      {showQrModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl relative border border-gray-100 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setShowQrModal(false)
+                setCopiedUpi(false)
+              }}
+              className="absolute top-4 right-4 p-1.5 text-gray-400 hover:text-gray-600 rounded-lg cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="space-y-1">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase">
+                Instant UPI Payment
+              </span>
+              <h3 className="font-black text-base text-gray-900">{pgInfo.name || 'PG-SETU Accommodation'}</h3>
+              <p className="text-2xl font-black text-emerald-700">
+                ₹{qrAmountRupees.toLocaleString('en-IN')}
+              </p>
+            </div>
+
+            {/* QR Code Container */}
+            <div className="bg-white p-3 rounded-2xl border-2 border-emerald-100 shadow-inner inline-block mx-auto">
+              {(() => {
+                const upiString = `upi://pay?pa=${encodeURIComponent(pgInfo.upi_id || 'pgsetu@upi')}&pn=${encodeURIComponent(pgInfo.name || 'PG Accommodation')}&am=${qrAmountRupees.toFixed(2)}&tn=${encodeURIComponent(qrNote || 'Rent')}&cu=INR`
+                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=4&data=${encodeURIComponent(upiString)}`
+
+                return (
+                  <div className="space-y-2">
+                    <img
+                      src={qrUrl}
+                      alt="UPI QR Code"
+                      className="w-48 h-48 mx-auto rounded-lg"
+                      loading="eager"
+                    />
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                      Scan with GPay · PhonePe · Paytm · BHIM
+                    </p>
+                  </div>
+                )
+              })()}
+            </div>
+
+            {/* Copy UPI ID */}
+            <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100 flex items-center justify-between text-xs">
+              <div className="text-left min-w-0">
+                <span className="text-[10px] text-gray-400 uppercase font-bold block">UPI ID</span>
+                <span className="font-mono font-bold text-gray-800 text-[11px] truncate block">
+                  {pgInfo.upi_id || 'pgsetu@upi'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(pgInfo.upi_id || 'pgsetu@upi')
+                  setCopiedUpi(true)
+                  setTimeout(() => setCopiedUpi(false), 2000)
+                }}
+                className="px-2.5 py-1 bg-white hover:bg-gray-100 text-gray-700 rounded-lg text-xs font-bold border border-gray-200 transition flex items-center gap-1 shrink-0 cursor-pointer"
+              >
+                {copiedUpi ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedUpi ? 'Copied' : 'Copy'}</span>
+              </button>
+            </div>
+
+            {/* Direct App Link for mobile */}
+            {(() => {
+              const upiString = `upi://pay?pa=${encodeURIComponent(pgInfo.upi_id || 'pgsetu@upi')}&pn=${encodeURIComponent(pgInfo.name || 'PG Accommodation')}&am=${qrAmountRupees.toFixed(2)}&tn=${encodeURIComponent(qrNote || 'Rent')}&cu=INR`
+              return (
+                <a
+                  href={upiString}
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs"
+                >
+                  <CreditCard className="w-4 h-4" /> Open Installed UPI App
+                </a>
+              )
+            })()}
+
+            <p className="text-[10px] text-gray-400">
+              After paying, share a payment screenshot with your PG manager on WhatsApp for immediate receipt confirmation.
+            </p>
           </div>
         </div>
       )}

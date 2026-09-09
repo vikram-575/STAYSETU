@@ -131,8 +131,16 @@ export default async function ElectricityPage() {
               </div>
             ))
           ) : (
-            <div className="col-span-full py-8 text-center text-gray-400 text-xs">
-              No meters added yet. Click &quot;Add Sub-Meter&quot; above to create one.
+            <div className="col-span-full py-12 text-center bg-gray-50 rounded-2xl border border-gray-200 p-6 space-y-2">
+              <Gauge className="w-8 h-8 text-gray-300 mx-auto" />
+              <h4 className="text-xs font-bold text-gray-800">No Sub-Meters Configured</h4>
+              <p className="text-[11px] text-gray-400">Add digital sub-meters to track room electricity usage.</p>
+              <Link
+                href="/dashboard/electricity/new-meter"
+                className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-xs font-bold transition shadow-xs active:scale-95"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add First Meter
+              </Link>
             </div>
           )}
         </div>
@@ -222,8 +230,16 @@ export default async function ElectricityPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-gray-400">
-                    No electricity readings logged yet.
+                  <td colSpan={8} className="py-16 text-center text-gray-400">
+                    <Zap className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
+                    <p className="font-bold text-gray-800 text-xs">No Electricity Readings Logged Yet</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">Record meter units to automatically compute and split room electric bills.</p>
+                    <Link
+                      href="/dashboard/electricity/reading"
+                      className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-yellow-500 hover:bg-yellow-600 active:scale-95 text-gray-950 rounded-xl text-xs font-bold transition shadow-xs"
+                    >
+                      <Zap className="w-3.5 h-3.5" /> Record Reading
+                    </Link>
                   </td>
                 </tr>
               )}

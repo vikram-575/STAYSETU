@@ -6,10 +6,11 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import {
   CreditCard, ArrowLeft, CheckCircle2, Loader2,
-  DollarSign, Smartphone, Banknote, Building2
+  DollarSign, Smartphone, Banknote, Building2,
+  Printer, MessageCircle, Plus, RotateCcw, FileText
 } from 'lucide-react'
 import { formatCurrency, rupeesToPaise } from '@/lib/money'
-import { generateIdempotencyKey } from '@/lib/utils'
+import { generateIdempotencyKey, formatDate, buildWhatsAppLink } from '@/lib/utils'
 
 export default function NewPaymentPage() {
   const router = useRouter()
@@ -61,6 +62,18 @@ export default function NewPaymentPage() {
     }
   }
 
+  const [recordedPayment, setRecordedPayment] = useState<any>(null)
+
+  const handleReset = () => {
+    setSuccess(false)
+    setRecordedPayment(null)
+    setAmountRupees(5000)
+    setTransactionId('')
+    setNotes('')
+    setError('')
+    setLoading(false)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedResidentId || amountRupees <= 0) {
@@ -91,6 +104,15 @@ export default function NewPaymentPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to record payment')
 
+      setRecordedPayment({
+        payment_number: data.payment_number || 'RCP-PAID',
+        resident: selectedResident,
+        amount: amountRupees,
+        method: paymentMethod,
+        date: paymentDate,
+        transaction_id: transactionId,
+        notes,
+      })
       setSuccess(true)
     } catch (err: any) {
       setError(err.message)
@@ -98,32 +120,127 @@ export default function NewPaymentPage() {
     }
   }
 
-  if (success) {
+  if (success && recordedPayment) {
+    const res = recordedPayment.resident
+    const receiptMessage = `*Payment Receipt - PG-SETU*\n\nDear ${res?.full_name || 'Resident'},\nWe have successfully received *₹${recordedPayment.amount.toLocaleString('en-IN')}* via ${recordedPayment.method.toUpperCase()}.\nReceipt No: *${recordedPayment.payment_number}*\nDate: ${formatDate(recordedPayment.date)}\n${recordedPayment.transaction_id ? `Ref: ${recordedPayment.transaction_id}\n` : ''}Room: ${res?.room_number || '—'} (Bed ${res?.bed_label || '—'})\n\nCredited to your digital ledger. Thank you!`
+    const waLink = res?.phone ? buildWhatsAppLink(res.phone, receiptMessage) : ''
+
     return (
-      <div className="max-w-xl mx-auto py-12 px-4">
-        <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center shadow-lg space-y-5">
-          <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto">
-            <CheckCircle2 className="w-8 h-8" />
+      <div className="max-w-xl mx-auto py-6 sm:py-10 px-4 space-y-4">
+        {/* Printable Official Receipt Card */}
+        <div id="receipt-card" className="bg-white rounded-2xl sm:rounded-3xl border border-gray-200 p-6 sm:p-8 shadow-xl space-y-5">
+          {/* Header */}
+          <div className="flex items-start justify-between border-b border-gray-100 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-green-100 text-green-700 flex items-center justify-center font-bold">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <h2 className="text-lg font-black text-gray-900">Payment Collection Receipt</h2>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Official money collection voucher</p>
+            </div>
+            <div className="text-right">
+              <span className="inline-block px-2.5 py-1 bg-blue-50 text-blue-700 font-mono text-xs font-bold rounded-lg border border-blue-200">
+                {recordedPayment.payment_number}
+              </span>
+              <p className="text-[10px] text-gray-400 mt-0.5">{formatDate(recordedPayment.date)}</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Payment Recorded Successfully!</h2>
-            <p className="text-xs text-gray-500 mt-1">
-              ₹{amountRupees.toLocaleString('en-IN')} received and credited to resident ledger. Outstanding balance updated.
+
+          {/* Resident Details */}
+          <div className="grid grid-cols-2 gap-3 text-xs bg-gray-50 p-4 rounded-2xl border border-gray-100">
+            <div>
+              <span className="text-[10px] text-gray-400 uppercase font-bold block">Resident</span>
+              <p className="font-bold text-gray-900 mt-0.5 text-sm">{res?.full_name}</p>
+              <p className="font-mono text-[11px] text-gray-500">{res?.registration_number}</p>
+            </div>
+            <div>
+              <span className="text-[10px] text-gray-400 uppercase font-bold block">Assigned Space</span>
+              <p className="font-bold text-gray-900 mt-0.5">
+                Room {res?.room_number || '—'} · Bed {res?.bed_label || '—'}
+              </p>
+              <p className="text-[10px] text-gray-500">{res?.building_name || 'Main Property'}</p>
+            </div>
+            <div>
+              <span className="text-[10px] text-gray-400 uppercase font-bold block">Payment Mode</span>
+              <span className="inline-block mt-0.5 uppercase font-bold text-[11px] bg-white px-2 py-0.5 rounded border border-gray-200">
+                {recordedPayment.method}
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] text-gray-400 uppercase font-bold block">Transaction / Ref ID</span>
+              <p className="font-mono font-semibold text-gray-800 mt-0.5 text-[11px]">
+                {recordedPayment.transaction_id || 'Cash / Direct'}
+              </p>
+            </div>
+          </div>
+
+          {/* Amount Paid Big Banner */}
+          <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 block">
+                Total Amount Received
+              </span>
+              <p className="text-2xl sm:text-3xl font-black text-emerald-800">
+                ₹{recordedPayment.amount.toLocaleString('en-IN')}
+              </p>
+            </div>
+            <div className="text-right text-xs text-emerald-700 font-bold flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>Credited to Ledger</span>
+            </div>
+          </div>
+
+          {recordedPayment.notes && (
+            <p className="text-xs text-gray-500 italic bg-gray-50 p-2.5 rounded-xl">
+              &quot;{recordedPayment.notes}&quot;
             </p>
+          )}
+
+          {/* Action Buttons */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-gray-100">
+            {waLink && (
+              <a
+                href={waLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 py-2.5 px-4 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold transition shadow-xs active:scale-95"
+              >
+                <MessageCircle className="w-4 h-4" /> Share on WhatsApp
+              </a>
+            )}
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="flex items-center justify-center gap-2 py-2.5 px-4 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-xs font-bold transition shadow-xs active:scale-95"
+            >
+              <Printer className="w-4 h-4" /> Print Receipt
+            </button>
           </div>
-          <div className="flex items-center justify-center gap-3 pt-4 border-t border-gray-100">
-            <Link
-              href={`/dashboard/residents/${selectedResidentId}?tab=ledger`}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition"
+
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2 text-xs">
+            <button
+              type="button"
+              onClick={handleReset}
+              className="flex items-center gap-1.5 font-bold text-blue-600 hover:text-blue-700 active:scale-95 transition"
             >
-              View Updated Ledger →
-            </Link>
-            <Link
-              href="/dashboard/payments"
-              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl text-xs font-bold transition"
-            >
-              Back to Collection Log
-            </Link>
+              <Plus className="w-4 h-4" /> Record Another Payment
+            </button>
+            <div className="flex items-center gap-2">
+              <Link
+                href={`/dashboard/residents/${res?.resident_id}?tab=ledger`}
+                className="font-bold text-gray-600 hover:text-gray-900 transition"
+              >
+                View Ledger →
+              </Link>
+              <Link
+                href="/dashboard/payments"
+                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition"
+              >
+                Collection Log
+              </Link>
+            </div>
           </div>
         </div>
       </div>

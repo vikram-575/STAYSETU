@@ -277,8 +277,20 @@ export default async function PaymentsPage({ searchParams }: Props) {
                 })
               ) : (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-gray-400">
-                    No payment records found.
+                  <td colSpan={7} className="py-16 text-center text-gray-400">
+                    <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-2.5">
+                      <CreditCard className="w-6 h-6" />
+                    </div>
+                    <p className="font-bold text-gray-800 text-sm">No Payment Collections Yet</p>
+                    <p className="text-xs text-gray-400 mt-1 max-w-sm mx-auto">
+                      Record your first rent or fee collection in cash, UPI, or bank transfer.
+                    </p>
+                    <Link
+                      href="/dashboard/payments/new"
+                      className="mt-3.5 inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs active:scale-95"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Record Payment
+                    </Link>
                   </td>
                 </tr>
               )}

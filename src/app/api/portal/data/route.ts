@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
     // 8. Calculate UPI Payment String & Manager Contacts
     const orgSettings = org?.settings || {}
     const managerPhone = prop?.phone || org?.phone || ''
-    const upiId = orgSettings.upi_id || 'pgsetu@upi'
+    const upiId = orgSettings.upi_id || orgSettings.bank_settlement?.upi_id || (org as any)?.upi_id || 'pgsetu@upi'
     const pgName = prop?.name || org?.name || 'PG-SETU Accommodation'
     const totalDueRupees = Math.max(0, (resident.total_outstanding_paise || 0) / 100)
 
