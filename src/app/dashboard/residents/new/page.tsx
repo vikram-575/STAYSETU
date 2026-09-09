@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import {
   UserPlus, ArrowLeft, ArrowRight, CheckCircle2,
   Building2, BedDouble, Shield, FileText, Loader2, DollarSign
@@ -13,19 +12,21 @@ import { FirebaseFileUploader } from '@/components/ui/firebase-file-uploader'
 
 export default function CheckInResidentPage() {
   const router = useRouter()
-  const supabase = createClient()
 
   const [currentStep, setCurrentStep] = useState(1)
   const [loading, setLoading] = useState(false)
+  const [dataLoading, setDataLoading] = useState(true)
   const [error, setError] = useState('')
   const [successData, setSuccessData] = useState<{ registration_number: string; resident_id: string } | null>(null)
 
-  // Cascading location states
-  const [properties, setProperties] = useState<any[]>([])
-  const [buildings, setBuildings] = useState<any[]>([])
-  const [floors, setFloors] = useState<any[]>([])
-  const [rooms, setRooms] = useState<any[]>([])
-  const [beds, setBeds] = useState<any[]>([])
+  // Isolated PG Inventory state
+  const [inventory, setInventory] = useState<{
+    properties: any[]
+    buildings: any[]
+    floors: any[]
+    rooms: any[]
+    beds: any[]
+  }>({ properties: [], buildings: [], floors: [], rooms: [], beds: [] })
 
   // Form State
   const [form, setForm] = useState({
@@ -63,85 +64,108 @@ export default function CheckInResidentPage() {
     deposit_payment_method: 'upi',
   })
 
-  // Load properties on mount
+  // Load isolated PG inventory from server API on mount
   useEffect(() => {
-    async function loadProperties() {
-      const { data } = await supabase.from('properties').select('*').eq('is_active', true)
-      if (data && data.length > 0) {
-        setProperties(data)
-        setForm((prev) => ({ ...prev, property_id: data[0].id }))
+    async function loadInventory() {
+      setDataLoading(true)
+      try {
+        const res = await fetch('/api/residents/checkin')
+        if (!res.ok) throw new Error('Failed to load PG inventory')
+        const data = await res.json()
+        setInventory(data)
+
+        if (data.properties && data.properties.length > 0) {
+          const firstProp = data.properties[0]
+          const propBldgs = (data.buildings || []).filter((b: any) => b.property_id === firstProp.id)
+          const firstBldg = propBldgs[0] || (data.buildings || [])[0]
+          const bldgFloors = firstBldg ? (data.floors || []).filter((fl: any) => fl.building_id === firstBldg.id) : []
+          const firstFloor = bldgFloors[0] || (data.floors || [])[0]
+          const floorRooms = firstFloor ? (data.rooms || []).filter((r: any) => r.floor_id === firstFloor.id) : []
+          const firstRoom = floorRooms[0] || (data.rooms || [])[0]
+          const roomBeds = firstRoom ? (data.beds || []).filter((bd: any) => bd.room_id === firstRoom.id && bd.status === 'available') : []
+          const firstBed = roomBeds[0] || null
+
+          setForm((prev) => ({
+            ...prev,
+            property_id: firstProp.id,
+            building_id: firstBldg?.id || '',
+            floor_id: firstFloor?.id || '',
+            room_id: firstRoom?.id || '',
+            bed_id: firstBed?.id || '',
+            monthly_rent_rupees: firstRoom?.base_rent_paise ? firstRoom.base_rent_paise / 100 : prev.monthly_rent_rupees,
+          }))
+        }
+      } catch (err: any) {
+        console.error('Inventory load error:', err)
+      } finally {
+        setDataLoading(false)
       }
     }
-    loadProperties()
+    loadInventory()
   }, [])
 
-  // Load buildings when property changes
-  useEffect(() => {
-    if (!form.property_id) return
-    async function loadBuildings() {
-      const { data } = await supabase.from('buildings').select('*').eq('property_id', form.property_id)
-      setBuildings(data || [])
-      if (data && data.length > 0) {
-        setForm((prev) => ({ ...prev, building_id: data[0].id }))
-      } else {
-        setForm((prev) => ({ ...prev, building_id: '', floor_id: '', room_id: '', bed_id: '' }))
-      }
-    }
-    loadBuildings()
-  }, [form.property_id])
+  // Dynamic filter helpers for cascading dropdowns
+  const availableBuildings = inventory.buildings.filter(
+    (b) => !form.property_id || b.property_id === form.property_id
+  )
 
-  // Load floors when building changes
-  useEffect(() => {
-    if (!form.building_id) return
-    async function loadFloors() {
-      const { data } = await supabase.from('floors').select('*').eq('building_id', form.building_id).order('floor_number')
-      setFloors(data || [])
-      if (data && data.length > 0) {
-        setForm((prev) => ({ ...prev, floor_id: data[0].id }))
-      } else {
-        setForm((prev) => ({ ...prev, floor_id: '', room_id: '', bed_id: '' }))
-      }
-    }
-    loadFloors()
-  }, [form.building_id])
+  const availableFloors = inventory.floors.filter(
+    (fl) => !form.building_id || fl.building_id === form.building_id
+  )
 
-  // Load rooms when floor changes
-  useEffect(() => {
-    if (!form.floor_id) return
-    async function loadRooms() {
-      const { data } = await supabase.from('rooms').select('*').eq('floor_id', form.floor_id).eq('is_active', true)
-      setRooms(data || [])
-      if (data && data.length > 0) {
-        setForm((prev) => ({
-          ...prev,
-          room_id: data[0].id,
-          monthly_rent_rupees: data[0].base_rent_paise ? data[0].base_rent_paise / 100 : prev.monthly_rent_rupees,
-        }))
-      } else {
-        setForm((prev) => ({ ...prev, room_id: '', bed_id: '' }))
-      }
-    }
-    loadRooms()
-  }, [form.floor_id])
+  const availableRooms = inventory.rooms.filter(
+    (rm) => !form.floor_id || rm.floor_id === form.floor_id
+  )
 
-  // Load available beds when room changes
-  useEffect(() => {
-    if (!form.room_id) return
-    async function loadBeds() {
-      const { data } = await supabase.from('beds').select('*').eq('room_id', form.room_id).eq('status', 'available')
-      setBeds(data || [])
-      if (data && data.length > 0) {
-        setForm((prev) => ({
-          ...prev,
-          bed_id: data[0].id,
-          monthly_rent_rupees: data[0].base_rent_paise ? data[0].base_rent_paise / 100 : prev.monthly_rent_rupees,
-        }))
-      } else {
-        setForm((prev) => ({ ...prev, bed_id: '' }))
-      }
-    }
-    loadBeds()
-  }, [form.room_id])
+  const availableBeds = inventory.beds.filter(
+    (bd) => (!form.room_id || bd.room_id === form.room_id) && bd.status === 'available'
+  )
+
+  const handleBuildingChange = (bldgId: string) => {
+    const bldgFloors = inventory.floors.filter((fl) => fl.building_id === bldgId)
+    const firstFloor = bldgFloors[0] || null
+    const floorRooms = firstFloor ? inventory.rooms.filter((rm) => rm.floor_id === firstFloor.id) : []
+    const firstRoom = floorRooms[0] || null
+    const roomBeds = firstRoom ? inventory.beds.filter((bd) => bd.room_id === firstRoom.id && bd.status === 'available') : []
+    const firstBed = roomBeds[0] || null
+
+    setForm((prev) => ({
+      ...prev,
+      building_id: bldgId,
+      floor_id: firstFloor?.id || '',
+      room_id: firstRoom?.id || '',
+      bed_id: firstBed?.id || '',
+      monthly_rent_rupees: firstRoom?.base_rent_paise ? firstRoom.base_rent_paise / 100 : prev.monthly_rent_rupees,
+    }))
+  }
+
+  const handleFloorChange = (floorId: string) => {
+    const floorRooms = inventory.rooms.filter((rm) => rm.floor_id === floorId)
+    const firstRoom = floorRooms[0] || null
+    const roomBeds = firstRoom ? inventory.beds.filter((bd) => bd.room_id === firstRoom.id && bd.status === 'available') : []
+    const firstBed = roomBeds[0] || null
+
+    setForm((prev) => ({
+      ...prev,
+      floor_id: floorId,
+      room_id: firstRoom?.id || '',
+      bed_id: firstBed?.id || '',
+      monthly_rent_rupees: firstRoom?.base_rent_paise ? firstRoom.base_rent_paise / 100 : prev.monthly_rent_rupees,
+    }))
+  }
+
+  const handleRoomChange = (roomId: string) => {
+    const roomObj = inventory.rooms.find((rm) => rm.id === roomId)
+    const roomBeds = inventory.beds.filter((bd) => bd.room_id === roomId && bd.status === 'available')
+    const firstBed = roomBeds[0] || null
+
+    setForm((prev) => ({
+      ...prev,
+      room_id: roomId,
+      bed_id: firstBed?.id || '',
+      monthly_rent_rupees: roomObj?.base_rent_paise ? roomObj.base_rent_paise / 100 : prev.monthly_rent_rupees,
+    }))
+  }
 
   const nextStep = () => {
     setError('')
@@ -512,72 +536,120 @@ export default function CheckInResidentPage() {
         {currentStep === 4 && (
           <div className="space-y-4">
             <h3 className="text-sm sm:text-base font-bold text-gray-900 border-b border-gray-100 pb-2">4. Room & Bed Assignment</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Building</label>
-                <select
-                  value={form.building_id}
-                  onChange={(e) => setForm({ ...form, building_id: e.target.value })}
-                  className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-semibold"
-                >
-                  {buildings.map((b) => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                </select>
+            
+            {dataLoading ? (
+              <div className="p-8 text-center space-y-2">
+                <Loader2 className="w-6 h-6 text-blue-600 animate-spin mx-auto" />
+                <p className="text-xs text-gray-500 font-semibold">Loading available rooms & beds for your property...</p>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Floor</label>
-                <select
-                  value={form.floor_id}
-                  onChange={(e) => setForm({ ...form, floor_id: e.target.value })}
-                  className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-semibold"
-                >
-                  {floors.map((fl) => (
-                    <option key={fl.id} value={fl.id}>{fl.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Room</label>
-                <select
-                  value={form.room_id}
-                  onChange={(e) => setForm({ ...form, room_id: e.target.value })}
-                  className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-semibold"
-                >
-                  {rooms.map((rm) => (
-                    <option key={rm.id} value={rm.id}>Room {rm.room_number}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Bed Selection */}
-            <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1.5">Select Available Bed *</label>
-              {beds.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
-                  {beds.map((b) => (
-                    <button
-                      type="button"
-                      key={b.id}
-                      onClick={() => setForm({ ...form, bed_id: b.id })}
-                      className={`p-3 rounded-2xl border text-center transition active:scale-95 ${
-                        form.bed_id === b.id
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                          : 'bg-gray-50 border-gray-200 text-gray-800 hover:bg-gray-100'
-                      }`}
-                    >
-                      <BedDouble className="w-5 h-5 mx-auto mb-1" />
-                      <span className="font-bold text-xs">Bed {b.bed_label}</span>
-                    </button>
-                  ))}
+            ) : availableBuildings.length === 0 && availableRooms.length === 0 ? (
+              <div className="p-6 bg-blue-50 border border-blue-200 rounded-2xl text-center space-y-3">
+                <Building2 className="w-8 h-8 text-blue-600 mx-auto" />
+                <div className="space-y-1">
+                  <h4 className="text-sm font-black text-gray-900">No Rooms Configured Yet</h4>
+                  <p className="text-xs text-gray-600 max-w-sm mx-auto">
+                    Before adding residents, you need to add at least one room and bed in your property.
+                  </p>
                 </div>
-              ) : (
-                <p className="text-xs text-red-500 p-3 bg-red-50 rounded-xl border border-red-200">
-                  No beds currently available in this room. Please choose another room.
-                </p>
-              )}
-            </div>
+                <Link
+                  href="/dashboard/rooms/new"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition shadow-xs"
+                >
+                  + Create First Room & Beds →
+                </Link>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Building</label>
+                    <select
+                      value={form.building_id}
+                      onChange={(e) => handleBuildingChange(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-semibold"
+                    >
+                      {availableBuildings.map((b) => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Floor</label>
+                    <select
+                      value={form.floor_id}
+                      onChange={(e) => handleFloorChange(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-semibold"
+                    >
+                      {availableFloors.map((fl) => (
+                        <option key={fl.id} value={fl.id}>{fl.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Room</label>
+                    <select
+                      value={form.room_id}
+                      onChange={(e) => handleRoomChange(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-semibold"
+                    >
+                      {availableRooms.map((rm) => (
+                        <option key={rm.id} value={rm.id}>Room {rm.room_number}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Bed Selection */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-gray-700">Select Available Bed *</label>
+                    <Link
+                      href="/dashboard/rooms/new"
+                      className="text-[11px] font-bold text-blue-600 hover:text-blue-700"
+                    >
+                      + Add Another Room
+                    </Link>
+                  </div>
+
+                  {availableBeds.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
+                      {availableBeds.map((b) => (
+                        <button
+                          type="button"
+                          key={b.id}
+                          onClick={() => setForm({ ...form, bed_id: b.id })}
+                          className={`p-3 rounded-2xl border text-center transition active:scale-95 cursor-pointer ${
+                            form.bed_id === b.id
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                              : 'bg-gray-50 border-gray-200 text-gray-800 hover:bg-gray-100'
+                          }`}
+                        >
+                          <BedDouble className="w-5 h-5 mx-auto mb-1" />
+                          <span className="font-bold text-xs">Bed {b.bed_label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs text-amber-800 font-bold">
+                          No beds currently available in this room.
+                        </p>
+                        <p className="text-[11px] text-amber-700 mt-0.5">
+                          All beds in this room are occupied. Please select another room or create a new room.
+                        </p>
+                      </div>
+                      <Link
+                        href="/dashboard/rooms/new"
+                        className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-amber-700 hover:bg-amber-800 text-white text-xs font-bold rounded-xl transition shrink-0"
+                      >
+                        + Create Room & Beds →
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
 
             {/* Rent & Checkin Date */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-gray-100">

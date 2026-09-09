@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getAuthenticatedUser } from '@/lib/auth-session'
 
 /**
  * POST /api/residents/checkout
@@ -7,22 +8,24 @@ import { createClient } from '@/lib/supabase/server'
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getAuthenticatedUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('organization_id, role')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile || !['owner', 'manager', 'staff'].includes(profile.role)) {
+    if (!['owner', 'manager', 'staff', 'accountant', 'superadmin'].includes(user.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const orgId = profile.organization_id
-    if (!orgId) return NextResponse.json({ error: 'No active organization found' }, { status: 400 })
+    const serviceClient = await createServiceClient()
+    let orgId = user.organization_id
+
+    if (!orgId) {
+      const { data: defaultOrg } = await serviceClient
+        .from('organizations')
+        .select('id')
+        .limit(1)
+        .single()
+      orgId = defaultOrg?.id || 'primary'
+    }
 
     const body = await request.json()
     const {
@@ -34,8 +37,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Resident ID and exit date are required' }, { status: 400 })
     }
 
+    // Resolve valid user ID for audit and ledger
+    let validUserId: string | null = null
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id)
+    if (isUuid) {
+      const { data: dbU } = await serviceClient.from('users').select('id').eq('id', user.id).maybeSingle()
+      if (dbU) validUserId = dbU.id
+    }
+    if (!validUserId && user.email) {
+      const { data: dbU } = await serviceClient.from('users').select('id').ilike('email', user.email).maybeSingle()
+      if (dbU) validUserId = dbU.id
+    }
+
     // 1. Get active assignment scoped to organization
-    const { data: assignment } = await supabase
+    const { data: assignment } = await serviceClient
       .from('resident_assignments')
       .select('*, beds(id, bed_label)')
       .eq('organization_id', orgId)
@@ -45,14 +60,14 @@ export async function POST(request: NextRequest) {
 
     if (assignment) {
       // Close assignment
-      await supabase
+      await serviceClient
         .from('resident_assignments')
         .update({ check_out_date: exit_date, updated_at: new Date().toISOString() })
         .eq('id', assignment.id)
         .eq('organization_id', orgId)
 
       // Mark bed available
-      await supabase
+      await serviceClient
         .from('beds')
         .update({ status: 'available', updated_at: new Date().toISOString() })
         .eq('id', assignment.bed_id)
@@ -61,7 +76,7 @@ export async function POST(request: NextRequest) {
 
     // 2. Add damage charge to ledger if applicable
     if (damage_charges_paise && damage_charges_paise > 0) {
-      await supabase.from('ledger_entries').insert({
+      await serviceClient.from('ledger_entries').insert({
         organization_id: orgId,
         resident_id,
         entry_date: exit_date,
@@ -70,14 +85,14 @@ export async function POST(request: NextRequest) {
         entry_type: 'charge',
         debit_paise: damage_charges_paise,
         credit_paise: 0,
-        added_by: user.id,
+        added_by: validUserId,
         notes,
       })
     }
 
     // 3. Add other charges to ledger if applicable
     if (other_charges_paise && other_charges_paise > 0) {
-      await supabase.from('ledger_entries').insert({
+      await serviceClient.from('ledger_entries').insert({
         organization_id: orgId,
         resident_id,
         entry_date: exit_date,
@@ -86,13 +101,13 @@ export async function POST(request: NextRequest) {
         entry_type: 'charge',
         debit_paise: other_charges_paise,
         credit_paise: 0,
-        added_by: user.id,
+        added_by: validUserId,
       })
     }
 
     // 4. Record Deposit Adjustment or Refund
     if (deposit_deduction_paise && deposit_deduction_paise > 0) {
-      await supabase.from('ledger_entries').insert({
+      await serviceClient.from('ledger_entries').insert({
         organization_id: orgId,
         resident_id,
         entry_date: exit_date,
@@ -101,12 +116,12 @@ export async function POST(request: NextRequest) {
         entry_type: 'adjustment',
         debit_paise: 0,
         credit_paise: deposit_deduction_paise,
-        added_by: user.id,
+        added_by: validUserId,
       })
     }
 
     if (refund_amount_paise && refund_amount_paise > 0) {
-      await supabase.from('ledger_entries').insert({
+      await serviceClient.from('ledger_entries').insert({
         organization_id: orgId,
         resident_id,
         entry_date: exit_date,
@@ -115,35 +130,37 @@ export async function POST(request: NextRequest) {
         entry_type: 'refund',
         debit_paise: 0,
         credit_paise: 0, // Refund settlement entry
-        added_by: user.id,
+        added_by: validUserId,
         notes: 'Final deposit refund at checkout',
       })
     }
 
     // Mark all deposits for resident as refunded in this organization
-    await supabase
+    await serviceClient
       .from('deposits')
       .update({ is_refunded: true, refunded_at: new Date().toISOString() })
       .eq('organization_id', orgId)
       .eq('resident_id', resident_id)
 
     // 5. Update resident status to checked_out
-    await supabase
+    await serviceClient
       .from('residents')
       .update({ status: 'checked_out', updated_at: new Date().toISOString() })
       .eq('organization_id', orgId)
       .eq('id', resident_id)
 
     // 6. Audit Log
-    await supabase.from('audit_logs').insert({
-      organization_id: orgId,
-      user_id: user.id,
-      action: 'checkout',
-      entity_type: 'resident',
-      entity_id: resident_id,
-      entity_label: `Checkout on ${exit_date}`,
-      after_data: { exit_date, damage_charges_paise, refund_amount_paise },
-    })
+    try {
+      await serviceClient.from('audit_logs').insert({
+        organization_id: orgId,
+        user_id: validUserId,
+        action: 'checkout',
+        entity_type: 'resident',
+        entity_id: resident_id,
+        entity_label: `Checkout on ${exit_date}`,
+        after_data: { exit_date, damage_charges_paise, refund_amount_paise },
+      })
+    } catch {}
 
     return NextResponse.json({ success: true })
   } catch (err: any) {

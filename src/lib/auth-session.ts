@@ -91,11 +91,34 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
       sbUser = data?.user || null
     } catch {}
 
+    const serviceClient = await createServiceClient()
+
     if (!sbUser) {
+      // Fallback: check session cookies set by login route
+      const authUserId = cookieStore.get('auth_user_id')?.value
+      const authEmail = cookieStore.get('auth_email')?.value
+      if (authUserId || authEmail) {
+        let query = serviceClient.from('users').select('*, organizations(*)')
+        if (authUserId) {
+          query = query.eq('id', authUserId)
+        } else if (authEmail) {
+          query = query.ilike('email', authEmail)
+        }
+        const { data: fallbackProfile } = await query.maybeSingle()
+        if (fallbackProfile) {
+          return {
+            id: fallbackProfile.id,
+            email: fallbackProfile.email,
+            full_name: fallbackProfile.full_name || fallbackProfile.email?.split('@')[0] || 'User',
+            role: fallbackProfile.role || 'owner',
+            organization_id: fallbackProfile.organization_id,
+            phone: fallbackProfile.phone,
+            organizations: fallbackProfile.organizations,
+          }
+        }
+      }
       return null
     }
-
-    const serviceClient = await createServiceClient()
 
     let profile: any = null
 

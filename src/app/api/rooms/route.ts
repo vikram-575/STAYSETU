@@ -1,5 +1,41 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getAuthenticatedUser } from '@/lib/auth-session'
+
+/**
+ * GET /api/rooms
+ * Returns all buildings, floors, rooms, and beds for the current authenticated user's organization
+ */
+export async function GET() {
+  try {
+    const user = await getAuthenticatedUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const serviceClient = await createServiceClient()
+    let orgId = user.organization_id
+
+    if (!orgId) {
+      const { data: defaultOrg } = await serviceClient
+        .from('organizations')
+        .select('id')
+        .limit(1)
+        .single()
+      orgId = defaultOrg?.id || 'primary'
+    }
+
+    const { data: rooms, error } = await serviceClient
+      .from('rooms')
+      .select('*, floors(id, name, buildings(id, name)), beds(*)')
+      .eq('organization_id', orgId)
+      .order('room_number')
+
+    if (error) throw error
+
+    return NextResponse.json({ rooms: rooms || [] })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'Failed to fetch rooms' }, { status: 500 })
+  }
+}
 
 /**
  * POST /api/rooms
@@ -7,22 +43,15 @@ import { createClient } from '@/lib/supabase/server'
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getAuthenticatedUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('organization_id, role')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile || !['owner', 'manager'].includes(profile.role)) {
+    if (!['owner', 'manager', 'staff', 'superadmin'].includes(user.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const orgId = profile.organization_id
-    if (!orgId) return NextResponse.json({ error: 'No active organization found' }, { status: 400 })
+    const serviceClient = await createServiceClient()
+    let orgId = user.organization_id
 
     const body = await request.json()
     const { floor_id, room_number, room_type, capacity, base_rent_paise, description, bed_labels } = body
@@ -32,22 +61,23 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify floor belongs to organization
-    const { data: floor } = await supabase
-      .from('floors')
-      .select('id')
-      .eq('id', floor_id)
-      .eq('organization_id', orgId)
-      .single()
+    let floorQuery = serviceClient.from('floors').select('id, organization_id').eq('id', floor_id)
+    if (orgId) {
+      floorQuery = floorQuery.eq('organization_id', orgId)
+    }
+    const { data: floor } = await floorQuery.maybeSingle()
 
     if (!floor) {
       return NextResponse.json({ error: 'Floor not found in this organization' }, { status: 404 })
     }
 
+    const targetOrgId = floor.organization_id || orgId
+
     // 1. Create Room
-    const { data: room, error: roomError } = await supabase
+    const { data: room, error: roomError } = await serviceClient
       .from('rooms')
       .insert({
-        organization_id: orgId,
+        organization_id: targetOrgId,
         floor_id,
         room_number,
         name: `Room ${room_number}`,
@@ -55,6 +85,7 @@ export async function POST(request: NextRequest) {
         capacity,
         base_rent_paise: base_rent_paise || 0,
         description: description || null,
+        is_active: true,
       })
       .select()
       .single()
@@ -69,14 +100,14 @@ export async function POST(request: NextRequest) {
       : Array.from({ length: capacity }, (_, i) => String.fromCharCode(65 + i))
 
     const bedInserts = labels.map((label) => ({
-      organization_id: orgId,
+      organization_id: targetOrgId,
       room_id: room.id,
       bed_label: label,
       status: 'available' as const,
       base_rent_paise: base_rent_paise || null,
     }))
 
-    const { data: beds, error: bedError } = await supabase
+    const { data: beds, error: bedError } = await serviceClient
       .from('beds')
       .insert(bedInserts)
       .select()
@@ -85,16 +116,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: bedError?.message || 'Failed to create beds for room' }, { status: 500 })
     }
 
+    // Resolve valid user ID for audit log
+    let validUserId: string | null = null
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id)
+    if (isUuid) {
+      const { data: dbU } = await serviceClient.from('users').select('id').eq('id', user.id).maybeSingle()
+      if (dbU) validUserId = dbU.id
+    }
+
     // 3. Audit Log
-    await supabase.from('audit_logs').insert({
-      organization_id: orgId,
-      user_id: user.id,
-      action: 'create',
-      entity_type: 'room',
-      entity_id: room.id,
-      entity_label: `Room ${room_number} with ${labels.length} beds`,
-      after_data: { room_number, capacity, base_rent_paise },
-    })
+    try {
+      await serviceClient.from('audit_logs').insert({
+        organization_id: targetOrgId,
+        user_id: validUserId,
+        action: 'create',
+        entity_type: 'room',
+        entity_id: room.id,
+        entity_label: `Room ${room_number} with ${labels.length} beds`,
+        after_data: { room_number, capacity, base_rent_paise },
+      })
+    } catch {}
 
     return NextResponse.json({ success: true, room_id: room.id, beds_count: beds.length })
   } catch (err: any) {

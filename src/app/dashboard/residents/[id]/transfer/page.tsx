@@ -3,7 +3,6 @@
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import {
   ArrowRightLeft, ArrowLeft, BedDouble, CheckCircle2,
   Building2, Loader2, AlertCircle
@@ -17,7 +16,6 @@ interface Props {
 export default function TransferResidentPage({ params }: Props) {
   const { id: residentId } = use(params)
   const router = useRouter()
-  const supabase = createClient()
 
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -25,11 +23,13 @@ export default function TransferResidentPage({ params }: Props) {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
 
-  // Cascading location states
-  const [buildings, setBuildings] = useState<any[]>([])
-  const [floors, setFloors] = useState<any[]>([])
-  const [rooms, setRooms] = useState<any[]>([])
-  const [beds, setBeds] = useState<any[]>([])
+  // Inventory State
+  const [inventory, setInventory] = useState<{ buildings: any[]; floors: any[]; rooms: any[]; beds: any[] }>({
+    buildings: [],
+    floors: [],
+    rooms: [],
+    beds: [],
+  })
 
   // Form State
   const [selectedBuilding, setSelectedBuilding] = useState('')
@@ -42,68 +42,107 @@ export default function TransferResidentPage({ params }: Props) {
   const [notes, setNotes] = useState('')
 
   useEffect(() => {
-    async function loadResident() {
-      const { data } = await supabase
-        .from('v_resident_current')
-        .select('*')
-        .eq('resident_id', residentId)
-        .single()
+    async function loadData() {
+      try {
+        const [resRes, invRes] = await Promise.all([
+          fetch(`/api/residents/${residentId}`),
+          fetch('/api/residents/checkin'),
+        ])
 
-      if (data) {
-        setResident(data)
-        setNewRentRupees(data.monthly_rent_paise ? data.monthly_rent_paise / 100 : 6000)
-      }
+        if (resRes.ok) {
+          const resData = await resRes.json()
+          if (resData.resident) {
+            setResident(resData.resident)
+            setNewRentRupees(resData.resident.monthly_rent_paise ? resData.resident.monthly_rent_paise / 100 : 6000)
+          }
+        }
 
-      // Load buildings
-      const { data: bldgs } = await supabase.from('buildings').select('*').eq('is_active', true)
-      if (bldgs && bldgs.length > 0) {
-        setBuildings(bldgs)
-        setSelectedBuilding(bldgs[0].id)
-      }
-      setLoading(false)
-    }
-    loadResident()
-  }, [residentId, supabase])
+        if (invRes.ok) {
+          const invData = await invRes.json()
+          const bldgs = invData.buildings || []
+          const fls = invData.floors || []
+          const rms = invData.rooms || []
+          const bds = invData.beds || []
 
-  // Load floors when building changes
-  useEffect(() => {
-    if (!selectedBuilding) return
-    async function loadFloors() {
-      const { data } = await supabase.from('floors').select('*').eq('building_id', selectedBuilding).order('floor_number')
-      setFloors(data || [])
-      if (data && data.length > 0) setSelectedFloor(data[0].id)
-      else setSelectedFloor('')
-    }
-    loadFloors()
-  }, [selectedBuilding, supabase])
+          setInventory({ buildings: bldgs, floors: fls, rooms: rms, beds: bds })
 
-  // Load rooms when floor changes
-  useEffect(() => {
-    if (!selectedFloor) return
-    async function loadRooms() {
-      const { data } = await supabase.from('rooms').select('*').eq('floor_id', selectedFloor).eq('is_active', true)
-      setRooms(data || [])
-      if (data && data.length > 0) setSelectedRoom(data[0].id)
-      else setSelectedRoom('')
-    }
-    loadRooms()
-  }, [selectedFloor, supabase])
+          if (bldgs.length > 0) {
+            const firstBldg = bldgs[0]
+            setSelectedBuilding(firstBldg.id)
 
-  // Load beds when room changes
-  useEffect(() => {
-    if (!selectedRoom) return
-    async function loadBeds() {
-      const { data } = await supabase.from('beds').select('*').eq('room_id', selectedRoom).eq('status', 'available')
-      setBeds(data || [])
-      if (data && data.length > 0) {
-        setSelectedBed(data[0].id)
-        if (data[0].base_rent_paise) setNewRentRupees(data[0].base_rent_paise / 100)
-      } else {
-        setSelectedBed('')
+            const bldgFloors = fls.filter((f: any) => f.building_id === firstBldg.id)
+            const firstFloor = bldgFloors[0] || null
+            setSelectedFloor(firstFloor?.id || '')
+
+            const floorRooms = firstFloor ? rms.filter((r: any) => r.floor_id === firstFloor.id) : []
+            const firstRoom = floorRooms[0] || null
+            setSelectedRoom(firstRoom?.id || '')
+
+            const roomBeds = firstRoom ? bds.filter((b: any) => b.room_id === firstRoom.id && b.status === 'available') : []
+            const firstBed = roomBeds[0] || null
+            setSelectedBed(firstBed?.id || '')
+
+            if (firstBed?.base_rent_paise) {
+              setNewRentRupees(firstBed.base_rent_paise / 100)
+            }
+          }
+        }
+      } catch (err: any) {
+        console.error('Error loading transfer data:', err)
+        setError('Failed to load resident or room inventory.')
+      } finally {
+        setLoading(false)
       }
     }
-    loadBeds()
-  }, [selectedRoom, supabase])
+    loadData()
+  }, [residentId])
+
+  const handleBuildingChange = (bldgId: string) => {
+    setSelectedBuilding(bldgId)
+    const bldgFloors = inventory.floors.filter((f) => f.building_id === bldgId)
+    const firstFloor = bldgFloors[0] || null
+    setSelectedFloor(firstFloor?.id || '')
+
+    const floorRooms = firstFloor ? inventory.rooms.filter((r) => r.floor_id === firstFloor.id) : []
+    const firstRoom = floorRooms[0] || null
+    setSelectedRoom(firstRoom?.id || '')
+
+    const roomBeds = firstRoom ? inventory.beds.filter((b) => b.room_id === firstRoom.id && b.status === 'available') : []
+    const firstBed = roomBeds[0] || null
+    setSelectedBed(firstBed?.id || '')
+    if (firstBed?.base_rent_paise) setNewRentRupees(firstBed.base_rent_paise / 100)
+  }
+
+  const handleFloorChange = (floorId: string) => {
+    setSelectedFloor(floorId)
+    const floorRooms = inventory.rooms.filter((r) => r.floor_id === floorId)
+    const firstRoom = floorRooms[0] || null
+    setSelectedRoom(firstRoom?.id || '')
+
+    const roomBeds = firstRoom ? inventory.beds.filter((b) => b.room_id === firstRoom.id && b.status === 'available') : []
+    const firstBed = roomBeds[0] || null
+    setSelectedBed(firstBed?.id || '')
+    if (firstBed?.base_rent_paise) setNewRentRupees(firstBed.base_rent_paise / 100)
+  }
+
+  const handleRoomChange = (roomId: string) => {
+    setSelectedRoom(roomId)
+    const roomBeds = inventory.beds.filter((b) => b.room_id === roomId && b.status === 'available')
+    const firstBed = roomBeds[0] || null
+    setSelectedBed(firstBed?.id || '')
+    if (firstBed?.base_rent_paise) setNewRentRupees(firstBed.base_rent_paise / 100)
+  }
+
+  const handleBedSelect = (bedId: string) => {
+    setSelectedBed(bedId)
+    const bd = inventory.beds.find((b) => b.id === bedId)
+    if (bd?.base_rent_paise) setNewRentRupees(bd.base_rent_paise / 100)
+  }
+
+  const availableBuildings = inventory.buildings
+  const availableFloors = inventory.floors.filter((fl) => !selectedBuilding || fl.building_id === selectedBuilding)
+  const availableRooms = inventory.rooms.filter((rm) => !selectedFloor || rm.floor_id === selectedFloor)
+  const availableBeds = inventory.beds.filter((bd) => (!selectedRoom || bd.room_id === selectedRoom) && bd.status === 'available')
 
   if (loading) {
     return (
@@ -222,10 +261,10 @@ export default function TransferResidentPage({ params }: Props) {
             <label className="block text-xs font-bold text-gray-700 mb-1">Building</label>
             <select
               value={selectedBuilding}
-              onChange={(e) => setSelectedBuilding(e.target.value)}
+              onChange={(e) => handleBuildingChange(e.target.value)}
               className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-semibold"
             >
-              {buildings.map((b) => (
+              {availableBuildings.map((b) => (
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </select>
@@ -234,10 +273,10 @@ export default function TransferResidentPage({ params }: Props) {
             <label className="block text-xs font-bold text-gray-700 mb-1">Floor</label>
             <select
               value={selectedFloor}
-              onChange={(e) => setSelectedFloor(e.target.value)}
+              onChange={(e) => handleFloorChange(e.target.value)}
               className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-semibold"
             >
-              {floors.map((fl) => (
+              {availableFloors.map((fl) => (
                 <option key={fl.id} value={fl.id}>{fl.name}</option>
               ))}
             </select>
@@ -246,10 +285,10 @@ export default function TransferResidentPage({ params }: Props) {
             <label className="block text-xs font-bold text-gray-700 mb-1">Room</label>
             <select
               value={selectedRoom}
-              onChange={(e) => setSelectedRoom(e.target.value)}
+              onChange={(e) => handleRoomChange(e.target.value)}
               className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-semibold"
             >
-              {rooms.map((rm) => (
+              {availableRooms.map((rm) => (
                 <option key={rm.id} value={rm.id}>Room {rm.room_number}</option>
               ))}
             </select>
@@ -259,13 +298,13 @@ export default function TransferResidentPage({ params }: Props) {
         {/* Beds */}
         <div>
           <label className="block text-xs font-bold text-gray-700 mb-1.5">Select New Available Bed *</label>
-          {beds.length > 0 ? (
+          {availableBeds.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
-              {beds.map((b) => (
+              {availableBeds.map((b) => (
                 <button
                   type="button"
                   key={b.id}
-                  onClick={() => setSelectedBed(b.id)}
+                  onClick={() => handleBedSelect(b.id)}
                   className={`p-3 rounded-2xl border text-center transition active:scale-95 ${
                     selectedBed === b.id
                       ? 'bg-blue-600 text-white border-blue-600 shadow-xs'

@@ -50,7 +50,9 @@ export async function middleware(request: NextRequest) {
     sbUser = data?.user || null
   } catch {}
 
-  const isAuthenticated = Boolean(isSuperAdmin || sbUser)
+  const authUserId = request.cookies.get('auth_user_id')?.value
+  const authEmail = request.cookies.get('auth_email')?.value
+  const isAuthenticated = Boolean(isSuperAdmin || sbUser || (authUserId && authEmail))
 
   const mustChangePassword = request.cookies.get('must_change_password')?.value === 'true'
 

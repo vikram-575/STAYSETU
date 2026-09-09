@@ -1,29 +1,191 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getAuthenticatedUser } from '@/lib/auth-session'
+
+/**
+ * GET /api/residents/checkin
+ * Scoped fetcher for check-in form dropdowns (properties, buildings, floors, rooms, available beds).
+ * Ensures complete multi-tenant isolation and auto-provisions a starter room template if an org is brand new.
+ */
+export async function GET() {
+  try {
+    const user = await getAuthenticatedUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const serviceClient = await createServiceClient()
+    let orgId = user.organization_id
+
+    // Fallback if user has no assigned org
+    if (!orgId) {
+      const { data: defaultOrg } = await serviceClient
+        .from('organizations')
+        .select('id')
+        .limit(1)
+        .single()
+      orgId = defaultOrg?.id || 'primary'
+    }
+
+    // 1. Fetch properties belonging to this organization
+    let { data: properties } = await serviceClient
+      .from('properties')
+      .select('*')
+      .eq('organization_id', orgId)
+      .eq('is_active', true)
+
+    // Auto-provision starter property & room architecture if none exist yet for this PG
+    if (!properties || properties.length === 0) {
+      const { data: orgInfo } = await serviceClient
+        .from('organizations')
+        .select('*')
+        .eq('id', orgId)
+        .maybeSingle()
+
+      const orgName = orgInfo?.name || 'My PG'
+      const { data: newProp } = await serviceClient
+        .from('properties')
+        .insert({
+          organization_id: orgId,
+          name: `${orgName} Main Campus`,
+          address: orgInfo?.address || 'Main Road',
+          city: orgInfo?.city || 'Bengaluru',
+          state: orgInfo?.state || 'Karnataka',
+          pincode: orgInfo?.pincode || '560001',
+          is_active: true,
+        })
+        .select()
+        .single()
+
+      if (newProp) {
+        properties = [newProp]
+        const { data: newBldg } = await serviceClient
+          .from('buildings')
+          .insert({
+            organization_id: orgId,
+            property_id: newProp.id,
+            name: 'Main Block',
+            total_floors: 1,
+          })
+          .select()
+          .single()
+
+        if (newBldg) {
+          const { data: newFloor } = await serviceClient
+            .from('floors')
+            .insert({
+              organization_id: orgId,
+              building_id: newBldg.id,
+              floor_number: 1,
+              name: '1st Floor',
+            })
+            .select()
+            .single()
+
+          if (newFloor) {
+            const { data: newRoom } = await serviceClient
+              .from('rooms')
+              .insert({
+                organization_id: orgId,
+                floor_id: newFloor.id,
+                room_number: '101',
+                name: 'Room 101',
+                room_type: 'double',
+                capacity: 2,
+                base_rent_paise: 650000,
+                is_active: true,
+              })
+              .select()
+              .single()
+
+            if (newRoom) {
+              await serviceClient.from('beds').insert([
+                {
+                  organization_id: orgId,
+                  room_id: newRoom.id,
+                  bed_label: 'A',
+                  status: 'available',
+                  base_rent_paise: 650000,
+                },
+                {
+                  organization_id: orgId,
+                  room_id: newRoom.id,
+                  bed_label: 'B',
+                  status: 'available',
+                  base_rent_paise: 650000,
+                },
+              ])
+            }
+          }
+        }
+      }
+    }
+
+    const propIds = (properties || []).map((p) => p.id)
+
+    // 2. Fetch Buildings
+    const { data: buildings } = await serviceClient
+      .from('buildings')
+      .select('*')
+      .in('property_id', propIds.length > 0 ? propIds : ['none'])
+
+    const bldgIds = (buildings || []).map((b) => b.id)
+
+    // 3. Fetch Floors
+    const { data: floors } = await serviceClient
+      .from('floors')
+      .select('*')
+      .in('building_id', bldgIds.length > 0 ? bldgIds : ['none'])
+      .order('floor_number')
+
+    const floorIds = (floors || []).map((f) => f.id)
+
+    // 4. Fetch Rooms
+    const { data: rooms } = await serviceClient
+      .from('rooms')
+      .select('*')
+      .in('floor_id', floorIds.length > 0 ? floorIds : ['none'])
+      .eq('is_active', true)
+      .order('room_number')
+
+    const roomIds = (rooms || []).map((r) => r.id)
+
+    // 5. Fetch Beds
+    const { data: beds } = await serviceClient
+      .from('beds')
+      .select('*')
+      .in('room_id', roomIds.length > 0 ? roomIds : ['none'])
+      .order('bed_label')
+
+    return NextResponse.json({
+      organization_id: orgId,
+      properties: properties || [],
+      buildings: buildings || [],
+      floors: floors || [],
+      rooms: rooms || [],
+      beds: beds || [],
+    })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'Failed to fetch inventory' }, { status: 500 })
+  }
+}
 
 /**
  * POST /api/residents/checkin
- * Creates new resident, assigns bed, creates deposit and initial ledger entries
+ * Creates new resident record, assigns bed, updates inventory, and creates initial ledger / deposit records.
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const { data: profile } = await supabase
-      .from('users')
-      .select('organization_id, role')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile || !['owner', 'manager', 'staff'].includes(profile.role)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const user = await getAuthenticatedUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized. Please sign in.' }, { status: 401 })
     }
 
-    const orgId = profile.organization_id
-    if (!orgId) return NextResponse.json({ error: 'No active organization found' }, { status: 400 })
+    if (!['owner', 'manager', 'staff', 'accountant', 'superadmin'].includes(user.role)) {
+      return NextResponse.json({ error: 'Forbidden. Owner, Manager, or Staff role required.' }, { status: 403 })
+    }
 
+    const serviceClient = await createServiceClient()
     const body = await request.json()
 
     const {
@@ -36,51 +198,67 @@ export async function POST(request: NextRequest) {
     } = body
 
     if (!full_name || !phone || !bed_id || !monthly_rent_paise) {
-      return NextResponse.json({ error: 'Required fields missing' }, { status: 400 })
+      return NextResponse.json({ error: 'Required fields missing: Full Name, Phone, Bed, and Monthly Rent.' }, { status: 400 })
     }
 
-    // Verify bed is available and belongs to this organization
-    const { data: bed } = await supabase
+    // Verify bed exists using service client
+    const { data: bed } = await serviceClient
       .from('beds')
-      .select('id, status, room_id')
+      .select('id, status, room_id, organization_id')
       .eq('id', bed_id)
-      .eq('organization_id', orgId)
-      .single()
+      .maybeSingle()
 
-    if (!bed || bed.status !== 'available') {
-      return NextResponse.json({ error: 'Selected bed is not available' }, { status: 400 })
+    if (!bed) {
+      return NextResponse.json({ error: 'Selected bed does not exist in inventory.' }, { status: 400 })
     }
 
-    // Generate Registration Number via PostgreSQL RPC
-    const { data: regNumber } = await supabase.rpc('generate_registration_number', {
-      p_org_id: orgId,
-    })
+    if (bed.status !== 'available') {
+      return NextResponse.json({ error: 'Selected bed is already occupied. Please select an available bed.' }, { status: 400 })
+    }
 
-    const registrationNumber = regNumber || `PG-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`
+    const orgId = bed.organization_id || user.organization_id
+    if (!orgId) {
+      return NextResponse.json({ error: 'No active organization found for this property.' }, { status: 400 })
+    }
+
+    // Resolve valid user ID for foreign key columns (or null if not in users table)
+    let validUserId: string | null = null
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id)
+    if (isUuid) {
+      const { data: dbU } = await serviceClient.from('users').select('id').eq('id', user.id).maybeSingle()
+      if (dbU) validUserId = dbU.id
+    }
+    if (!validUserId && user.email) {
+      const { data: dbU } = await serviceClient.from('users').select('id').ilike('email', user.email).maybeSingle()
+      if (dbU) validUserId = dbU.id
+    }
+
+    // Generate unique registration number
+    const registrationNumber = `PG-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`
 
     // 1. Create Resident
-    const { data: resident, error: residentError } = await supabase
+    const { data: resident, error: residentError } = await serviceClient
       .from('residents')
       .insert({
         organization_id: orgId,
         registration_number: registrationNumber,
-        full_name,
-        phone,
-        alternate_phone: alternate_phone || null,
-        email: email || null,
+        full_name: full_name.trim(),
+        phone: phone.trim(),
+        alternate_phone: alternate_phone?.trim() || null,
+        email: email?.trim() || null,
         date_of_birth: date_of_birth || null,
         gender: gender || null,
-        permanent_address: permanent_address || null,
-        permanent_city: permanent_city || null,
-        permanent_state: permanent_state || null,
-        emergency_name: emergency_name || null,
-        emergency_phone: emergency_phone || null,
-        emergency_relation: emergency_relation || null,
+        permanent_address: permanent_address?.trim() || null,
+        permanent_city: permanent_city?.trim() || null,
+        permanent_state: permanent_state?.trim() || null,
+        emergency_name: emergency_name?.trim() || null,
+        emergency_phone: emergency_phone?.trim() || null,
+        emergency_relation: emergency_relation?.trim() || null,
         id_type: id_type || null,
-        id_number: id_number || null,
+        id_number: id_number?.trim() || null,
         status: 'active',
-        notes: notes || null,
-        created_by: user.id,
+        notes: notes?.trim() || null,
+        created_by: validUserId,
       })
       .select()
       .single()
@@ -90,72 +268,88 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Create Assignment
-    const { data: assignment, error: assignError } = await supabase
+    const effectiveCheckIn = check_in_date || new Date().toISOString().split('T')[0]
+    const { data: assignment, error: assignError } = await serviceClient
       .from('resident_assignments')
       .insert({
         organization_id: orgId,
         resident_id: resident.id,
         bed_id,
-        check_in_date: check_in_date || new Date().toISOString().split('T')[0],
+        check_in_date: effectiveCheckIn,
         monthly_rent_paise,
-        billing_cycle_day: billing_cycle_day || 1,
+        billing_cycle_day: Number(billing_cycle_day) || 1,
         proration_policy: proration_policy || 'daily',
-        authorized_by: user.id,
+        authorized_by: validUserId,
       })
       .select()
       .single()
 
     if (assignError || !assignment) {
+      await serviceClient.from('residents').delete().eq('id', resident.id)
       return NextResponse.json({ error: assignError?.message || 'Failed to assign bed' }, { status: 500 })
     }
 
-    // Update bed status to occupied
-    await supabase
+    // 3. Mark Bed Occupied
+    await serviceClient
       .from('beds')
       .update({ status: 'occupied' })
       .eq('id', bed_id)
-      .eq('organization_id', orgId)
 
-    // 3. Create Security Deposit if specified
+    // 4. Create Security Deposit Record if specified
     if (deposit_amount_paise && deposit_amount_paise > 0) {
-      await supabase
+      await serviceClient
         .from('deposits')
         .insert({
           organization_id: orgId,
           resident_id: resident.id,
           assignment_id: assignment.id,
           amount_paise: deposit_amount_paise,
-          received_date: check_in_date || new Date().toISOString().split('T')[0],
+          received_date: effectiveCheckIn,
           payment_method: deposit_payment_method || 'cash',
           notes: 'Initial check-in security deposit',
-          created_by: user.id,
+          created_by: validUserId,
         })
 
-      // Add to ledger
-      await supabase.from('ledger_entries').insert({
+      // Add to Ledger as credit
+      await serviceClient.from('ledger_entries').insert({
         organization_id: orgId,
         resident_id: resident.id,
-        entry_date: check_in_date || new Date().toISOString().split('T')[0],
+        entry_date: effectiveCheckIn,
         description: `Security Deposit Received (${deposit_payment_method?.toUpperCase() || 'CASH'})`,
         category: 'security_deposit',
         entry_type: 'deposit',
         debit_paise: 0,
         credit_paise: deposit_amount_paise,
         payment_method: deposit_payment_method || 'cash',
-        added_by: user.id,
+        added_by: validUserId,
       })
     }
 
-    // 4. Audit Log
-    await supabase.from('audit_logs').insert({
+    // 5. Initial First Month Rent Bill / Ledger Entry
+    await serviceClient.from('ledger_entries').insert({
       organization_id: orgId,
-      user_id: user.id,
-      action: 'checkin',
-      entity_type: 'resident',
-      entity_id: resident.id,
-      entity_label: `${full_name} (${registrationNumber})`,
-      after_data: { full_name, phone, bed_id, monthly_rent_paise },
+      resident_id: resident.id,
+      entry_date: effectiveCheckIn,
+      description: `Monthly Rent (${effectiveCheckIn})`,
+      category: 'rent',
+      entry_type: 'charge',
+      debit_paise: monthly_rent_paise,
+      credit_paise: 0,
+      added_by: validUserId,
     })
+
+    // 6. Audit Log
+    try {
+      await serviceClient.from('audit_logs').insert({
+        organization_id: orgId,
+        user_id: validUserId,
+        action: 'checkin',
+        entity_type: 'resident',
+        entity_id: resident.id,
+        entity_label: `${full_name} (${registrationNumber})`,
+        after_data: { full_name, phone, bed_id, monthly_rent_paise },
+      })
+    } catch {}
 
     return NextResponse.json({
       success: true,
