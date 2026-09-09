@@ -4,6 +4,7 @@ import {
   Building2, ShieldCheck, ArrowLeft, LayoutDashboard,
   Users, CreditCard, Sparkles, LogOut, Layers, ExternalLink
 } from 'lucide-react'
+import AdminLogoutButton from '@/components/admin/admin-logout-button'
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
@@ -40,6 +41,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             >
               <ExternalLink className="w-3.5 h-3.5" /> Tenant Portal
             </Link>
+            <AdminLogoutButton />
           </div>
         </div>
       </header>

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/money'
 import { formatDate, formatDateTime, cn } from '@/lib/utils'
+import AdminLogoutButton from '@/components/admin/admin-logout-button'
 
 export default function MasterCompanyAdminPage() {
   const router = useRouter()
@@ -350,11 +351,14 @@ export default function MasterCompanyAdminPage() {
             {/* Direct Connect to 7-Step Enterprise Onboarding Wizard */}
             <Link
               href="/onboarding?returnTo=/superman"
-              className="py-2.5 px-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 text-white rounded-xl text-xs font-black shadow-lg shadow-blue-500/25 transition flex items-center gap-2"
+              className="py-2.5 px-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 text-white rounded-xl text-xs font-black shadow-lg shadow-blue-500/25 transition flex items-center gap-2"
             >
               <Sparkles className="w-4 h-4 text-blue-200" />
-              <span>Onboard New PG (Enterprise Wizard) →</span>
+              <span>Onboard New PG →</span>
             </Link>
+
+            {/* Logout Button */}
+            <AdminLogoutButton />
           </div>
         </div>
 
