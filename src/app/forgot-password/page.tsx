@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { resetPassword } from '@/lib/firebase/auth'
-import { Building2, Loader2, ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Building2, Loader2, ArrowLeft, CheckCircle2, AlertCircle, Mail, ShieldCheck } from 'lucide-react'
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
@@ -27,62 +27,72 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0B0F19] text-slate-100 flex flex-col justify-between p-4 sm:p-6 selection:bg-blue-600 selection:text-white relative overflow-hidden">
-      {/* Subtle Professional Ambient Gradients & Architectural Grid */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-15%,rgba(59,130,246,0.15),transparent_70%)] pointer-events-none" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_120%,rgba(99,102,241,0.08),transparent_70%)] pointer-events-none" />
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b14_1px,transparent_1px),linear-gradient(to_bottom,#1e293b14_1px,transparent_1px)] bg-[size:3.5rem_3.5rem] [mask-image:radial-gradient(ellipse_70%_70%_at_50%_40%,#000_60%,transparent_100%)] pointer-events-none" />
+    <div className="min-h-screen bg-[#F7FAF7] text-[#17211B] flex flex-col justify-between p-4 sm:p-6 selection:bg-[#DCFCE7] selection:text-[#14532D] relative overflow-hidden">
+      {/* Ambient background glows */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-15%,rgba(22,163,74,0.12),transparent_70%)] pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(#16A34A_1px,transparent_1px)] [background-size:24px_24px] opacity-25 pointer-events-none" />
 
       {/* Top Header */}
       <header className="w-full max-w-5xl mx-auto flex items-center justify-between z-20 pt-2 pb-4">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-white shadow-sm">
-            <Building2 className="w-4 h-4 text-blue-400" />
+        <Link href="/" className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#16A34A] to-[#DCFCE7] flex items-center justify-center text-[#14532D] shadow-sm font-black">
+            <Building2 className="w-5 h-5" />
           </div>
-          <span className="text-sm font-black tracking-tight text-white">PG-SETU</span>
-          <span className="px-2 py-0.5 rounded-full bg-slate-800 text-[10px] font-mono text-slate-400 border border-slate-700">
-            Account Recovery
-          </span>
-        </div>
+          <div>
+            <span className="text-base font-black tracking-tight text-[#17211B] block leading-none">StaySetu</span>
+            <span className="text-[10px] font-bold text-[#16A34A] tracking-wider uppercase mt-0.5 block">Account Recovery</span>
+          </div>
+        </Link>
+        <Link
+          href="/login"
+          className="text-xs font-semibold text-[#647067] hover:text-[#14532D] transition px-3 py-1.5 rounded-full bg-white border border-[#E5E7EB] shadow-sm flex items-center gap-1"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>Back to Sign In</span>
+        </Link>
       </header>
 
       <div className="w-full max-w-md mx-auto my-auto relative z-10 space-y-6">
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl shadow-xl shadow-blue-500/25 text-white mb-1 border border-blue-400/30">
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-tr from-[#14532D] to-[#16A34A] rounded-2xl shadow-xl shadow-[#16A34A]/20 text-white mb-1 border border-[#16A34A]/30">
             <Building2 className="w-7 h-7" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">PG-SETU</h1>
-          <p className="text-xs sm:text-sm text-slate-400 font-medium">Password Recovery</p>
+          <h1 className="text-2xl sm:text-3xl font-black text-[#17211B] tracking-tight">Recover Password</h1>
+          <p className="text-xs sm:text-sm text-[#647067] font-medium">
+            Reset your PG-SETU Property Cloud credentials securely
+          </p>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800 rounded-3xl shadow-2xl p-6 sm:p-8 backdrop-blur-xl">
+        <div className="bg-white border border-[#E5E7EB] rounded-3xl shadow-xl shadow-slate-200/70 p-7 sm:p-8">
           {sent ? (
             <div className="text-center space-y-4">
-              <div className="w-12 h-12 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center mx-auto text-emerald-400">
-                <CheckCircle2 className="w-6 h-6" />
+              <div className="w-14 h-14 bg-[#DCFCE7] border border-[#16A34A]/30 rounded-2xl flex items-center justify-center mx-auto text-[#14532D] shadow-sm">
+                <CheckCircle2 className="w-7 h-7" />
               </div>
-              <h2 className="text-base font-bold text-white">Reset Link Dispatched</h2>
-              <p className="text-xs text-neutral-400">
-                We sent instructions to <span className="font-semibold text-white">{email}</span>. Please check your inbox or spam folder.
+              <h2 className="text-lg font-black text-[#17211B]">Reset Link Dispatched</h2>
+              <p className="text-xs text-[#647067] leading-relaxed">
+                We sent password recovery instructions to <span className="font-bold text-[#17211B]">{email}</span>. Please check your inbox or spam folder.
               </p>
-              <div className="pt-2">
+              <div className="pt-3">
                 <Link
                   href="/login"
-                  className="inline-flex items-center gap-2 text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
+                  className="w-full py-3 px-4 bg-gradient-to-r from-[#16A34A] to-[#14532D] hover:from-[#15803D] hover:to-[#0F3E22] text-white font-bold text-xs rounded-xl shadow-lg shadow-[#16A34A]/20 inline-flex items-center justify-center gap-2 transition"
                 >
-                  <ArrowLeft className="w-4 h-4" /> Back to Sign In
+                  <ArrowLeft className="w-4 h-4" /> Return to Login
                 </Link>
               </div>
             </div>
           ) : (
             <>
-              <h2 className="text-base font-semibold text-white mb-1.5">Reset Your Password</h2>
-              <p className="text-xs text-neutral-400 mb-6">
-                Enter your account email to receive a secure Firebase password reset link.
-              </p>
+              <div className="border-b border-[#E5E7EB] pb-3.5 mb-5">
+                <span className="text-xs font-bold uppercase tracking-wider text-[#16A34A] block">Email Verification</span>
+                <p className="text-[11px] text-[#647067] mt-0.5">
+                  Enter your registered account email to receive a secure recovery link.
+                </p>
+              </div>
 
               {error && (
-                <div className="mb-5 p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs text-rose-300 flex items-center gap-2">
+                <div className="mb-5 p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-semibold flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <span>{error}</span>
                 </div>
@@ -90,36 +100,47 @@ export default function ForgotPasswordPage() {
 
               <form onSubmit={handleReset} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-300 mb-1.5">Email Address</label>
-                  <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-neutral-950/80 border border-neutral-800 rounded-xl text-xs text-white placeholder:text-neutral-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
-                    placeholder="owner@saipg.com"
-                  />
+                  <label className="block text-xs font-bold text-[#17211B] uppercase tracking-wider mb-1.5">Registered Email Address</label>
+                  <div className="relative">
+                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#647067]">
+                      <Mail className="w-4 h-4" />
+                    </div>
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 bg-[#F7FAF7] border border-[#E5E7EB] rounded-xl text-xs sm:text-sm text-[#17211B] font-medium placeholder-[#647067]/60 focus:bg-white focus:border-[#16A34A] focus:ring-4 focus:ring-[#16A34A]/10 outline-none transition"
+                      placeholder="e.g. owner@example.com"
+                    />
+                  </div>
                 </div>
 
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 disabled:opacity-50 text-white font-semibold py-2.5 px-4 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20"
+                  className="w-full bg-gradient-to-r from-[#16A34A] to-[#14532D] hover:from-[#15803D] hover:to-[#0F3E22] disabled:opacity-50 text-white font-extrabold py-3.5 px-4 rounded-xl text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-[#16A34A]/25 cursor-pointer"
                 >
                   {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {loading ? 'Dispatching Link...' : 'Send Firebase Reset Link'}
+                  <span>{loading ? 'Dispatching Reset Link...' : 'Send Password Reset Link →'}</span>
                 </button>
               </form>
 
-              <div className="mt-5 text-center">
-                <Link href="/login" className="inline-flex items-center gap-1.5 text-xs text-neutral-400 hover:text-white transition-colors">
+              <div className="mt-5 text-center pt-3 border-t border-[#E5E7EB]">
+                <Link href="/login" className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#647067] hover:text-[#14532D] transition">
                   <ArrowLeft className="w-3.5 h-3.5" /> Return to Login
                 </Link>
               </div>
             </>
           )}
         </div>
+
+        <div className="flex items-center justify-center gap-2 text-[11px] text-[#647067]">
+          <ShieldCheck className="w-3.5 h-3.5 text-[#16A34A]" />
+          <span>Strict 256-Bit TLS Bank-Grade Encryption</span>
+        </div>
       </div>
+
       <div />
     </div>
   )

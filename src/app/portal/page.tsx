@@ -124,22 +124,15 @@ export default function ResidentPortalPage() {
     setDob('')
   }
 
-  // 4. Autofill Demo Credentials
-  const handleAutofillDemo = () => {
-    setPhone('9876543210')
-    setDob('1998-05-15')
-    setLoginError('')
-  }
-
   // Loading Screen
   if (loadingData && isAuthenticated) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[#F7FAF7] flex items-center justify-center p-4">
         <div className="flex flex-col items-center gap-3 text-center">
-          <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200 animate-pulse">
+          <div className="w-12 h-12 bg-gradient-to-tr from-[#16A34A] to-[#14532D] rounded-2xl flex items-center justify-center shadow-lg shadow-[#16A34A]/20 animate-pulse">
             <Building2 className="w-6 h-6 text-white" />
           </div>
-          <p className="text-xs font-bold text-gray-500">Loading your stay passbook...</p>
+          <p className="text-xs font-bold text-[#647067]">Loading your stay passbook...</p>
         </div>
       </div>
     )
@@ -150,46 +143,56 @@ export default function ResidentPortalPage() {
   // -------------------------------------------------------------
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-[#0B0F19] text-slate-100 flex flex-col justify-between p-4 sm:p-6 selection:bg-blue-600 selection:text-white relative overflow-hidden">
-        {/* Subtle Professional Ambient Gradients & Architectural Grid */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-15%,rgba(59,130,246,0.15),transparent_70%)] pointer-events-none" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_120%,rgba(99,102,241,0.08),transparent_70%)] pointer-events-none" />
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b14_1px,transparent_1px),linear-gradient(to_bottom,#1e293b14_1px,transparent_1px)] bg-[size:3.5rem_3.5rem] [mask-image:radial-gradient(ellipse_70%_70%_at_50%_40%,#000_60%,transparent_100%)] pointer-events-none" />
+      <div className="min-h-screen bg-[#F7FAF7] text-[#17211B] flex flex-col justify-between p-4 sm:p-6 selection:bg-[#DCFCE7] selection:text-[#14532D] relative overflow-hidden">
+        {/* Subtle Ambient Glows & Grid */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-15%,rgba(22,163,74,0.12),transparent_70%)] pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_120%,rgba(245,158,11,0.06),transparent_70%)] pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(#16A34A_1px,transparent_1px)] [background-size:24px_24px] opacity-25 pointer-events-none" />
 
         {/* Top Header */}
         <header className="w-full max-w-5xl mx-auto flex items-center justify-between z-20 pt-2 pb-4">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-white shadow-sm">
-              <Building2 className="w-4 h-4 text-blue-400" />
+          <Link href="/" className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#16A34A] to-[#DCFCE7] flex items-center justify-center text-[#14532D] shadow-sm font-black">
+              <Building2 className="w-5 h-5" />
             </div>
-            <span className="text-sm font-black tracking-tight text-white">PG-SETU</span>
-            <span className="px-2 py-0.5 rounded-full bg-slate-800 text-[10px] font-mono text-slate-400 border border-slate-700">
-              Resident Self-Service
-            </span>
-          </div>
+            <div>
+              <span className="text-base font-black tracking-tight text-[#17211B] block leading-none">StaySetu</span>
+              <span className="text-[10px] font-bold text-[#16A34A] tracking-wider uppercase mt-0.5 block">Resident Self-Service</span>
+            </div>
+          </Link>
+          <Link
+            href="/"
+            className="text-xs font-semibold text-[#647067] hover:text-[#14532D] transition px-3 py-1.5 rounded-full bg-white border border-[#E5E7EB] shadow-sm flex items-center gap-1"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Marketplace</span>
+          </Link>
         </header>
 
         <div className="w-full max-w-md mx-auto my-auto relative z-10 space-y-6">
           {/* Header */}
           <div className="text-center space-y-2">
-            <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl shadow-xl shadow-blue-500/20 text-white mb-2 border border-blue-400/30">
+            <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-tr from-[#14532D] via-[#0F3E22] to-[#16A34A] rounded-2xl shadow-xl shadow-[#16A34A]/20 text-white mb-1 border border-[#16A34A]/30">
               <Building2 className="w-7 h-7" />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Resident Passbook</h1>
-            <p className="text-xs sm:text-sm text-slate-400 font-medium">
-              View your rent bills, payment receipts, electricity charges & ledger in 1 tap.
+            <h1 className="text-2xl sm:text-3xl font-black text-[#17211B] tracking-tight">Resident Stay Passbook</h1>
+            <p className="text-xs sm:text-sm text-[#647067] font-medium max-w-sm mx-auto">
+              View your monthly rent bills, verified UPI receipts, electricity sub-meter readings & stay history in 1 tap.
             </p>
           </div>
 
           {/* Form Card */}
-          <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5 border border-slate-200/80">
-            <div className="border-b border-gray-100 pb-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-blue-600 block">Resident Self-Service Login</span>
-              <p className="text-[11px] text-gray-500 mt-0.5">Enter your check-in phone number and date of birth</p>
+          <div className="bg-white rounded-3xl p-7 sm:p-8 shadow-xl shadow-slate-200/70 space-y-5 border border-[#E5E7EB]">
+            <div className="border-b border-[#E5E7EB] pb-3.5 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-extrabold uppercase tracking-wider text-[#16A34A] block">Secure Passbook Access</span>
+                <p className="text-[11px] text-[#647067] mt-0.5">Enter your registered mobile number & date of birth</p>
+              </div>
+              <span className="px-2 py-0.5 rounded-full bg-[#DCFCE7] text-[#14532D] text-[10px] font-extrabold">Verified</span>
             </div>
 
             {loginError && (
-              <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium flex items-start gap-2">
+              <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-semibold flex items-start gap-2.5 animate-in fade-in">
                 <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
                 <span>{loginError}</span>
               </div>
@@ -197,9 +200,9 @@ export default function ResidentPortalPage() {
 
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1.5">Registered Mobile Number *</label>
+                <label className="block text-xs font-bold text-[#17211B] mb-1.5 uppercase tracking-wider">Registered Mobile Number *</label>
                 <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">+91</span>
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-extrabold text-[#647067]">+91</span>
                   <input
                     type="tel"
                     required
@@ -207,49 +210,61 @@ export default function ResidentPortalPage() {
                     placeholder="10-digit phone number"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 font-medium focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition"
+                    className="w-full pl-12 pr-4 py-3 bg-[#F7FAF7] border border-[#E5E7EB] rounded-xl text-xs sm:text-sm text-[#17211B] font-medium placeholder-[#647067]/60 focus:bg-white focus:border-[#16A34A] focus:ring-4 focus:ring-[#16A34A]/10 outline-none transition"
                   />
                 </div>
-                <p className="text-[10px] text-gray-400 mt-1">The mobile number registered during your check-in.</p>
+                <p className="text-[10px] text-[#647067] mt-1">The phone number given during your PG check-in.</p>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1.5">Date of Birth (DOB) *</label>
+                <label className="block text-xs font-bold text-[#17211B] mb-1.5 uppercase tracking-wider">Date of Birth (DOB) *</label>
                 <input
                   type="date"
                   required
                   value={dob}
                   onChange={(e) => setDob(e.target.value)}
-                  className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 font-medium focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition"
+                  className="w-full px-3.5 py-3 bg-[#F7FAF7] border border-[#E5E7EB] rounded-xl text-xs sm:text-sm text-[#17211B] font-medium focus:bg-white focus:border-[#16A34A] focus:ring-4 focus:ring-[#16A34A]/10 outline-none transition"
                 />
-                <p className="text-[10px] text-gray-400 mt-1">Used to verify your identity securely.</p>
+                <p className="text-[10px] text-[#647067] mt-1">Used to verify your stay records securely.</p>
               </div>
 
               <button
                 type="submit"
                 disabled={loginLoading}
-                className="w-full py-3.5 px-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:via-indigo-500 hover:to-blue-600 active:scale-[0.99] disabled:opacity-50 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-lg shadow-blue-500/25 transition flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3.5 px-4 bg-gradient-to-r from-[#16A34A] to-[#14532D] hover:from-[#15803D] hover:to-[#0F3E22] active:scale-[0.99] disabled:opacity-50 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-lg shadow-[#16A34A]/25 transition flex items-center justify-center gap-2 cursor-pointer"
               >
                 {loginLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
-                {loginLoading ? 'Verifying Details...' : 'View My Bills & Passbook'}
+                {loginLoading ? 'Verifying Stay Records...' : 'View My Passbook & Rent Bills →'}
               </button>
             </form>
 
-            <div className="pt-3 border-t border-gray-100 text-center space-y-1">
-              <p className="text-[11px] text-gray-400 font-medium">
-                Not a tenant or need to manage your PG?
+            <div className="pt-3 border-t border-[#E5E7EB] text-center space-y-1">
+              <p className="text-[11px] text-[#647067] font-medium">
+                Are you a property owner or manager?
               </p>
               <Link
                 href="/login"
-                className="inline-block text-xs font-extrabold text-blue-600 hover:text-blue-700 transition"
+                className="inline-block text-xs font-extrabold text-[#16A34A] hover:text-[#14532D] transition"
               >
-                Owner / Manager Login →
+                Owner & Staff Login Portal →
               </Link>
             </div>
           </div>
 
-          <p className="text-center text-[11px] text-slate-500 font-medium">
-            © 2026 PG-SETU Platform Enterprise · Strict 256-bit TLS Security
+          {/* Trust Guarantees */}
+          <div className="flex items-center justify-center gap-4 text-[11px] text-[#647067]">
+            <span className="flex items-center gap-1 font-medium">
+              <Shield className="w-3.5 h-3.5 text-[#16A34A]" />
+              256-Bit Encrypted
+            </span>
+            <span>•</span>
+            <span className="font-medium">Instant UPI Receipts</span>
+            <span>•</span>
+            <span className="font-medium">Direct Bank Verification</span>
+          </div>
+
+          <p className="text-center text-[10px] text-[#647067]/70 font-medium">
+            © 2026 StaySetu Platform Enterprise · Resident Self-Service Portal
           </p>
         </div>
 

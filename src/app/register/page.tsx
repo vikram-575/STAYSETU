@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Building2, Eye, EyeOff, Loader2, Sparkles, CheckCircle2 } from 'lucide-react'
+import { Building2, Eye, EyeOff, Loader2, Sparkles, CheckCircle2, ShieldCheck, ArrowRight, ArrowLeft } from 'lucide-react'
 
 export default function RegisterPage() {
   const [form, setForm] = useState({ email: '', password: '', full_name: '', confirmPassword: '' })
@@ -50,89 +50,99 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0B0F19] text-slate-100 flex flex-col justify-between p-4 sm:p-6 selection:bg-blue-600 selection:text-white relative overflow-hidden">
-      {/* Subtle Professional Ambient Gradients & Architectural Grid */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-15%,rgba(59,130,246,0.15),transparent_70%)] pointer-events-none" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_120%,rgba(99,102,241,0.08),transparent_70%)] pointer-events-none" />
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b14_1px,transparent_1px),linear-gradient(to_bottom,#1e293b14_1px,transparent_1px)] bg-[size:3.5rem_3.5rem] [mask-image:radial-gradient(ellipse_70%_70%_at_50%_40%,#000_60%,transparent_100%)] pointer-events-none" />
+    <div className="min-h-screen bg-[#F7FAF7] text-[#17211B] flex flex-col justify-between p-4 sm:p-6 selection:bg-[#DCFCE7] selection:text-[#14532D] relative overflow-hidden">
+      {/* Subtle Ambient Glows & Grid */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-15%,rgba(22,163,74,0.12),transparent_70%)] pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_120%,rgba(245,158,11,0.06),transparent_70%)] pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(#16A34A_1px,transparent_1px)] [background-size:24px_24px] opacity-25 pointer-events-none" />
 
       {/* Top Header */}
       <header className="w-full max-w-5xl mx-auto flex items-center justify-between z-20 pt-2 pb-4">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-white shadow-sm">
-            <Building2 className="w-4 h-4 text-blue-400" />
+        <Link href="/" className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#16A34A] to-[#DCFCE7] flex items-center justify-center text-[#14532D] shadow-sm font-black">
+            <Building2 className="w-5 h-5" />
           </div>
-          <span className="text-sm font-black tracking-tight text-white">PG-SETU</span>
-          <span className="px-2 py-0.5 rounded-full bg-slate-800 text-[10px] font-mono text-slate-400 border border-slate-700">
-            Owner Registration
-          </span>
-        </div>
+          <div>
+            <span className="text-base font-black tracking-tight text-[#17211B] block leading-none">StaySetu</span>
+            <span className="text-[10px] font-bold text-[#16A34A] tracking-wider uppercase mt-0.5 block">Owner Registration</span>
+          </div>
+        </Link>
+        <Link
+          href="/login"
+          className="text-xs font-semibold text-[#647067] hover:text-[#14532D] transition px-3 py-1.5 rounded-full bg-white border border-[#E5E7EB] shadow-sm flex items-center gap-1"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>Already have account</span>
+        </Link>
       </header>
 
       <div className="w-full max-w-md mx-auto my-auto relative z-10 space-y-6">
         {/* Brand Header */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl shadow-xl shadow-blue-500/25 text-white mb-1 border border-blue-400/30">
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-tr from-[#14532D] via-[#0F3E22] to-[#16A34A] rounded-2xl shadow-xl shadow-[#16A34A]/20 text-white mb-1 border border-[#16A34A]/30">
             <Building2 className="w-7 h-7" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">PG-SETU</h1>
-          <p className="text-xs sm:text-sm text-slate-400 font-medium">Create Your Owner & Property Manager Account</p>
+          <h1 className="text-2xl sm:text-3xl font-black text-[#17211B] tracking-tight">Create Property Account</h1>
+          <p className="text-xs sm:text-sm text-[#647067] font-medium max-w-sm mx-auto">
+            Automate room inventory, 1-click rent rolls & smart electricity sub-meters
+          </p>
         </div>
 
-        <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-200/80 p-7 sm:p-8 space-y-5">
-          <div>
-            <h2 className="text-xl font-black text-slate-900 tracking-tight">Register New PG Owner</h2>
-            <p className="text-xs text-slate-500 font-medium mt-1">
-              Start managing rooms, automate rent collections & split electricity units
+        <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/70 border border-[#E5E7EB] p-7 sm:p-8 space-y-5">
+          <div className="border-b border-[#E5E7EB] pb-3.5">
+            <span className="text-xs font-bold uppercase tracking-wider text-[#16A34A] block">PG Owner & Manager Sign Up</span>
+            <p className="text-[11px] text-[#647067] mt-0.5">
+              Start your 30-day free trial · No credit card required
             </p>
           </div>
 
           {error && (
-            <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-semibold animate-in fade-in">
+            <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-semibold animate-in fade-in">
               {error}
             </div>
           )}
 
           <form onSubmit={handleRegister} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Full Name *</label>
+              <label className="block text-xs font-bold text-[#17211B] uppercase tracking-wider mb-1.5">Full Name *</label>
               <input
                 type="text"
                 required
                 value={form.full_name}
                 onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 font-medium focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition"
+                className="w-full px-4 py-3 bg-[#F7FAF7] border border-[#E5E7EB] rounded-xl text-xs sm:text-sm text-[#17211B] font-medium placeholder-[#647067]/60 focus:bg-white focus:border-[#16A34A] focus:ring-4 focus:ring-[#16A34A]/10 outline-none transition"
                 placeholder="e.g. Vikram Tomar"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Email Address *</label>
+              <label className="block text-xs font-bold text-[#17211B] uppercase tracking-wider mb-1.5">Email Address *</label>
               <input
                 type="email"
                 required
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 font-medium focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition"
+                className="w-full px-4 py-3 bg-[#F7FAF7] border border-[#E5E7EB] rounded-xl text-xs sm:text-sm text-[#17211B] font-medium placeholder-[#647067]/60 focus:bg-white focus:border-[#16A34A] focus:ring-4 focus:ring-[#16A34A]/10 outline-none transition"
                 placeholder="owner@example.com"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Password *</label>
+              <label className="block text-xs font-bold text-[#17211B] uppercase tracking-wider mb-1.5">Password *</label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  className="w-full px-4 py-3 pr-11 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 font-medium focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition"
+                  className="w-full px-4 py-3 pr-11 bg-[#F7FAF7] border border-[#E5E7EB] rounded-xl text-xs sm:text-sm text-[#17211B] font-medium placeholder-[#647067]/60 focus:bg-white focus:border-[#16A34A] focus:ring-4 focus:ring-[#16A34A]/10 outline-none transition"
                   placeholder="At least 6 characters"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#647067] hover:text-[#17211B] p-1"
+                  aria-label="Toggle password visibility"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -140,13 +150,13 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Confirm Password *</label>
+              <label className="block text-xs font-bold text-[#17211B] uppercase tracking-wider mb-1.5">Confirm Password *</label>
               <input
                 type="password"
                 required
                 value={form.confirmPassword}
                 onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 font-medium focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition"
+                className="w-full px-4 py-3 bg-[#F7FAF7] border border-[#E5E7EB] rounded-xl text-xs sm:text-sm text-[#17211B] font-medium placeholder-[#647067]/60 focus:bg-white focus:border-[#16A34A] focus:ring-4 focus:ring-[#16A34A]/10 outline-none transition"
                 placeholder="Confirm password"
               />
             </div>
@@ -154,24 +164,25 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:via-indigo-500 hover:to-blue-600 active:scale-[0.99] disabled:opacity-50 text-white font-black py-3.5 px-4 rounded-xl text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25"
+              className="w-full bg-gradient-to-r from-[#16A34A] to-[#14532D] hover:from-[#15803D] hover:to-[#0F3E22] active:scale-[0.99] disabled:opacity-50 text-white font-black py-3.5 px-4 rounded-xl text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-[#16A34A]/25 cursor-pointer mt-2"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              <span>{loading ? 'Setting up profile...' : 'Continue to PG Onboarding →'}</span>
+              <span>{loading ? 'Creating Your Account...' : 'Continue to PG Onboarding →'}</span>
             </button>
           </form>
 
-          <div className="pt-4 border-t border-slate-100 text-center text-xs text-slate-500">
-            Already registered?{' '}
-            <Link href="/login" className="text-blue-600 hover:text-blue-700 font-bold">
-              Sign In to Account
+          <div className="pt-4 border-t border-[#E5E7EB] text-center text-xs text-[#647067]">
+            Already have an account?{' '}
+            <Link href="/login" className="text-[#16A34A] hover:text-[#14532D] font-bold">
+              Sign In Here →
             </Link>
           </div>
         </div>
 
-        <p className="text-center text-[11px] text-slate-500 font-medium pt-2">
-          © 2026 PG-SETU. All data encrypted and secured.
-        </p>
+        <div className="flex items-center justify-center gap-2 text-[11px] text-[#647067]">
+          <ShieldCheck className="w-3.5 h-3.5 text-[#16A34A]" />
+          <span>Strict 256-Bit TLS Bank-Grade Encryption</span>
+        </div>
       </div>
 
       <div />
