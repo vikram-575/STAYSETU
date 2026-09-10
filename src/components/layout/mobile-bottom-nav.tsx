@@ -88,7 +88,7 @@ export default function MobileBottomNav() {
           <div className="relative bg-white rounded-t-3xl p-5 shadow-2xl border-t border-slate-100 space-y-4 animate-in slide-in-from-bottom duration-200 safe-bottom">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
+                <div className="w-8 h-8 rounded-xl bg-[#DCFCE7] text-[#14532D] flex items-center justify-center font-bold">
                   <Sparkles className="w-4 h-4" />
                 </div>
                 <div>
@@ -150,10 +150,10 @@ export default function MobileBottomNav() {
                   className="flex flex-col items-center justify-center -mt-5 group active:scale-90 transition-transform"
                   aria-label="Quick Action"
                 >
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white flex items-center justify-center shadow-lg shadow-blue-500/40 border-4 border-white">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#14532D] to-[#16A34A] hover:opacity-95 text-white flex items-center justify-center shadow-lg shadow-emerald-700/30 border-4 border-white">
                     <Plus className="w-6 h-6 stroke-[2.5]" />
                   </div>
-                  <span className="text-[10px] font-bold text-blue-600 mt-0.5">Quick</span>
+                  <span className="text-[10px] font-bold text-[#14532D] mt-0.5">Quick</span>
                 </button>
               )
             }
@@ -164,16 +164,16 @@ export default function MobileBottomNav() {
                 href={item.href}
                 className={cn(
                   'flex flex-col items-center justify-center flex-1 py-1 transition-colors active:scale-95',
-                  active ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600'
+                  active ? 'text-[#14532D] font-bold' : 'text-slate-400 hover:text-slate-600'
                 )}
               >
                 <div className="relative">
-                  <item.icon className={cn('w-5 h-5 transition-transform', active && 'scale-110 stroke-[2.5] text-blue-600')} />
+                  <item.icon className={cn('w-5 h-5 transition-transform', active && 'scale-110 stroke-[2.5] text-[#16A34A]')} />
                   {active && (
-                    <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-600 rounded-full" />
+                    <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-[#16A34A] rounded-full" />
                   )}
                 </div>
-                <span className={cn('text-[10px] mt-1 tracking-tight', active ? 'font-bold text-blue-600' : 'font-medium')}>
+                <span className={cn('text-[10px] mt-1 tracking-tight', active ? 'font-bold text-[#14532D]' : 'font-medium')}>
                   {item.label}
                 </span>
               </Link>

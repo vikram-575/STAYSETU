@@ -54,10 +54,10 @@ export default function ExpectedVsCollected({
 
       {/* 4 columns */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4">
-        <div className="text-center p-3 sm:p-4 bg-blue-50/70 border border-blue-100 rounded-xl">
-          <p className="text-[10px] sm:text-xs text-blue-600 font-bold mb-0.5">EXPECTED</p>
-          <p className="text-base sm:text-xl font-black text-blue-900 truncate" title={formatCurrency(expectedPaise)}>{formatCurrency(expectedPaise)}</p>
-          <p className="text-[10px] text-blue-500 mt-0.5">Total billed</p>
+        <div className="text-center p-3 sm:p-4 bg-[#DCFCE7]/50 border border-emerald-200/80 rounded-xl">
+          <p className="text-[10px] sm:text-xs text-[#14532D] font-bold mb-0.5">EXPECTED</p>
+          <p className="text-base sm:text-xl font-black text-[#14532D] truncate" title={formatCurrency(expectedPaise)}>{formatCurrency(expectedPaise)}</p>
+          <p className="text-[10px] text-[#16A34A] mt-0.5 font-semibold">Total billed</p>
         </div>
         <div className="text-center p-3 sm:p-4 bg-green-50/70 border border-green-100 rounded-xl">
           <div className="flex items-center justify-center gap-1 mb-0.5">

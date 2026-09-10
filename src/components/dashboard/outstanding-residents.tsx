@@ -29,7 +29,7 @@ export default function OutstandingResidentsList({ residents }: Props) {
           <h2 className="text-sm sm:text-base font-bold text-gray-900">Who Owes Money?</h2>
           <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5">{residents.length} residents with unpaid balance</p>
         </div>
-        <Link href="/dashboard/billing?tab=outstanding" className="text-xs text-blue-600 hover:text-blue-700 font-bold flex items-center gap-1">
+        <Link href="/dashboard/billing?tab=outstanding" className="text-xs text-[#16A34A] hover:text-[#14532D] font-bold flex items-center gap-1">
           View all <ExternalLink className="w-3.5 h-3.5" />
         </Link>
       </div>
@@ -43,11 +43,11 @@ export default function OutstandingResidentsList({ residents }: Props) {
           return (
             <div
               key={resident.resident_id}
-              className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-blue-50/30 transition-colors group"
+              className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-xl border border-gray-100 bg-[#F7FAF7] hover:bg-[#DCFCE7]/25 transition-colors group"
             >
               <div className="flex items-center gap-3 min-w-0">
                 {/* Avatar */}
-                <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-blue-700">
+                <div className="w-9 h-9 bg-[#DCFCE7] rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-[#14532D]">
                   {resident.photo_url ? (
                     <img src={resident.photo_url} alt="" className="w-full h-full rounded-full object-cover" />
                   ) : (

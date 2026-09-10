@@ -46,8 +46,8 @@ function KPICard({ label, value, sub, icon: Icon, iconBg, iconColor, badge, high
     <div className={cn(
       'bg-white rounded-2xl border p-4 sm:p-5 flex flex-col justify-between transition-all duration-200',
       highlight
-        ? 'border-blue-200 shadow-[0_2px_8px_rgba(37,99,235,0.06)] bg-gradient-to-b from-blue-50/30 to-white'
-        : 'border-slate-200/90 shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-md hover:border-slate-300'
+        ? 'border-[#16A34A]/40 shadow-xs bg-gradient-to-b from-[#DCFCE7]/30 to-white'
+        : 'border-gray-200/90 shadow-2xs hover:shadow-md hover:border-[#16A34A]/40'
     )}>
       {/* Header with Title and Icon */}
       <div className="flex items-center justify-between gap-2 mb-3">
@@ -96,8 +96,8 @@ export default function DashboardKPICards({ kpis }: Props) {
         value={formatCurrency(kpis.monthExpectedPaise)}
         sub="Monthly billable target"
         icon={BarChart2}
-        iconBg="bg-blue-50"
-        iconColor="text-blue-600"
+        iconBg="bg-[#DCFCE7]/70"
+        iconColor="text-[#14532D]"
         highlight
         badge={{
           text: `${kpis.activeResidents} active billings`,
@@ -111,8 +111,8 @@ export default function DashboardKPICards({ kpis }: Props) {
         value={formatCurrency(kpis.monthCollectedPaise)}
         sub={`${kpis.collectionRate}% of expected`}
         icon={CreditCard}
-        iconBg="bg-emerald-50"
-        iconColor="text-emerald-600"
+        iconBg="bg-[#DCFCE7]"
+        iconColor="text-[#16A34A]"
         badge={{
           text: `${kpis.collectionRate}% realization rate`,
           variant: kpis.collectionRate >= 80 ? 'positive' : kpis.collectionRate >= 50 ? 'info' : 'negative'
@@ -125,8 +125,8 @@ export default function DashboardKPICards({ kpis }: Props) {
         value={formatCurrency(kpis.totalOutstandingPaise)}
         sub="Pending resident dues"
         icon={AlertCircle}
-        iconBg={kpis.totalOutstandingPaise > 0 ? 'bg-amber-50' : 'bg-slate-50'}
-        iconColor={kpis.totalOutstandingPaise > 0 ? 'text-amber-600' : 'text-slate-400'}
+        iconBg={kpis.totalOutstandingPaise > 0 ? 'bg-[#FEF3C7]' : 'bg-gray-50'}
+        iconColor={kpis.totalOutstandingPaise > 0 ? 'text-[#F59E0B]' : 'text-gray-400'}
         badge={{
           text: kpis.totalOutstandingPaise > 0 ? 'Collection in progress' : 'All clear!',
           variant: kpis.totalOutstandingPaise > 0 ? 'negative' : 'positive'
@@ -139,8 +139,8 @@ export default function DashboardKPICards({ kpis }: Props) {
         value={formatCurrency(kpis.totalOverduePaise)}
         sub="Past due date"
         icon={TrendingDown}
-        iconBg={kpis.totalOverduePaise > 0 ? 'bg-rose-50' : 'bg-slate-50'}
-        iconColor={kpis.totalOverduePaise > 0 ? 'text-rose-600' : 'text-slate-400'}
+        iconBg={kpis.totalOverduePaise > 0 ? 'bg-rose-50' : 'bg-gray-50'}
+        iconColor={kpis.totalOverduePaise > 0 ? 'text-rose-600' : 'text-gray-400'}
         badge={{
           text: kpis.totalOverduePaise > 0 ? 'Urgent action required' : 'Zero overdue',
           variant: kpis.totalOverduePaise > 0 ? 'negative' : 'positive'
@@ -153,8 +153,8 @@ export default function DashboardKPICards({ kpis }: Props) {
         value={formatCurrency(kpis.todayCollectedPaise)}
         sub="Processed today"
         icon={DollarSign}
-        iconBg="bg-purple-50"
-        iconColor="text-purple-600"
+        iconBg="bg-[#DCFCE7]/70"
+        iconColor="text-[#14532D]"
         badge={{
           text: kpis.todayCollectedPaise > 0 ? 'Live recorded' : 'No receipts yet today',
           variant: kpis.todayCollectedPaise > 0 ? 'positive' : 'neutral'
@@ -167,8 +167,8 @@ export default function DashboardKPICards({ kpis }: Props) {
         value={`${kpis.occupancyRate}%`}
         sub={`${kpis.occupiedBeds} of ${kpis.totalBeds} beds filled`}
         icon={BedDouble}
-        iconBg={kpis.occupancyRate >= 80 ? 'bg-emerald-50' : 'bg-amber-50'}
-        iconColor={kpis.occupancyRate >= 80 ? 'text-emerald-600' : 'text-amber-600'}
+        iconBg={kpis.occupancyRate >= 80 ? 'bg-[#DCFCE7]' : 'bg-[#FEF3C7]'}
+        iconColor={kpis.occupancyRate >= 80 ? 'text-[#14532D]' : 'text-[#F59E0B]'}
         badge={{
           text: `${kpis.availableBeds} beds available`,
           variant: kpis.occupancyRate >= 80 ? 'positive' : 'neutral'
@@ -181,8 +181,8 @@ export default function DashboardKPICards({ kpis }: Props) {
         value={String(kpis.activeResidents)}
         sub="Registered occupants"
         icon={Users}
-        iconBg="bg-indigo-50"
-        iconColor="text-indigo-600"
+        iconBg="bg-[#DCFCE7]/60"
+        iconColor="text-[#16A34A]"
         badge={{
           text: `${kpis.occupiedBeds} checked-in`,
           variant: 'info'
@@ -195,8 +195,8 @@ export default function DashboardKPICards({ kpis }: Props) {
         value={formatCurrency(kpis.depositsHeldPaise)}
         sub="Refundable security"
         icon={ShieldCheck}
-        iconBg="bg-teal-50"
-        iconColor="text-teal-600"
+        iconBg="bg-[#FEF3C7]"
+        iconColor="text-[#F59E0B]"
         badge={{
           text: 'Escrow / Non-revenue',
           variant: 'neutral'

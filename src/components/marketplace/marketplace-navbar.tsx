@@ -79,6 +79,13 @@ export function MarketplaceNavbar({
           >
             Popular Cities
           </button>
+          <Link
+            href="/software"
+            className="text-sm font-medium text-[#14532D] font-bold transition hover:text-[#16A34A] flex items-center gap-1"
+          >
+            <span>ERP Software</span>
+            <span className="rounded-sm bg-[#FEF3C7] px-1 py-0.2 text-[9px] font-black text-[#F59E0B]">PRO</span>
+          </Link>
           <button
             onClick={() => handleNavClick('trust-section')}
             className="text-sm font-medium text-[#647067] transition hover:text-[#16A34A]"
@@ -183,6 +190,17 @@ export function MarketplaceNavbar({
               <span>Popular Cities</span>
               <Building2 className="h-4 w-4 text-[#647067]" />
             </button>
+            <Link
+              href="/software"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-bold text-[#14532D] bg-[#DCFCE7]/40 hover:bg-[#DCFCE7]"
+            >
+              <div className="flex items-center gap-1.5">
+                <span>PG Management ERP</span>
+                <span className="rounded-sm bg-[#FEF3C7] px-1 py-0.2 text-[9px] font-black text-[#F59E0B]">PRO</span>
+              </div>
+              <Sparkles className="h-4 w-4 text-[#16A34A]" />
+            </Link>
             <button
               onClick={() => handleNavClick('trust-section')}
               className="flex items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-[#17211B] hover:bg-gray-50"

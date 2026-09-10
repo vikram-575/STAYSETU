@@ -49,7 +49,7 @@ export default async function DashboardLayout({
         role: profile.role,
       }}
     >
-      <div className="flex h-screen bg-gray-50 overflow-hidden">
+      <div className="flex h-screen bg-[#F7FAF7] overflow-hidden">
         <AppSidebar role={profile.role} orgName={profile.organizations?.name ?? 'PG-SETU Management'} />
         <div className="flex-1 flex flex-col min-w-0 w-full overflow-hidden">
           <AppHeader user={profile as any} />

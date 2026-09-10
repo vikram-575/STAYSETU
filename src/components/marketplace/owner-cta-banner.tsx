@@ -70,10 +70,11 @@ export function OwnerCtaBanner({ onOpenListModal }: OwnerCtaBannerProps) {
               </button>
 
               <Link
-                href="/register"
+                href="/software"
                 className="inline-flex items-center gap-2 rounded-xl border border-white/40 bg-white/10 px-6 py-3.5 text-xs sm:text-sm font-bold text-white backdrop-blur-xs hover:bg-white/20 transition"
               >
                 <span>Explore PG-SETU ERP Software</span>
+                <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
           </div>

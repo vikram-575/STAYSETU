@@ -87,7 +87,13 @@ export function MarketplaceFooter() {
             </h4>
             <ul className="space-y-2">
               <li>
-                <Link href="/login" className="hover:text-[#16A34A] font-semibold text-[#14532D]">
+                <Link href="/software" className="hover:text-[#16A34A] font-bold text-[#14532D] flex items-center gap-1">
+                  <span>PG-SETU ERP Software</span>
+                  <span className="rounded-sm bg-[#DCFCE7] px-1 py-0.2 text-[9px] text-[#14532D]">NEW</span>
+                </Link>
+              </li>
+              <li>
+                <Link href="/login" className="hover:text-[#16A34A] font-semibold text-gray-700">
                   Owner ERP Login
                 </Link>
               </li>

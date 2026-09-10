@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Users, Building2, BedDouble, FileText,
   CreditCard, Zap, BarChart3, MessageSquare, Settings,
   DollarSign, BookOpen, PackageSearch, LogOut,
-  TrendingUp, ShieldAlert, Sparkles
+  TrendingUp, ShieldAlert, Sparkles, Compass
 } from 'lucide-react'
 
 interface NavItem {
@@ -56,40 +56,57 @@ export default function AppSidebar({ role, orgName }: Props) {
   }
 
   return (
-    <aside className="hidden md:flex w-64 bg-white border-r border-gray-200 flex-col h-full shrink-0">
+    <aside className="hidden md:flex w-64 bg-white border-r border-gray-200/90 flex-col h-full shrink-0 shadow-xs select-none">
       {/* Logo & Org Header */}
-      <div className="p-4 border-b border-gray-100">
+      <div className="p-4 border-b border-gray-100 bg-[#F7FAF7]/60">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center shrink-0 shadow-sm">
+          <div className="w-10 h-10 bg-gradient-to-br from-[#14532D] to-[#16A34A] rounded-xl flex items-center justify-center shrink-0 shadow-sm ring-2 ring-[#DCFCE7]">
             <Building2 className="w-5 h-5 text-white" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <p className="font-extrabold text-gray-900 text-sm leading-tight tracking-tight">PG-SETU</p>
-              <span className="px-1.5 py-0.2 bg-blue-50 text-blue-700 text-[10px] font-black rounded-md border border-blue-200">
-                PRO
+              <p className="font-black text-[#14532D] text-sm leading-tight tracking-tight">PG-SETU</p>
+              <span className="px-1.5 py-0.2 bg-[#DCFCE7] text-[#14532D] text-[10px] font-black rounded-md border border-[#16A34A]/25">
+                ERP
               </span>
             </div>
-            <p className="text-xs text-gray-500 font-medium truncate mt-0.5">{orgName}</p>
+            <p className="text-xs text-[#647067] font-semibold truncate mt-0.5" title={orgName}>
+              {orgName}
+            </p>
           </div>
         </div>
       </div>
 
+      {/* Quick link to public marketplace */}
+      <div className="px-3 pt-2.5">
+        <Link
+          href="/"
+          target="_blank"
+          className="flex items-center justify-between px-3 py-1.5 rounded-lg border border-gray-200 bg-[#F7FAF7] text-[11px] font-semibold text-[#647067] hover:border-[#16A34A] hover:text-[#14532D] transition"
+        >
+          <div className="flex items-center gap-1.5">
+            <Compass className="w-3.5 h-3.5 text-[#16A34A]" />
+            <span>View Public Marketplace</span>
+          </div>
+          <span className="text-[10px] text-gray-400">↗</span>
+        </Link>
+      </div>
+
       {/* Super Admin Command Center Link (If Super Admin) */}
       {isSuperAdmin && (
-        <div className="p-3 bg-gradient-to-r from-slate-900 to-indigo-950 border-b border-slate-800">
+        <div className="p-3 bg-gradient-to-r from-[#14532D] to-[#166534] border-b border-emerald-800/40 text-white">
           <Link
             href="/superman"
-            className="flex items-center justify-between p-2.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-white transition group"
+            className="flex items-center justify-between p-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white transition group"
           >
             <div className="flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-blue-400 group-hover:text-blue-300" />
+              <ShieldAlert className="w-4 h-4 text-[#FEF3C7] group-hover:text-white" />
               <div className="text-left">
-                <p className="text-xs font-black leading-tight text-blue-200">Super Admin Panel</p>
-                <p className="text-[10px] text-slate-400">Manage all client PGs</p>
+                <p className="text-xs font-black leading-tight text-[#DCFCE7]">Super Admin Panel</p>
+                <p className="text-[10px] text-gray-200">Manage all client PGs</p>
               </div>
             </div>
-            <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+            <Sparkles className="w-3.5 h-3.5 text-[#FEF3C7]" />
           </Link>
         </div>
       )}
@@ -97,7 +114,7 @@ export default function AppSidebar({ role, orgName }: Props) {
       {/* Nav links */}
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
         <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400">
-          {role === 'superadmin' ? 'Organization Management' : `${role.toUpperCase()} WORKSPACE`}
+          {role === 'superadmin' ? 'Organization Operations' : `${role.toUpperCase()} WORKSPACE`}
         </div>
 
         {visibleItems.map((item) => {
@@ -110,14 +127,14 @@ export default function AppSidebar({ role, orgName }: Props) {
               className={cn(
                 'flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all',
                 isActive
-                  ? 'bg-blue-50 text-blue-700 font-bold shadow-xs'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  ? 'bg-[#DCFCE7]/70 text-[#14532D] font-bold shadow-xs'
+                  : 'text-[#647067] hover:bg-[#F7FAF7] hover:text-[#17211B]'
               )}
             >
-              <Icon className={cn('w-4 h-4 shrink-0', isActive ? 'text-blue-600' : 'text-gray-400')} />
+              <Icon className={cn('w-4 h-4 shrink-0', isActive ? 'text-[#16A34A]' : 'text-gray-400')} />
               <span className="truncate">{item.label}</span>
               {item.badge && (
-                <span className="ml-auto bg-red-500 text-white text-[10px] rounded-full px-1.5 py-0.5 leading-none font-bold">
+                <span className="ml-auto bg-rose-500 text-white text-[10px] rounded-full px-1.5 py-0.5 leading-none font-bold">
                   {item.badge}
                 </span>
               )}
@@ -127,12 +144,12 @@ export default function AppSidebar({ role, orgName }: Props) {
       </nav>
 
       {/* User Status & Sign Out Footer */}
-      <div className="p-3 border-t border-gray-100 bg-gray-50/50">
+      <div className="p-3 border-t border-gray-100 bg-[#F7FAF7]/80">
         <div className="flex items-center justify-between px-2 py-1.5 mb-1.5">
           <div className="text-xs truncate">
-            <span className="font-bold text-gray-700 block capitalize">{role} Account</span>
-            <span className="text-[10px] text-green-600 font-bold flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+            <span className="font-bold text-[#17211B] block capitalize">{role} Account</span>
+            <span className="text-[10px] text-[#16A34A] font-bold flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A] animate-pulse" />
               Live Connected
             </span>
           </div>
@@ -140,10 +157,10 @@ export default function AppSidebar({ role, orgName }: Props) {
 
         <button
           onClick={handleLogout}
-          className="flex items-center gap-2 px-3 py-2 w-full rounded-xl text-xs font-bold text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors"
+          className="flex items-center gap-2 px-3 py-2 w-full rounded-xl text-xs font-bold text-gray-600 hover:bg-rose-50 hover:text-rose-600 transition-colors"
         >
           <LogOut className="w-4 h-4" />
-          Sign Out
+          <span>Sign Out</span>
         </button>
       </div>
     </aside>
