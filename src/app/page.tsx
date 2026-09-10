@@ -15,6 +15,7 @@ import { PropertyDetailModal } from '@/components/marketplace/property-detail-mo
 import { PropertyCompareDrawer } from '@/components/marketplace/property-compare-drawer'
 import { ListPropertyModal } from '@/components/marketplace/list-property-modal'
 import { MobileBottomNav } from '@/components/marketplace/mobile-bottom-nav'
+import { FloatingWebsiteAdminBar } from '@/components/marketplace/website-admin-quick-edit'
 
 export default function MarketplaceHomePage() {
   const [properties, setProperties] = useState<PropertyListing[]>(MOCK_PROPERTIES)
@@ -237,6 +238,9 @@ export default function MarketplaceHomePage() {
         onClose={() => setIsListModalOpen(false)}
         onListingCreated={handleListingCreated}
       />
+
+      {/* Floating Website Live Admin Editor Bar */}
+      <FloatingWebsiteAdminBar />
     </div>
   )
 }

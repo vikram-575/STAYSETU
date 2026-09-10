@@ -15,6 +15,8 @@ import {
   Building,
 } from 'lucide-react'
 import { PropertyType } from '@/types/marketplace'
+import { useWebsiteContent } from '@/context/website-content-context'
+import { SectionEditButton } from './website-admin-quick-edit'
 
 interface HeroSearchProps {
   onSearch: (criteria: {
@@ -37,18 +39,6 @@ const SEARCH_TABS: { id: PropertyType | 'all'; label: string; icon: string }[] =
   { id: 'apartment', label: 'Luxury Apartment', icon: '🏰' },
 ]
 
-const QUICK_CHIPS = [
-  { label: 'Girls Only PG', filterKey: 'girls' },
-  { label: 'Boys Only PG', filterKey: 'boys' },
-  { label: 'Co-ed Spaces', filterKey: 'coed' },
-  { label: '1 BHK Flat', filterKey: '1bhk' },
-  { label: 'Zero Brokerage', filterKey: 'zero_brokerage' },
-  { label: 'Food Included', filterKey: 'food' },
-  { label: 'Near Metro Station', filterKey: 'metro' },
-  { label: 'AC with Backup', filterKey: 'ac' },
-  { label: 'Fully Furnished', filterKey: 'furnished' },
-]
-
 const POPULAR_SUGGESTIONS = [
   { city: 'Bangalore', locality: 'Koramangala' },
   { city: 'Bangalore', locality: 'Indiranagar' },
@@ -64,6 +54,9 @@ const POPULAR_SUGGESTIONS = [
 ]
 
 export function HeroSearch({ onSearch, selectedCity, onCityChange }: HeroSearchProps) {
+  const { content } = useWebsiteContent()
+  const hero = content?.hero
+
   const [activeTab, setActiveTab] = useState<PropertyType | 'all'>('all')
   const [locationQuery, setLocationQuery] = useState(selectedCity ? selectedCity : '')
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -120,27 +113,39 @@ export function HeroSearch({ onSearch, selectedCity, onCityChange }: HeroSearchP
       </div>
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Top Tagline Pill */}
-        <div className="flex justify-center">
+        {/* Top Tagline Pill & Edit Button */}
+        <div className="flex items-center justify-center gap-3">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#16A34A]/25 bg-[#DCFCE7]/60 px-3.5 py-1.5 text-xs font-semibold text-[#14532D] shadow-2xs backdrop-blur-xs">
             <ShieldCheck className="h-4 w-4 text-[#16A34A]" />
-            <span>100% Physically Verified Spaces</span>
-            <span className="text-gray-400">•</span>
-            <span className="text-[#F59E0B] font-bold">₹0 Brokerage Direct Connect</span>
+            <span>{hero?.badge || '#1 PropTech & PG Rental Network'}</span>
           </div>
+          <SectionEditButton section="hero" label="Edit Hero" />
         </div>
 
         {/* Main Hero Typography */}
         <div className="mx-auto mt-6 max-w-4xl text-center">
           <h1 className="text-3xl font-extrabold tracking-tight text-[#14532D] sm:text-5xl lg:text-6xl">
-            Find Your Ideal PG or Flat{' '}
+            {hero?.headline || 'Find Your Ideal PG or Flat'}{' '}
             <span className="bg-gradient-to-r from-[#16A34A] to-[#14532D] bg-clip-text text-transparent">
-              Without Brokerage Hassle
+              {hero?.highlightText || 'Without Brokerage Hassle'}
             </span>
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-base sm:text-lg text-[#647067] leading-relaxed">
-            Discover verified PGs, rooms and flats with transparent digital rent passbooks, live electricity meter readings, and zero middleman commissions.
+            {hero?.subtitle ||
+              'Discover verified PGs, rooms and flats with transparent digital rent passbooks, live electricity meter readings, and zero middleman commissions.'}
           </p>
+
+          {/* 4 Stats Counters */}
+          {hero?.stats && hero.stats.length > 0 && (
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-6 sm:gap-10 text-center">
+              {hero.stats.map((st, i) => (
+                <div key={i} className="flex flex-col items-center">
+                  <span className="text-lg sm:text-xl font-black text-[#14532D]">{st.value}</span>
+                  <span className="text-xs text-[#647067] font-medium">{st.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Multi-Tab Search Box Card */}
@@ -278,7 +283,7 @@ export function HeroSearch({ onSearch, selectedCity, onCityChange }: HeroSearchP
           {/* Quick Search Chips */}
           <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
             <span className="text-xs font-semibold text-[#647067] mr-1 hidden sm:inline">Quick Filters:</span>
-            {QUICK_CHIPS.map((chip) => {
+            {(hero?.quickChips || []).map((chip) => {
               const isSelected = activeChip === chip.filterKey
               return (
                 <button

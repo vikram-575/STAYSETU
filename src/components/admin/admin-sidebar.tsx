@@ -5,7 +5,7 @@ import Link from 'next/link'
 import {
   LayoutDashboard, Store, MessageCircleQuestion, Network,
   Users2, Landmark, Building2, UserCog, ShieldAlert,
-  Radio, Cpu, ChevronRight, Sparkles, Calendar, Eye, Plus
+  Radio, Cpu, ChevronRight, Sparkles, Calendar, Eye, Plus, Globe
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AdminMode } from './admin-header'
@@ -25,6 +25,7 @@ export type AdminTabId =
   | 'communications'
   | 'system-health'
   | 'onboard'
+  | 'website-cms'
 
 interface NavItem {
   id: AdminTabId
@@ -108,6 +109,18 @@ export default function AdminSidebar({
       ],
     },
     {
+      title: 'Website CMS & Portal',
+      items: [
+        {
+          id: 'website-cms',
+          label: 'Website CMS & Live Editor',
+          icon: Globe,
+          badge: 'Live CMS',
+          badgeVariant: 'emerald',
+        },
+      ],
+    },
+    {
       title: 'Infrastructure & Governance',
       items: [
         { id: 'system-health', label: 'System Health & Audit Logs', icon: Cpu },
@@ -149,6 +162,18 @@ export default function AdminSidebar({
           href: '/onboarding?returnTo=/admin',
         },
         { id: 'promotions', label: 'Featured Listings & Ranks', icon: Sparkles },
+      ],
+    },
+    {
+      title: 'Website CMS & Portal',
+      items: [
+        {
+          id: 'website-cms',
+          label: 'Website CMS & Live Editor',
+          icon: Globe,
+          badge: 'Live CMS',
+          badgeVariant: 'amber',
+        },
       ],
     },
     {

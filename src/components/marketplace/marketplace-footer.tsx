@@ -2,28 +2,59 @@
 
 import React from 'react'
 import Link from 'next/link'
-import { Building2, ShieldCheck, Mail, Phone, Heart, ExternalLink } from 'lucide-react'
+import { Building2, ShieldCheck, Mail, Phone, Heart, ExternalLink, MapPin, Clock } from 'lucide-react'
+import { useWebsiteContent } from '@/context/website-content-context'
+import { SectionEditButton } from './website-admin-quick-edit'
 
 export function MarketplaceFooter() {
+  const { content } = useWebsiteContent()
+  const footer = content?.footer
+
   return (
-    <footer className="border-t border-gray-200 bg-white text-xs text-[#647067]">
+    <footer className="border-t border-gray-200 bg-white text-xs text-[#647067] relative">
       {/* Upper Footer Links */}
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-5">
           {/* Col 1: Brand info */}
           <div className="lg:col-span-2 space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#14532D] to-[#16A34A] text-white">
-                <Building2 className="h-5 w-5" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#14532D] to-[#16A34A] text-white">
+                  <Building2 className="h-5 w-5" />
+                </div>
+                <span className="text-lg font-bold text-[#14532D]">PGSetu</span>
               </div>
-              <span className="text-lg font-bold text-[#14532D]">PGSetu</span>
+              <SectionEditButton section="footer" label="Edit Footer" />
             </div>
             <p className="max-w-sm text-xs leading-relaxed text-[#647067]">
-              India’s high-trust PG and rental property discovery platform. Connecting tenants directly with genuine property owners with zero brokerage, verified listings, and automated digital rent passbooks.
+              {footer?.aboutText ||
+                'India’s high-trust PG and rental property discovery platform. Connecting tenants directly with genuine property owners with zero brokerage, verified listings, and automated digital rent passbooks.'}
             </p>
             <div className="flex items-center gap-2 pt-1 text-[11px] font-semibold text-[#14532D]">
               <ShieldCheck className="h-4 w-4 text-[#16A34A]" />
-              <span>Certified Safe & Zero Brokerage Guaranteed</span>
+              <span>{footer?.guaranteeText || 'Certified Safe & Zero Brokerage Guaranteed'}</span>
+            </div>
+
+            {/* Direct Contact Info */}
+            <div className="pt-2 space-y-1.5 text-xs">
+              {footer?.phone && (
+                <div className="flex items-center gap-2 text-slate-700 font-semibold">
+                  <Phone className="w-3.5 h-3.5 text-[#16A34A]" />
+                  <span>{footer.phone}</span>
+                </div>
+              )}
+              {footer?.email && (
+                <div className="flex items-center gap-2 text-slate-700">
+                  <Mail className="w-3.5 h-3.5 text-[#16A34A]" />
+                  <span>{footer.email}</span>
+                </div>
+              )}
+              {footer?.address && (
+                <div className="flex items-start gap-2 text-[11px] text-slate-500">
+                  <MapPin className="w-3.5 h-3.5 text-[#16A34A] shrink-0 mt-0.5" />
+                  <span>{footer.address}</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -119,7 +150,7 @@ export function MarketplaceFooter() {
       {/* Bottom Copyright Bar */}
       <div className="border-t border-gray-100 bg-[#F7FAF7] py-4">
         <div className="mx-auto flex max-w-7xl flex-col sm:flex-row items-center justify-between px-4 sm:px-6 lg:px-8 gap-2 text-[11px]">
-          <p>© 2026 PGSetu PropTech Technologies Pvt. Ltd. All rights reserved.</p>
+          <p>{footer?.copyrightText || '© 2026 PGSetu PropTech Technologies Pvt. Ltd. All rights reserved.'}</p>
           <div className="flex items-center gap-4">
             <span className="hover:text-gray-900 cursor-pointer">Privacy Policy</span>
             <span className="hover:text-gray-900 cursor-pointer">Terms of Service</span>

@@ -16,6 +16,7 @@ import SafetyTab from '@/components/admin/safety-tab'
 import CommunicationsTab from '@/components/admin/communications-tab'
 import SystemHealthTab from '@/components/admin/system-health-tab'
 import UsersTab from '@/components/admin/users-tab'
+import WebsiteCmsTab from '@/components/admin/website-cms-tab'
 import { Loader2 } from 'lucide-react'
 
 function AdminContent() {
@@ -163,6 +164,9 @@ function AdminContent() {
           {currentTab === 'safety' && <SafetyTab />}
           {currentTab === 'communications' && <CommunicationsTab />}
           {currentTab === 'system-health' && <SystemHealthTab />}
+          {currentTab === 'website-cms' && (
+            <WebsiteCmsTab initialSection={searchParams.get('section') || undefined} />
+          )}
         </main>
       </div>
 

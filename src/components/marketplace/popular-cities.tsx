@@ -3,7 +3,8 @@
 import React from 'react'
 import Image from 'next/image'
 import { MapPin, ArrowRight, Building, Sparkles } from 'lucide-react'
-import { POPULAR_CITIES } from '@/data/mock-properties'
+import { useWebsiteContent } from '@/context/website-content-context'
+import { SectionEditButton } from './website-admin-quick-edit'
 
 interface PopularCitiesProps {
   onSelectCity: (cityName: string) => void
@@ -11,6 +12,10 @@ interface PopularCitiesProps {
 }
 
 export function PopularCities({ onSelectCity, activeCity }: PopularCitiesProps) {
+  const { content } = useWebsiteContent()
+  const citiesData = content?.cities
+  const citiesList = citiesData?.cities || []
+
   const handleCityClick = (cityName: string) => {
     onSelectCity(cityName)
     const target = document.getElementById('featured-properties')
@@ -20,20 +25,24 @@ export function PopularCities({ onSelectCity, activeCity }: PopularCitiesProps) 
   }
 
   return (
-    <section id="popular-cities" className="bg-white py-14 sm:py-20">
+    <section id="popular-cities" className="bg-white py-14 sm:py-20 relative">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
           <div>
-            <div className="inline-flex items-center gap-1.5 rounded-full bg-[#DCFCE7] px-3 py-1 text-xs font-bold text-[#14532D]">
-              <Building className="h-3.5 w-3.5 text-[#16A34A]" />
-              <span>Top Rental Hubs</span>
+            <div className="flex items-center gap-2">
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-[#DCFCE7] px-3 py-1 text-xs font-bold text-[#14532D]">
+                <Building className="h-3.5 w-3.5 text-[#16A34A]" />
+                <span>{citiesData?.badge || 'Top Rental Hubs'}</span>
+              </div>
+              <SectionEditButton section="cities" label="Edit Cities" />
             </div>
             <h2 className="mt-2 text-2xl font-bold tracking-tight text-[#14532D] sm:text-3xl">
-              Explore Popular Cities
+              {citiesData?.title || 'Explore Popular Cities'}
             </h2>
             <p className="mt-1 text-sm text-[#647067]">
-              Find verified PGs, shared rooms, and independent flats across India’s major IT and educational centres.
+              {citiesData?.subtitle ||
+                'Find verified PGs, shared rooms, and independent flats across India’s major IT and educational centres.'}
             </p>
           </div>
 
@@ -41,14 +50,14 @@ export function PopularCities({ onSelectCity, activeCity }: PopularCitiesProps) 
             onClick={() => handleCityClick('all')}
             className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#16A34A] hover:underline"
           >
-            <span>View all 10 cities</span>
+            <span>View all {citiesList.length} cities</span>
             <ArrowRight className="h-4 w-4" />
           </button>
         </div>
 
-        {/* 10 Cities Grid */}
+        {/* Cities Grid */}
         <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-          {POPULAR_CITIES.map((city) => {
+          {citiesList.map((city) => {
             const isSelected = activeCity === city.name
             return (
               <div

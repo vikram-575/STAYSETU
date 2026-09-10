@@ -31,6 +31,8 @@ import {
 import { MarketplaceNavbar } from '@/components/marketplace/marketplace-navbar'
 import { MarketplaceFooter } from '@/components/marketplace/marketplace-footer'
 import { ListPropertyModal } from '@/components/marketplace/list-property-modal'
+import { useWebsiteContent } from '@/context/website-content-context'
+import { SectionEditButton, FloatingWebsiteAdminBar } from '@/components/marketplace/website-admin-quick-edit'
 
 const ERP_MODULES = [
   {
@@ -248,13 +250,17 @@ const FAQS = [
 ]
 
 export default function ErpSoftwareShowcasePage() {
-  const [activeModule, setActiveModule] = useState(ERP_MODULES[0].id)
+  const { content } = useWebsiteContent()
+  const sw = content?.softwarePage
+  const modulesList = sw?.modules && sw.modules.length > 0 ? sw.modules : ERP_MODULES
+
+  const [activeModule, setActiveModule] = useState(modulesList[0]?.id || 'billing')
   const [bedCount, setBedCount] = useState<number>(60)
   const [annualBilling, setAnnualBilling] = useState(true)
   const [openFaq, setOpenFaq] = useState<number | null>(0)
   const [isListModalOpen, setIsListModalOpen] = useState(false)
 
-  const selectedModule = ERP_MODULES.find((m) => m.id === activeModule) || ERP_MODULES[0]
+  const selectedModule = modulesList.find((m) => m.id === activeModule) || modulesList[0]
 
   // ROI calculations based on bed count
   const hoursSaved = Math.round(bedCount * 0.45)
@@ -263,7 +269,7 @@ export default function ErpSoftwareShowcasePage() {
   const totalAnnualSavings = (rentRecovered + electricitySaved) * 12
 
   return (
-    <div className="min-h-screen bg-[#F7FAF7] text-[#17211B] flex flex-col font-sans selection:bg-[#DCFCE7] selection:text-[#14532D]">
+    <div className="min-h-screen bg-[#F7FAF7] text-[#17211B] flex flex-col font-sans selection:bg-[#DCFCE7] selection:text-[#14532D] relative">
       {/* 1. Navigation Header */}
       <MarketplaceNavbar
         onOpenListModal={() => setIsListModalOpen(true)}
@@ -280,22 +286,23 @@ export default function ErpSoftwareShowcasePage() {
 
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-4xl text-center">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#16A34A]/25 bg-[#DCFCE7]/70 px-4 py-1.5 text-xs font-bold text-[#14532D] shadow-2xs">
-                <Sparkles className="h-4 w-4 text-[#16A34A]" />
-                <span>India’s Most Powerful Property ERP for PGs & Hostels</span>
-                <span className="text-gray-400">•</span>
-                <span className="text-[#F59E0B]">PRO Edition</span>
+              <div className="flex items-center justify-center gap-3">
+                <div className="inline-flex items-center gap-2 rounded-full border border-[#16A34A]/25 bg-[#DCFCE7]/70 px-4 py-1.5 text-xs font-bold text-[#14532D] shadow-2xs">
+                  <Sparkles className="h-4 w-4 text-[#16A34A]" />
+                  <span>{sw?.badge || 'India’s Most Powerful Property ERP for PGs & Hostels'}</span>
+                  <span className="text-gray-400">•</span>
+                  <span className="text-[#F59E0B]">PRO Edition</span>
+                </div>
+                <SectionEditButton section="software" label="Edit Software Page" />
               </div>
 
               <h1 className="mt-6 text-3xl font-black tracking-tight text-[#14532D] sm:text-5xl lg:text-6xl leading-tight">
-                Automate Rent, Electricity & Tenants on{' '}
-                <span className="bg-gradient-to-r from-[#16A34A] to-[#14532D] bg-clip-text text-transparent">
-                  One Unified ERP System
-                </span>
+                {sw?.heroHeadline || 'Automate Rent, Electricity & Tenants on One Unified ERP System'}
               </h1>
 
               <p className="mx-auto mt-5 max-w-2xl text-base sm:text-lg text-[#647067] leading-relaxed">
-                Say goodbye to paper registers, lost electricity chits, and late rent excuses. PG-SETU ERP manages your entire property portfolio with 1-click bulk invoicing, live digital passbooks, direct UPI QR collections, and Govt. Aadhaar KYC.
+                {sw?.heroSubtitle ||
+                  'Say goodbye to paper registers, lost electricity chits, and late rent excuses. PG-SETU ERP manages your entire property portfolio with 1-click bulk invoicing, live digital passbooks, direct UPI QR collections, and Govt. Aadhaar KYC.'}
               </p>
 
               {/* CTAs */}
@@ -962,6 +969,9 @@ export default function ErpSoftwareShowcasePage() {
         isOpen={isListModalOpen}
         onClose={() => setIsListModalOpen(false)}
       />
+
+      {/* Floating Website Live Admin Editor Bar */}
+      <FloatingWebsiteAdminBar />
     </div>
   )
 }

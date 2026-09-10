@@ -15,7 +15,10 @@ import {
   GitCompare,
   Heart,
   PhoneCall,
+  Megaphone,
 } from 'lucide-react'
+import { useWebsiteContent } from '@/context/website-content-context'
+import { SectionEditButton } from './website-admin-quick-edit'
 
 interface MarketplaceNavbarProps {
   onOpenListModal: () => void
@@ -33,6 +36,8 @@ export function MarketplaceNavbar({
   onScrollToSection,
 }: MarketplaceNavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const { content } = useWebsiteContent()
+  const announcement = content?.announcement
 
   const handleNavClick = (sectionId: string) => {
     setMobileMenuOpen(false)
@@ -47,7 +52,38 @@ export function MarketplaceNavbar({
   }
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-gray-200/80 bg-white/95 backdrop-blur-md shadow-xs transition-all">
+    <>
+      {/* Top Announcement Bar */}
+      {announcement?.enabled && announcement?.text && (
+        <aside aria-label="Announcement" className="relative z-50 bg-gradient-to-r from-[#14532D] via-[#166534] to-[#14532D] text-white text-xs px-4 py-2 border-b border-[#16A34A]/30">
+          <div className="mx-auto max-w-7xl flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 truncate">
+              {announcement.badge && (
+                <span className="rounded-full bg-[#FEF3C7] text-[#14532D] font-black text-[10px] px-2 py-0.5 uppercase tracking-wider shrink-0">
+                  {announcement.badge}
+                </span>
+              )}
+              <span className="font-medium truncate text-gray-100">
+                {announcement.text}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {announcement.linkText && (
+                <Link
+                  href={announcement.linkUrl || '/#featured-properties'}
+                  className="font-bold text-[#DCFCE7] hover:text-white underline text-xs"
+                >
+                  {announcement.linkText} →
+                </Link>
+              )}
+              <SectionEditButton section="announcement" label="Edit Banner" className="scale-90" />
+            </div>
+          </div>
+        </aside>
+      )}
+
+      <header className="sticky top-0 z-40 w-full border-b border-gray-200/80 bg-white/95 backdrop-blur-md shadow-xs transition-all">
       <div className="mx-auto flex h-18 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Brand Logo */}
         <Link href="/" className="group flex items-center gap-2.5">
@@ -249,5 +285,6 @@ export function MarketplaceNavbar({
         </div>
       )}
     </header>
+    </>
   )
 }

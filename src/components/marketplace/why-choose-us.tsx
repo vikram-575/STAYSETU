@@ -2,57 +2,35 @@
 
 import React from 'react'
 import { Check, X, Shield, Sparkles, TrendingUp, Users, Building, HeartHandshake } from 'lucide-react'
+import { useWebsiteContent } from '@/context/website-content-context'
+import { SectionEditButton } from './website-admin-quick-edit'
 
-const COMPARISON_ROWS = [
-  {
-    feature: 'Brokerage & Commission',
-    traditional: '1 to 2 months rent (₹15,000 – ₹40,000 lost)',
-    pgSetu: '₹0 Zero Brokerage — Always direct to owner',
-  },
-  {
-    feature: 'Photo & Amenity Verification',
-    traditional: 'Misleading stock photos, surprise roommates',
-    pgSetu: '100% In-person verified with actual room photos',
-  },
-  {
-    feature: 'Electricity & Sub-metering',
-    traditional: 'Arbitrary inflated unit rates (₹12 – ₹16/unit)',
-    pgSetu: 'Govt. tariff sub-meter readings visible in App passbook',
-  },
-  {
-    feature: 'Security Deposit Refund',
-    traditional: 'Frequent non-refunds and phantom deductions',
-    pgSetu: 'Digitized move-in checklist + dispute concierge',
-  },
-  {
-    feature: 'Official Rent Receipts & HRA',
-    traditional: 'Handwritten slips or no receipts for tax exemption',
-    pgSetu: 'Automated 1-click tax receipts & HRA statements',
-  },
-]
-
-const STATS = [
-  { value: '15,000+', label: 'Verified Beds & Flats', icon: Building },
-  { value: '42,000+', label: 'Happy Tenants Moved In', icon: Users },
-  { value: '₹0', label: 'Brokerage Paid By Renters', icon: Shield },
-  { value: '4.9 / 5', label: 'Average Trust Rating', icon: HeartHandshake },
-]
+const STAT_ICONS = [Building, Users, Shield, HeartHandshake]
 
 export function WhyChooseUs() {
+  const { content } = useWebsiteContent()
+  const whyData = content?.whyChooseUs
+  const rows = whyData?.rows || []
+  const stats = whyData?.stats || []
+
   return (
-    <section id="why-choose-us" className="bg-[#F7FAF7] py-16 sm:py-24 border-t border-gray-200/70">
+    <section id="why-choose-us" className="bg-[#F7FAF7] py-16 sm:py-24 border-t border-gray-200/70 relative">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center">
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-[#DCFCE7] px-3.5 py-1 text-xs font-bold text-[#14532D]">
-            <Sparkles className="h-3.5 w-3.5 text-[#16A34A]" />
-            <span>Why Choose PGSetu</span>
+          <div className="flex items-center justify-center gap-2">
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-[#DCFCE7] px-3.5 py-1 text-xs font-bold text-[#14532D]">
+              <Sparkles className="h-3.5 w-3.5 text-[#16A34A]" />
+              <span>{whyData?.badge || 'Why Choose PGSetu'}</span>
+            </div>
+            <SectionEditButton section="comparison" label="Edit Comparison" />
           </div>
           <h2 className="mt-3 text-2xl sm:text-4xl font-extrabold text-[#14532D]">
-            How We Are Rebuilding Renter Trust
+            {whyData?.title || 'How We Are Rebuilding Renter Trust'}
           </h2>
           <p className="mx-auto mt-2 max-w-2xl text-sm sm:text-base text-[#647067]">
-            Traditional renting was built around brokers and middlemen. PGSetu is built around tenants and genuine property owners.
+            {whyData?.subtitle ||
+              'Traditional renting was built around brokers and middlemen. PGSetu is built around tenants and genuine property owners.'}
           </p>
         </div>
 
@@ -73,8 +51,8 @@ export function WhyChooseUs() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {COMPARISON_ROWS.map((row, i) => (
-                <tr key={i} className="hover:bg-gray-50/50 transition">
+              {rows.map((row, i) => (
+                <tr key={row.id || i} className="hover:bg-gray-50/50 transition">
                   <td className="p-4 sm:p-5 font-bold text-[#17211B]">{row.feature}</td>
                   <td className="p-4 sm:p-5 text-gray-500">
                     <div className="flex items-start gap-2">
@@ -100,8 +78,8 @@ export function WhyChooseUs() {
 
         {/* Counter Stats Grid */}
         <div className="mt-14 grid grid-cols-2 lg:grid-cols-4 gap-6">
-          {STATS.map((stat, idx) => {
-            const Icon = stat.icon
+          {stats.map((stat, idx) => {
+            const Icon = STAT_ICONS[idx % STAT_ICONS.length]
             return (
               <div
                 key={idx}

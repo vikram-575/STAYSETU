@@ -4,7 +4,7 @@ import React from 'react'
 import Link from 'next/link'
 import {
   ShieldCheck, Search, LayoutDashboard, ExternalLink,
-  Activity, Bell, Plus, Sparkles, Command, Building2, Store
+  Activity, Bell, Plus, Sparkles, Command, Building2, Store, Globe
 } from 'lucide-react'
 import AdminLogoutButton from '@/components/admin/admin-logout-button'
 import { cn } from '@/lib/utils'
@@ -128,6 +128,16 @@ export default function AdminHeader({
             <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
             <span className="hidden sm:inline">Onboard New PG</span>
             <span className="sm:hidden">Onboard</span>
+          </Link>
+
+          {/* Website CMS Quick Link */}
+          <Link
+            href="/admin?tab=website-cms"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-950/70 hover:bg-emerald-900/80 border border-emerald-500/40 text-emerald-300 text-xs font-bold rounded-xl shadow-sm transition"
+            title="Edit Website Content (CMS)"
+          >
+            <Globe className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden md:inline">Website CMS</span>
           </Link>
 
           {/* Mobile Search Icon */}
