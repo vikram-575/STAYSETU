@@ -5,7 +5,7 @@ import Link from 'next/link'
 import {
   LayoutDashboard, Store, MessageCircleQuestion, Network,
   Users2, Landmark, Building2, UserCog, ShieldAlert,
-  Radio, Cpu, ChevronRight, Sparkles, Calendar, Eye, Plus, Globe
+  Radio, Cpu, ChevronRight, Sparkles, Calendar, Eye, Plus, Globe, UserCheck
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AdminMode } from './admin-header'
@@ -26,6 +26,7 @@ export type AdminTabId =
   | 'system-health'
   | 'onboard'
   | 'website-cms'
+  | 'profiles'
 
 interface NavItem {
   id: AdminTabId
@@ -88,6 +89,13 @@ export default function AdminSidebar({
           badgeVariant: 'amber',
         },
         { id: 'users', label: 'Staff & Role Privileges', icon: UserCog },
+        {
+          id: 'profiles',
+          label: 'Marketplace Profiles',
+          icon: UserCheck,
+          badge: 'Tenant+Owner',
+          badgeVariant: 'slate',
+        },
       ],
     },
     {
@@ -180,6 +188,18 @@ export default function AdminSidebar({
       title: 'Trust & Fraud Radar',
       items: [
         { id: 'safety', label: 'Listing Fraud & Reports', icon: ShieldAlert },
+      ],
+    },
+    {
+      title: 'Marketplace Profiles',
+      items: [
+        {
+          id: 'profiles',
+          label: 'Tenant & Owner Profiles',
+          icon: UserCheck,
+          badge: 'ID Registry',
+          badgeVariant: 'emerald',
+        },
       ],
     },
     {

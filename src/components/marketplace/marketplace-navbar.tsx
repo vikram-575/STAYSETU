@@ -170,6 +170,14 @@ export function MarketplaceNavbar({
             <span>Owner Login</span>
           </Link>
 
+          {/* Create / My Profile CTA */}
+          <Link
+            href="/create-profile"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[#DCFCE7] bg-emerald-50 px-3.5 py-2 text-xs font-bold text-[#14532D] hover:bg-emerald-100 transition"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
+            <span>Create Profile</span>
+          </Link>
           {/* List Your Property CTA Button */}
           <button
             onClick={onOpenListModal}
@@ -267,7 +275,26 @@ export function MarketplaceNavbar({
 
             <div className="grid grid-cols-2 gap-2 pt-1">
               <Link
+                href="/create-profile"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-[#DCFCE7] bg-emerald-50 py-2.5 text-xs font-bold text-[#14532D] hover:bg-emerald-100"
+              >
+                <Sparkles className="h-4 w-4 text-emerald-600" />
+                <span>Create Profile</span>
+              </Link>
+              <Link
+                href="/my-profile"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 py-2.5 text-xs font-semibold text-[#17211B] hover:bg-gray-50"
+              >
+                <span>My Profile</span>
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <Link
                 href="/portal"
+                onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 py-2.5 text-xs font-semibold text-[#17211B] hover:bg-gray-50"
               >
                 <KeyRound className="h-4 w-4 text-[#16A34A]" />
@@ -275,6 +302,7 @@ export function MarketplaceNavbar({
               </Link>
               <Link
                 href="/login"
+                onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 py-2.5 text-xs font-semibold text-[#17211B] hover:bg-gray-50"
               >
                 <LogIn className="h-4 w-4 text-[#647067]" />

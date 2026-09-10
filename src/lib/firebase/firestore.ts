@@ -22,6 +22,8 @@ export const COLLECTIONS = {
   DEPOSITS: 'deposits',
   MESSAGES: 'messages',
   TEMPLATES: 'message_templates',
+  TENANT_PROFILES: 'tenant_profiles',
+  OWNER_PROFILES: 'owner_profiles',
 } as const
 
 // --- SAFE HELPER FUNCTIONS ---

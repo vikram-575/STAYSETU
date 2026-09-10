@@ -33,6 +33,8 @@ export const COLLECTIONS = {
   EXPENSES: 'expenses',
   DEPOSITS: 'deposits',
   MESSAGES: 'messages',
+  TENANT_PROFILES: 'tenant_profiles',
+  OWNER_PROFILES: 'owner_profiles',
 } as const
 
 /**
