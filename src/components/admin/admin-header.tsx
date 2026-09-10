@@ -120,6 +120,16 @@ export default function AdminHeader({
 
         {/* Action Controls */}
         <div className="flex items-center gap-2">
+          {/* Direct Connect to 7-Step Enterprise Onboarding Wizard */}
+          <Link
+            href="/onboarding?returnTo=/admin"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-600 hover:from-blue-500 hover:via-indigo-500 hover:to-emerald-500 text-white text-xs font-black rounded-xl shadow-lg shadow-blue-500/25 active:scale-95 transition"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+            <span className="hidden sm:inline">Onboard New PG</span>
+            <span className="sm:hidden">Onboard</span>
+          </Link>
+
           {/* Mobile Search Icon */}
           <button
             onClick={onOpenSearch}

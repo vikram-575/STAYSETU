@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import {
   Building2, Search, ShieldCheck, ShieldAlert, KeyRound,
   ExternalLink, Phone, Mail, MapPin, CheckCircle2,
-  Clock, AlertTriangle, ChevronRight, X, Loader2, Edit3
+  Clock, AlertTriangle, ChevronRight, X, Loader2, Edit3, Sparkles, Plus
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/money'
 import { formatDate } from '@/lib/utils'
@@ -137,6 +138,14 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          <Link
+            href="/onboarding?returnTo=/admin"
+            className="py-2 px-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-600 hover:from-blue-500 hover:to-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 shadow-lg shadow-blue-500/20 active:scale-95"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+            <span>Onboard New PG (Wizard)</span>
+          </Link>
+
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -191,7 +200,15 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
               ) : filteredOrgs.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="text-center py-12 text-slate-500 text-xs">
-                    No PG owners matching search criteria.
+                    <Building2 className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                    <p className="font-bold text-slate-400">No PG organizations matching your search criteria.</p>
+                    <Link
+                      href="/onboarding?returnTo=/admin"
+                      className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:underline mt-2 font-bold"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                      Launch 7-Step Enterprise Onboarding Wizard →
+                    </Link>
                   </td>
                 </tr>
               ) : (

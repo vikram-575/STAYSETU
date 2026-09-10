@@ -1,10 +1,11 @@
 'use client'
 
 import React from 'react'
+import Link from 'next/link'
 import {
   LayoutDashboard, Store, MessageCircleQuestion, Network,
   Users2, Landmark, Building2, UserCog, ShieldAlert,
-  Radio, Cpu, ChevronRight, Sparkles, Calendar, Eye
+  Radio, Cpu, ChevronRight, Sparkles, Calendar, Eye, Plus
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AdminMode } from './admin-header'
@@ -23,6 +24,7 @@ export type AdminTabId =
   | 'safety'
   | 'communications'
   | 'system-health'
+  | 'onboard'
 
 interface NavItem {
   id: AdminTabId
@@ -30,6 +32,7 @@ interface NavItem {
   icon: React.ElementType
   badge?: number | string
   badgeVariant?: 'emerald' | 'amber' | 'rose' | 'slate'
+  href?: string
 }
 
 interface NavSection {
@@ -66,8 +69,16 @@ export default function AdminSidebar({
       ],
     },
     {
-      title: 'Partners & Staff',
+      title: 'Partners & Onboarding',
       items: [
+        {
+          id: 'onboard',
+          label: 'Onboard New PG',
+          icon: Sparkles,
+          badge: 'Wizard',
+          badgeVariant: 'emerald',
+          href: '/onboarding?returnTo=/admin',
+        },
         {
           id: 'owners',
           label: 'Owners CRM & KYC',
@@ -127,8 +138,16 @@ export default function AdminSidebar({
       ],
     },
     {
-      title: 'Promotions & Featured Slots',
+      title: 'Promotions & Onboarding',
       items: [
+        {
+          id: 'onboard',
+          label: 'Onboard New Property',
+          icon: Sparkles,
+          badge: 'Wizard',
+          badgeVariant: 'amber',
+          href: '/onboarding?returnTo=/admin',
+        },
         { id: 'promotions', label: 'Featured Listings & Ranks', icon: Sparkles },
       ],
     },
@@ -149,8 +168,8 @@ export default function AdminSidebar({
   const sections = currentMode === 'erp' ? erpSections : rentingSections
 
   return (
-    <aside className="w-full lg:w-64 shrink-0 space-y-6">
-      <nav className="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-3 space-y-5 shadow-xl">
+    <aside className="w-full lg:w-64 shrink-0 space-y-4">
+      <nav className="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-3 space-y-4 shadow-xl">
         {/* Mode Label Banner */}
         <div className="px-3 py-2 bg-slate-950/70 rounded-xl border border-slate-800 flex items-center justify-between text-[10px] font-mono">
           <span className="text-slate-400 uppercase font-bold">Active Control Center</span>
@@ -166,6 +185,23 @@ export default function AdminSidebar({
           </span>
         </div>
 
+        {/* 7-Step Enterprise Onboarding Wizard Card */}
+        <Link
+          href="/onboarding?returnTo=/admin"
+          className="w-full flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-blue-600/20 via-indigo-600/20 to-emerald-600/20 hover:from-blue-600/30 hover:to-emerald-600/30 border border-blue-500/30 hover:border-emerald-500/40 text-xs font-bold text-white transition group shadow-lg"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-7 h-7 bg-gradient-to-tr from-blue-600 to-indigo-500 text-white rounded-lg flex items-center justify-center shrink-0 shadow-md">
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+            </div>
+            <div className="truncate">
+              <div className="text-white font-bold text-xs truncate">Onboard New PG</div>
+              <div className="text-[10px] text-blue-300/80 font-medium">7-Step Enterprise Wizard</div>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-blue-400 group-hover:translate-x-0.5 transition shrink-0" />
+        </Link>
+
         {sections.map((section, idx) => (
           <div key={idx} className="space-y-1">
             <h4 className="px-3 text-[11px] font-black uppercase tracking-wider text-slate-400">
@@ -175,6 +211,29 @@ export default function AdminSidebar({
               {section.items.map((item) => {
                 const Icon = item.icon
                 const isActive = currentTab === item.id
+
+                if (item.href) {
+                  return (
+                    <Link
+                      key={item.id}
+                      href={item.href}
+                      className={cn(
+                        'w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition group text-left',
+                        'text-blue-300 hover:text-white bg-blue-950/30 hover:bg-blue-900/50 border border-blue-800/40'
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <Icon className="w-4 h-4 shrink-0 text-amber-300" />
+                        <span className="truncate font-bold">{item.label}</span>
+                      </div>
+                      {item.badge && (
+                        <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30 uppercase">
+                          {item.badge}
+                        </span>
+                      )}
+                    </Link>
+                  )
+                }
 
                 return (
                   <button

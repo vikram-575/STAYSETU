@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import Link from 'next/link'
 import {
   Store, CheckCircle2, XCircle, AlertTriangle, Sparkles,
   Eye, Search, Filter, ShieldCheck, ShieldAlert, Clock,
@@ -147,8 +148,16 @@ export default function MarketplaceTab() {
           </button>
         </div>
 
-        {subTab === 'listings' && (
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
+          <Link
+            href="/onboarding?returnTo=/admin?mode=renting"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-amber-600 via-orange-600 to-emerald-600 hover:from-amber-500 hover:to-emerald-500 text-white rounded-xl text-xs font-bold transition shrink-0 shadow-md shadow-amber-500/20 active:scale-95"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-200" />
+            <span>Onboard Property (Wizard)</span>
+          </Link>
+
+          {subTab === 'listings' && (
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -161,8 +170,8 @@ export default function MarketplaceTab() {
               <option value="suspended">Suspended</option>
               <option value="rejected">Rejected</option>
             </select>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* 1. LISTINGS MODERATION TABLE */}

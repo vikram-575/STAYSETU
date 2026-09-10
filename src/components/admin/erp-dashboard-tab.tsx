@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import Link from 'next/link'
 import {
   Users, Building2, BedDouble, Landmark, ShieldCheck,
   AlertCircle, TrendingUp, Sparkles, CheckCircle2,
@@ -57,6 +58,14 @@ export default function ErpDashboardTab({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          <Link
+            href="/onboarding?returnTo=/admin"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-600 hover:from-blue-500 hover:to-emerald-500 text-white rounded-xl text-xs font-black shadow-lg shadow-blue-500/25 active:scale-95 transition"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+            <span>Onboard New PG (Wizard) →</span>
+          </Link>
+
           <button
             onClick={onRefresh}
             className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold border border-slate-700 transition"
