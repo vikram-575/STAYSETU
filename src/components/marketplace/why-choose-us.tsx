@@ -7,27 +7,27 @@ const COMPARISON_ROWS = [
   {
     feature: 'Brokerage & Commission',
     traditional: '1 to 2 months rent (₹15,000 – ₹40,000 lost)',
-    staySetu: '₹0 Zero Brokerage — Always direct to owner',
+    pgSetu: '₹0 Zero Brokerage — Always direct to owner',
   },
   {
     feature: 'Photo & Amenity Verification',
     traditional: 'Misleading stock photos, surprise roommates',
-    staySetu: '100% In-person verified with actual room photos',
+    pgSetu: '100% In-person verified with actual room photos',
   },
   {
     feature: 'Electricity & Sub-metering',
     traditional: 'Arbitrary inflated unit rates (₹12 – ₹16/unit)',
-    staySetu: 'Govt. tariff sub-meter readings visible in App passbook',
+    pgSetu: 'Govt. tariff sub-meter readings visible in App passbook',
   },
   {
     feature: 'Security Deposit Refund',
     traditional: 'Frequent non-refunds and phantom deductions',
-    staySetu: 'Digitized move-in checklist + dispute concierge',
+    pgSetu: 'Digitized move-in checklist + dispute concierge',
   },
   {
     feature: 'Official Rent Receipts & HRA',
     traditional: 'Handwritten slips or no receipts for tax exemption',
-    staySetu: 'Automated 1-click tax receipts & HRA statements',
+    pgSetu: 'Automated 1-click tax receipts & HRA statements',
   },
 ]
 
@@ -46,13 +46,13 @@ export function WhyChooseUs() {
         <div className="text-center">
           <div className="inline-flex items-center gap-1.5 rounded-full bg-[#DCFCE7] px-3.5 py-1 text-xs font-bold text-[#14532D]">
             <Sparkles className="h-3.5 w-3.5 text-[#16A34A]" />
-            <span>Why Choose StaySetu</span>
+            <span>Why Choose PGSetu</span>
           </div>
           <h2 className="mt-3 text-2xl sm:text-4xl font-extrabold text-[#14532D]">
             How We Are Rebuilding Renter Trust
           </h2>
           <p className="mx-auto mt-2 max-w-2xl text-sm sm:text-base text-[#647067]">
-            Traditional renting was built around brokers and middlemen. StaySetu is built around tenants and genuine property owners.
+            Traditional renting was built around brokers and middlemen. PGSetu is built around tenants and genuine property owners.
           </p>
         </div>
 
@@ -68,7 +68,7 @@ export function WhyChooseUs() {
                   Traditional Classifieds & Brokers
                 </th>
                 <th className="p-4 sm:p-5 font-bold text-[#14532D] uppercase tracking-wider text-[11px] w-1/3 bg-[#DCFCE7]/40">
-                  StaySetu Marketplace
+                  PGSetu Marketplace
                 </th>
               </tr>
             </thead>
@@ -89,7 +89,7 @@ export function WhyChooseUs() {
                       <div className="flex h-4.5 w-4.5 items-center justify-center rounded-full bg-[#16A34A] text-white shrink-0 mt-0.5">
                         <Check className="h-3 w-3" />
                       </div>
-                      <span>{row.staySetu}</span>
+                      <span>{row.pgSetu}</span>
                     </div>
                   </td>
                 </tr>

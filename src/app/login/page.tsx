@@ -86,7 +86,7 @@ function LoginFormContent() {
           <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#16A34A] to-[#DCFCE7] flex items-center justify-center text-[#14532D] shadow-sm font-black">
             <Building2 className="w-4 h-4" />
           </div>
-          <span className="font-extrabold text-sm tracking-tight">StaySetu</span>
+          <span className="font-extrabold text-sm tracking-tight">PGSetu</span>
         </Link>
         <Link
           href="/portal"
@@ -115,7 +115,7 @@ function LoginFormContent() {
                   <Building2 className="w-5 h-5" />
                 </div>
                 <div>
-                  <span className="text-xl font-black tracking-tight text-white block leading-none">StaySetu</span>
+                  <span className="text-xl font-black tracking-tight text-white block leading-none">PGSetu</span>
                   <span className="text-[10px] font-bold text-[#DCFCE7] tracking-widest uppercase mt-0.5 block">Property ERP Cloud</span>
                 </div>
               </Link>
@@ -219,7 +219,7 @@ function LoginFormContent() {
               <span className="text-xs font-bold text-[#647067]">Enterprise Property Operations</span>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-xs text-[#647067]">Staying in a StaySetu PG?</span>
+              <span className="text-xs text-[#647067]">Staying in a PGSetu PG?</span>
               <Link
                 href="/portal"
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#DCFCE7] text-[#14532D] text-xs font-bold hover:bg-[#bbf7d0] transition border border-[#16A34A]/20"
@@ -399,7 +399,7 @@ function LoginFormContent() {
 
           {/* Bottom Copyright */}
           <div className="relative z-10 text-center lg:text-left text-[11px] text-[#647067]/70 pt-6">
-            © 2026 StaySetu Platform Enterprise · All Rights Reserved
+            © 2026 PGSetu Platform Enterprise · All Rights Reserved
           </div>
         </div>
       </div>

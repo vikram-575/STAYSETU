@@ -42,7 +42,7 @@ export function TrustSection() {
         <div className="text-center">
           <div className="inline-flex items-center gap-1.5 rounded-full bg-[#DCFCE7] px-3 py-1 text-xs font-bold text-[#14532D]">
             <CheckCircle className="h-3.5 w-3.5 text-[#16A34A]" />
-            <span>The StaySetu Trust Standard</span>
+            <span>The PGSetu Trust Standard</span>
           </div>
           <h2 className="mt-3 text-2xl font-bold tracking-tight text-[#14532D] sm:text-3xl lg:text-4xl">
             Renting Made Honest, Transparent & Safe

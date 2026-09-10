@@ -27,7 +27,7 @@ export default function MarketplaceHomePage() {
   // Load wishlist favorites from localStorage on mount
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('staysetu_saved_ids')
+      const saved = localStorage.getItem('pgsetu_saved_ids') || localStorage.getItem('staysetu_saved_ids')
       if (saved) {
         setSavedIds(JSON.parse(saved))
       }
@@ -41,7 +41,7 @@ export default function MarketplaceHomePage() {
         ? prev.filter((id) => id !== propertyId)
         : [...prev, propertyId]
       try {
-        localStorage.setItem('staysetu_saved_ids', JSON.stringify(next))
+        localStorage.setItem('pgsetu_saved_ids', JSON.stringify(next))
       } catch {}
       return next
     })
@@ -135,7 +135,7 @@ export default function MarketplaceHomePage() {
         name: newListingData.ownerName || 'Verified Host',
         phone: newListingData.ownerPhone || '9876543210',
         whatsapp: newListingData.ownerWhatsapp || '919876543210',
-        email: newListingData.ownerEmail || 'host@staysetu.com',
+        email: newListingData.ownerEmail || 'host@pgsetu.com',
         responseRate: '100%',
         responseTime: 'Instant',
         verified: true,
@@ -186,7 +186,7 @@ export default function MarketplaceHomePage() {
           onCityChange={setActiveCity}
         />
 
-        {/* 6. Why Choose StaySetu (Comparison Table) */}
+        {/* 6. Why Choose PGSetu (Comparison Table) */}
         <WhyChooseUs />
 
         {/* 7. Owner CTA Banner */}

@@ -332,7 +332,7 @@ export default function ErpSoftwareShowcasePage() {
                     <span className="h-3 w-3 rounded-full bg-amber-400" />
                     <span className="h-3 w-3 rounded-full bg-emerald-400" />
                     <span className="ml-2 text-xs font-semibold text-gray-500">
-                      https://app.staysetu.com/dashboard
+                      https://app.pgsetu.com/dashboard
                     </span>
                   </div>
                   <div className="inline-flex items-center gap-1.5 rounded-md bg-[#DCFCE7] px-2 py-0.5 text-[10px] font-bold text-[#14532D]">
@@ -478,7 +478,7 @@ export default function ErpSoftwareShowcasePage() {
                       <span>Zero Friction Adoption</span>
                     </div>
                     <p className="text-[#647067] leading-relaxed">
-                      All modules seamlessly sync with your tenant list and the public StaySetu marketplace without requiring duplicate data entry.
+                      All modules seamlessly sync with your tenant list and the public PGSetu marketplace without requiring duplicate data entry.
                     </p>
                   </div>
                 </div>
@@ -843,7 +843,7 @@ export default function ErpSoftwareShowcasePage() {
                 },
                 {
                   quote:
-                    'The daily cash closing feature stopped cash leakage from our reception staff completely. Plus, having our property listed directly on the StaySetu marketplace keeps our occupancy at 98%.',
+                    'The daily cash closing feature stopped cash leakage from our reception staff completely. Plus, having our property listed directly on the PGSetu marketplace keeps our occupancy at 98%.',
                   name: 'Mrs. Rekha Sharma',
                   property: 'Aura Bloom Women’s PG (65 Beds)',
                   city: 'Sector 62, Noida',

@@ -35,7 +35,7 @@ export function OwnerCtaBanner({ onOpenListModal }: OwnerCtaBannerProps) {
             </h2>
 
             <p className="mt-4 text-sm sm:text-base text-gray-200 leading-relaxed max-w-2xl">
-              List your property on StaySetu for free and reach 50,000+ monthly tech workers and students. Connect directly with tenants and power your property with our integrated PG-SETU management software.
+              List your property on PGSetu for free and reach 50,000+ monthly tech workers and students. Connect directly with tenants and power your property with our integrated PG-SETU management software.
             </p>
 
             {/* Feature Highlights Grid */}

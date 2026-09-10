@@ -56,7 +56,7 @@ export function MarketplaceNavbar({
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
-              <span className="text-xl font-bold tracking-tight text-[#14532D]">StaySetu</span>
+              <span className="text-xl font-bold tracking-tight text-[#14532D]">PGSetu</span>
               <span className="inline-flex items-center rounded-full bg-[#DCFCE7] px-1.5 py-0.5 text-[10px] font-semibold text-[#14532D]">
                 Verified
               </span>
@@ -96,7 +96,7 @@ export function MarketplaceNavbar({
             onClick={() => handleNavClick('why-choose-us')}
             className="text-sm font-medium text-[#647067] transition hover:text-[#16A34A]"
           >
-            Why StaySetu
+            Why PGSetu
           </button>
         </nav>
 
@@ -212,7 +212,7 @@ export function MarketplaceNavbar({
               onClick={() => handleNavClick('why-choose-us')}
               className="flex items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-[#17211B] hover:bg-gray-50"
             >
-              <span>Why StaySetu</span>
+              <span>Why PGSetu</span>
               <Sparkles className="h-4 w-4 text-[#F59E0B]" />
             </button>
 

@@ -16,7 +16,7 @@ export function MarketplaceFooter() {
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#14532D] to-[#16A34A] text-white">
                 <Building2 className="h-5 w-5" />
               </div>
-              <span className="text-lg font-bold text-[#14532D]">StaySetu</span>
+              <span className="text-lg font-bold text-[#14532D]">PGSetu</span>
             </div>
             <p className="max-w-sm text-xs leading-relaxed text-[#647067]">
               India’s high-trust PG and rental property discovery platform. Connecting tenants directly with genuine property owners with zero brokerage, verified listings, and automated digital rent passbooks.
@@ -119,7 +119,7 @@ export function MarketplaceFooter() {
       {/* Bottom Copyright Bar */}
       <div className="border-t border-gray-100 bg-[#F7FAF7] py-4">
         <div className="mx-auto flex max-w-7xl flex-col sm:flex-row items-center justify-between px-4 sm:px-6 lg:px-8 gap-2 text-[11px]">
-          <p>© 2026 StaySetu PropTech Technologies Pvt. Ltd. All rights reserved.</p>
+          <p>© 2026 PGSetu PropTech Technologies Pvt. Ltd. All rights reserved.</p>
           <div className="flex items-center gap-4">
             <span className="hover:text-gray-900 cursor-pointer">Privacy Policy</span>
             <span className="hover:text-gray-900 cursor-pointer">Terms of Service</span>

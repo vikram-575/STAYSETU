@@ -156,7 +156,7 @@ export default function ResidentPortalPage() {
               <Building2 className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-base font-black tracking-tight text-[#17211B] block leading-none">StaySetu</span>
+              <span className="text-base font-black tracking-tight text-[#17211B] block leading-none">PGSetu</span>
               <span className="text-[10px] font-bold text-[#16A34A] tracking-wider uppercase mt-0.5 block">Resident Self-Service</span>
             </div>
           </Link>
@@ -264,7 +264,7 @@ export default function ResidentPortalPage() {
           </div>
 
           <p className="text-center text-[10px] text-[#647067]/70 font-medium">
-            © 2026 StaySetu Platform Enterprise · Resident Self-Service Portal
+            © 2026 PGSetu Platform Enterprise · Resident Self-Service Portal
           </p>
         </div>
 

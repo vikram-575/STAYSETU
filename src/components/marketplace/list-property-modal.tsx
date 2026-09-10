@@ -189,7 +189,7 @@ export function ListPropertyModal({ isOpen, onClose, onListingCreated }: ListPro
                 Property Submitted Successfully!
               </h3>
               <p className="mx-auto mt-2 max-w-md text-sm text-[#647067]">
-                Your listing <strong className="text-[#17211B]">{formData.propertyName || 'New Property'}</strong> is being verified by our team and will go live on the StaySetu marketplace within 2 hours.
+                Your listing <strong className="text-[#17211B]">{formData.propertyName || 'New Property'}</strong> is being verified by our team and will go live on the PGSetu marketplace within 2 hours.
               </p>
               <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
                 <button
@@ -758,7 +758,7 @@ export function ListPropertyModal({ isOpen, onClose, onListingCreated }: ListPro
                   </div>
 
                   <div className="rounded-xl bg-[#DCFCE7]/70 p-3 text-xs text-[#14532D] font-medium">
-                    ✓ By publishing, you agree to StaySetu&apos;s Zero Brokerage Direct Guarantee and honest pricing pledge.
+                    ✓ By publishing, you agree to PGSetu&apos;s Zero Brokerage Direct Guarantee and honest pricing pledge.
                   </div>
                 </div>
               )}

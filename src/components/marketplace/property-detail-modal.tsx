@@ -46,7 +46,7 @@ export function PropertyDetailModal({
     email: '',
     moveInDate: 'Immediate',
     sharingChoice: property?.sharingType || 'Single Room',
-    message: 'Hi, I found this property on StaySetu and would like to schedule a visit.',
+    message: 'Hi, I found this property on PGSetu and would like to schedule a visit.',
   })
   const [enquirySubmitted, setEnquirySubmitted] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
@@ -65,7 +65,7 @@ export function PropertyDetailModal({
     if (navigator.share) {
       navigator.share({
         title: property.title,
-        text: `Check out ${property.title} on StaySetu`,
+        text: `Check out ${property.title} on PGSetu`,
         url: window.location.href,
       })
     } else {
@@ -76,7 +76,7 @@ export function PropertyDetailModal({
   }
 
   const whatsappUrl = `https://wa.me/${property.owner.whatsapp}?text=${encodeURIComponent(
-    `Hi ${property.owner.name}, I am interested in ${property.title} listed on StaySetu (${property.sharingType}, ₹${property.price}/mo). Is a bed available for move-in?`
+    `Hi ${property.owner.name}, I am interested in ${property.title} listed on PGSetu (${property.sharingType}, ₹${property.price}/mo). Is a bed available for move-in?`
   )}`
 
   return (

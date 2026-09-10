@@ -1,6 +1,6 @@
-# 🏨 STAYSETU (PG-SETU) — Production PG & Hostel Management System
+# 🏨 PGSETU (PG-SETU) — Production PG & Hostel Management System
 
-**STAYSETU** is a comprehensive, production-grade PG (Paying Guest) and Hostel Management, Resident CRM, Sub-meter Electricity Billing, and Revenue Control System.
+**PGSETU** is a comprehensive, production-grade PG (Paying Guest) and Hostel Management, Resident CRM, Sub-meter Electricity Billing, and Revenue Control System.
 
 Built with **Next.js 15 (App Router)**, **TypeScript**, **Tailwind CSS**, **Supabase (PostgreSQL + RLS + GoTrue Auth)**, and **Capacitor (Android APK Mobile Runtime)**.
 
