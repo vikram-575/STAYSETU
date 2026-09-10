@@ -3,18 +3,17 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import { Plus, ArrowLeft, Building2, BedDouble, CheckCircle2, Loader2 } from 'lucide-react'
 import { rupeesToPaise } from '@/lib/money'
 
 export default function NewRoomPage() {
   const router = useRouter()
-  const supabase = createClient()
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [buildings, setBuildings] = useState<any[]>([])
   const [floors, setFloors] = useState<any[]>([])
+  const [allFloors, setAllFloors] = useState<any[]>([])
 
   const [form, setForm] = useState({
     building_id: '',
@@ -28,27 +27,35 @@ export default function NewRoomPage() {
   })
 
   useEffect(() => {
-    async function loadBuildings() {
-      const { data } = await supabase.from('buildings').select('*').eq('is_active', true)
-      if (data && data.length > 0) {
-        setBuildings(data)
-        setForm((prev) => ({ ...prev, building_id: data[0].id }))
+    async function loadArchitecture() {
+      try {
+        const res = await fetch('/api/residents/checkin')
+        const data = await res.json()
+        if (data.buildings && data.buildings.length > 0) {
+          setBuildings(data.buildings)
+          setAllFloors(data.floors || [])
+          setForm((prev) => ({
+            ...prev,
+            building_id: data.buildings[0].id,
+          }))
+        }
+      } catch (err) {
+        console.error('Failed to load architecture:', err)
       }
     }
-    loadBuildings()
-  }, [supabase])
+    loadArchitecture()
+  }, [])
 
   useEffect(() => {
     if (!form.building_id) return
-    async function loadFloors() {
-      const { data } = await supabase.from('floors').select('*').eq('building_id', form.building_id).order('floor_number')
-      if (data && data.length > 0) {
-        setFloors(data)
-        setForm((prev) => ({ ...prev, floor_id: data[0].id }))
-      }
+    const filteredFloors = allFloors.filter((f) => f.building_id === form.building_id)
+    setFloors(filteredFloors)
+    if (filteredFloors.length > 0) {
+      setForm((prev) => ({ ...prev, floor_id: filteredFloors[0].id }))
+    } else {
+      setForm((prev) => ({ ...prev, floor_id: '' }))
     }
-    loadFloors()
-  }, [form.building_id, supabase])
+  }, [form.building_id, allFloors])
 
   const handleCapacityChange = (cap: number) => {
     const defaultLabels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']

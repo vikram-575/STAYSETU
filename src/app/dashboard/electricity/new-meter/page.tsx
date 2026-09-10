@@ -3,12 +3,10 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import { Zap, ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react'
 
 export default function NewMeterPage() {
   const router = useRouter()
-  const supabase = createClient()
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -24,13 +22,18 @@ export default function NewMeterPage() {
 
   useEffect(() => {
     async function loadRooms() {
-      const { data } = await supabase.from('rooms').select('*, floors(*, buildings(*))').eq('is_active', true)
-      if (data && data.length > 0) {
-        setRooms(data)
+      try {
+        const res = await fetch('/api/rooms')
+        const data = await res.json()
+        if (data.rooms && data.rooms.length > 0) {
+          setRooms(data.rooms)
+        }
+      } catch (err) {
+        console.error('Failed to load rooms:', err)
       }
     }
     loadRooms()
-  }, [supabase])
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

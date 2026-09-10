@@ -1,5 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getAuthenticatedUser } from '@/lib/auth-session'
+
+const isUuid = (id: string | null | undefined): boolean => {
+  if (!id) return false
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+}
 
 /**
  * POST /api/charges
@@ -7,22 +13,19 @@ import { createClient } from '@/lib/supabase/server'
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getAuthenticatedUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('organization_id, role')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile || !['owner', 'manager', 'accountant', 'staff'].includes(profile.role)) {
+    if (!['owner', 'manager', 'accountant', 'staff', 'superadmin'].includes(user.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const orgId = profile.organization_id
-    if (!orgId) return NextResponse.json({ error: 'No active organization found' }, { status: 400 })
+    const serviceClient = await createServiceClient()
+    let orgId = user.organization_id
+    if (!orgId) {
+      const { data: defaultOrg } = await serviceClient.from('organizations').select('id').limit(1).single()
+      orgId = defaultOrg?.id || 'primary'
+    }
 
     const body = await request.json()
     const { resident_id, description, category, quantity, unit_price_paise, total_paise, notes, invoice_id } = body
@@ -31,9 +34,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required charge parameters' }, { status: 400 })
     }
 
+    const validUserId = isUuid(user.id) ? user.id : null
+
     // 1. If linked to an invoice, verify invoice belongs to same org, insert as invoice_item and update invoice balance
     if (invoice_id) {
-      const { data: inv } = await supabase
+      const { data: inv } = await serviceClient
         .from('invoices')
         .select('total_paise, balance_paise')
         .eq('id', invoice_id)
@@ -41,7 +46,7 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (inv) {
-        await supabase.from('invoice_items').insert({
+        await serviceClient.from('invoice_items').insert({
           organization_id: orgId,
           invoice_id,
           description,
@@ -52,7 +57,7 @@ export async function POST(request: NextRequest) {
           notes: notes || null,
         })
 
-        await supabase
+        await serviceClient
           .from('invoices')
           .update({
             total_paise: inv.total_paise + total_paise,
@@ -65,7 +70,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Post Debit Entry to Resident's Append-Only Ledger
-    const { data: ledgerEntry, error: ledgerError } = await supabase
+    const { data: ledgerEntry, error: ledgerError } = await serviceClient
       .from('ledger_entries')
       .insert({
         organization_id: orgId,
@@ -78,7 +83,7 @@ export async function POST(request: NextRequest) {
         debit_paise: total_paise,
         credit_paise: 0,
         notes: notes || null,
-        added_by: user.id,
+        added_by: validUserId,
       })
       .select()
       .single()
@@ -88,9 +93,9 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Audit Log
-    await supabase.from('audit_logs').insert({
+    await serviceClient.from('audit_logs').insert({
       organization_id: orgId,
-      user_id: user.id,
+      user_id: validUserId,
       action: 'charge_add',
       entity_type: 'ledger_entry',
       entity_id: ledgerEntry.id,

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import {
   BarChart3, TrendingUp, Sparkles, BedDouble,
   Calculator, DollarSign, Layers, ArrowUpRight, Loader2
@@ -9,7 +8,6 @@ import {
 import { formatCurrency, rupeesToPaise } from '@/lib/money'
 
 export default function AnalyticsPage() {
-  const supabase = createClient()
   const [loading, setLoading] = useState(true)
   const [roomsData, setRoomsData] = useState<any[]>([])
   const [occupiedBedsCount, setOccupiedBedsCount] = useState(0)
@@ -24,10 +22,10 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     async function loadData() {
-      // Fetch rooms with beds
-      const { data: rooms } = await supabase
-        .from('rooms')
-        .select('*, floors(*, buildings(*)), beds(*, resident_assignments(*))')
+      try {
+        const res = await fetch('/api/rooms')
+        const data = await res.json()
+        const rooms = data.rooms || []
 
       if (rooms) {
         let occupied = 0
@@ -48,12 +46,14 @@ export default function AnalyticsPage() {
         setRoomsData(rooms)
         setOccupiedBedsCount(occupied)
         setTotalBedsCount(total)
-        setTotalMonthlyRentPaise(totalRent)
+        }
+      } catch (err) {
+        console.error('Failed to load rooms for analytics:', err)
       }
       setLoading(false)
     }
     loadData()
-  }, [supabase])
+  }, [])
 
   if (loading) {
     return (

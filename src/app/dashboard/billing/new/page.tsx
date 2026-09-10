@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import {
   FileText, ArrowLeft, Plus, Trash2, CheckCircle2,
   Calendar, Loader2, DollarSign, Calculator
@@ -12,7 +11,6 @@ import { formatCurrency, rupeesToPaise, paiseToRupees } from '@/lib/money'
 
 export default function NewInvoicePage() {
   const router = useRouter()
-  const supabase = createClient()
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -36,24 +34,24 @@ export default function NewInvoicePage() {
 
   useEffect(() => {
     async function loadActiveResidents() {
-      const { data } = await supabase
-        .from('v_resident_current')
-        .select('*')
-        .eq('status', 'active')
-        .order('full_name')
-
-      if (data && data.length > 0) {
-        setResidents(data)
-        setSelectedResidentId(data[0].resident_id)
-        if (data[0].monthly_rent_paise) {
-          setItems([
-            { description: 'Monthly Bed Rent', category: 'rent', quantity: 1, unit_price_rupees: data[0].monthly_rent_paise / 100 },
-          ])
+      try {
+        const res = await fetch('/api/residents?status=active')
+        const data = await res.json()
+        if (data.residents && data.residents.length > 0) {
+          setResidents(data.residents)
+          setSelectedResidentId(data.residents[0].resident_id)
+          if (data.residents[0].monthly_rent_paise) {
+            setItems([
+              { description: 'Monthly Bed Rent', category: 'rent', quantity: 1, unit_price_rupees: data.residents[0].monthly_rent_paise / 100 },
+            ])
+          }
         }
+      } catch (e) {
+        console.error('Failed to load active residents:', e)
       }
     }
     loadActiveResidents()
-  }, [supabase])
+  }, [])
 
   const handleResidentChange = (resId: string) => {
     setSelectedResidentId(resId)

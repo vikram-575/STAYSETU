@@ -1,28 +1,31 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getAuthenticatedUser } from '@/lib/auth-session'
+
+const isUuid = (id: string | null | undefined): boolean => {
+  if (!id) return false
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+}
 
 /**
  * POST /api/expenses
- * Record a new expense
+ * Record a new operational expense
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getAuthenticatedUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('organization_id, role')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile || !['owner', 'manager', 'accountant'].includes(profile.role)) {
+    if (!['owner', 'manager', 'accountant', 'staff', 'superadmin'].includes(user.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const orgId = profile.organization_id
-    if (!orgId) return NextResponse.json({ error: 'No active organization found' }, { status: 400 })
+    const serviceClient = await createServiceClient()
+    let orgId = user.organization_id
+    if (!orgId) {
+      const { data: defaultOrg } = await serviceClient.from('organizations').select('id').limit(1).single()
+      orgId = defaultOrg?.id || 'primary'
+    }
 
     const body = await request.json()
     const {
@@ -35,8 +38,9 @@ export async function POST(request: NextRequest) {
     }
 
     const amount_paise = Math.round(amount_rupees * 100)
+    const validUserId = isUuid(user.id) ? user.id : null
 
-    const { data, error } = await supabase
+    const { data, error } = await serviceClient
       .from('expenses')
       .insert({
         organization_id: orgId,
@@ -49,7 +53,7 @@ export async function POST(request: NextRequest) {
         vendor: vendor ?? null,
         reference_no: reference_no ?? null,
         notes: notes ?? null,
-        recorded_by: user.id,
+        recorded_by: validUserId,
       })
       .select()
       .single()
@@ -59,9 +63,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Audit log
-    await supabase.from('audit_logs').insert({
+    await serviceClient.from('audit_logs').insert({
       organization_id: orgId,
-      user_id: user.id,
+      user_id: validUserId,
       action: 'create',
       entity_type: 'expense',
       entity_id: data.id,
@@ -81,29 +85,26 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getAuthenticatedUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('organization_id, role')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile || !['owner', 'manager', 'accountant'].includes(profile.role)) {
+    if (!['owner', 'manager', 'accountant', 'staff', 'superadmin'].includes(user.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const orgId = profile.organization_id
-    if (!orgId) return NextResponse.json({ expenses: [] })
+    const serviceClient = await createServiceClient()
+    let orgId = user.organization_id
+    if (!orgId) {
+      const { data: defaultOrg } = await serviceClient.from('organizations').select('id').limit(1).single()
+      orgId = defaultOrg?.id || 'primary'
+    }
 
     const { searchParams } = request.nextUrl
     const startDate = searchParams.get('start')
     const endDate = searchParams.get('end')
     const category = searchParams.get('category')
 
-    let query = supabase
+    let query = serviceClient
       .from('expenses')
       .select('*')
       .eq('organization_id', orgId)
@@ -111,7 +112,7 @@ export async function GET(request: NextRequest) {
 
     if (startDate) query = query.gte('expense_date', startDate)
     if (endDate) query = query.lte('expense_date', endDate)
-    if (category) query = query.eq('category', category)
+    if (category && category !== 'all') query = query.eq('category', category)
 
     const { data, error } = await query
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })

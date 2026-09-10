@@ -34,23 +34,23 @@ export default function GlobalSearch({ onClose }: Props) {
 
     const results: SearchResult[] = []
 
-    // Search residents by name, phone, registration number
-    const { data: residents } = await supabase
-      .from('v_resident_current')
-      .select('resident_id,full_name,phone,registration_number,room_number,bed_label,status')
-      .or(`full_name.ilike.%${q}%,phone.ilike.%${q}%,registration_number.ilike.%${q}%`)
-      .limit(5)
-
-    residents?.forEach((r) => {
-      results.push({
-        type: 'resident',
-        id: r.resident_id,
-        label: r.full_name,
-        sublabel: `${r.registration_number} · ${r.room_number ?? ''}${r.bed_label ? '-' + r.bed_label : ''} · ${r.phone}`,
-        href: `/dashboard/residents/${r.resident_id}`,
-        status: r.status,
+    // Search residents by name, phone, registration number using scoped API
+    try {
+      const res = await fetch(`/api/residents/search?q=${encodeURIComponent(q)}`)
+      const resData = await res.json()
+      resData.residents?.forEach((r: any) => {
+        results.push({
+          type: 'resident',
+          id: r.resident_id,
+          label: r.full_name,
+          sublabel: `${r.registration_number} · ${r.room_number ?? ''}${r.bed_label ? '-' + r.bed_label : ''} · ${r.phone}`,
+          href: `/dashboard/residents/${r.resident_id}`,
+          status: r.status,
+        })
       })
-    })
+    } catch (e) {
+      console.error('Failed searching residents:', e)
+    }
 
     // Search payments by payment number
     if (q.startsWith('PAY-') || q.match(/^\d+$/)) {

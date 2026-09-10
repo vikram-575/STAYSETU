@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import {
   Zap, ArrowLeft, CheckCircle2, AlertTriangle,
   Users, Calculator, Loader2
@@ -16,7 +15,6 @@ export default function RecordElectricityReadingPage() {
   const searchParams = useSearchParams()
   const defaultMeterId = searchParams.get('meter') || ''
 
-  const supabase = createClient()
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -34,59 +32,40 @@ export default function RecordElectricityReadingPage() {
 
   useEffect(() => {
     async function loadMeters() {
-      const { data } = await supabase
-        .from('electricity_meters')
-        .select('*, rooms(*)')
-        .eq('is_active', true)
+      try {
+        const res = await fetch('/api/electricity/meters')
+        const data = await res.json()
+        if (data.meters && data.meters.length > 0) {
+          setMeters(data.meters)
+          const activeMeter = defaultMeterId
+            ? (data.meters.find((m: any) => m.id === defaultMeterId) || data.meters[0])
+            : data.meters[0]
 
-      if (data && data.length > 0) {
-        setMeters(data)
-        const activeMeter = selectedMeterId ? data.find((m) => m.id === selectedMeterId) : data[0]
-        if (activeMeter) {
-          setSelectedMeterId(activeMeter.id)
-          loadMeterLatestReading(activeMeter.id)
-          if (activeMeter.room_id) loadRoomResidents(activeMeter.room_id)
+          if (activeMeter) {
+            setSelectedMeterId(activeMeter.id)
+            setPreviousReading(activeMeter.latest_reading || 0)
+            setCurrentReading((activeMeter.latest_reading || 0) + 50)
+            setRoomResidents(activeMeter.room_residents || [])
+          }
         }
+      } catch (err) {
+        console.error('Failed to load electricity meters:', err)
       }
       setLoading(false)
     }
     loadMeters()
-  }, [supabase])
-
-  const loadMeterLatestReading = async (meterId: string) => {
-    const { data } = await supabase
-      .from('electricity_readings')
-      .select('current_reading')
-      .eq('meter_id', meterId)
-      .order('reading_date', { ascending: false })
-      .limit(1)
-      .single()
-
-    if (data) {
-      setPreviousReading(data.current_reading)
-      setCurrentReading(data.current_reading + 50)
-    } else {
-      setPreviousReading(1000)
-      setCurrentReading(1050)
-    }
-  }
-
-  const loadRoomResidents = async (roomId: string) => {
-    const { data } = await supabase
-      .from('v_resident_current')
-      .select('*')
-      .eq('room_id', roomId)
-      .eq('status', 'active')
-
-    setRoomResidents(data || [])
-  }
+  }, [defaultMeterId])
 
   const handleMeterChange = (meterId: string) => {
     setSelectedMeterId(meterId)
-    loadMeterLatestReading(meterId)
     const m = meters.find((x) => x.id === meterId)
-    if (m?.room_id) loadRoomResidents(m.room_id)
-    else setRoomResidents([])
+    if (m) {
+      setPreviousReading(m.latest_reading || 0)
+      setCurrentReading((m.latest_reading || 0) + 50)
+      setRoomResidents(m.room_residents || [])
+    } else {
+      setRoomResidents([])
+    }
   }
 
   const unitsConsumed = isMeterReset ? currentReading : Math.max(0, currentReading - previousReading)

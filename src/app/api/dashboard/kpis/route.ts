@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getAuthenticatedUser } from '@/lib/auth-session'
 
 /**
  * GET /api/dashboard/kpis
@@ -7,28 +8,14 @@ import { createClient } from '@/lib/supabase/server'
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getAuthenticatedUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('organization_id, role')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
-
-    const orgId = profile.organization_id
-
+    const serviceClient = await createServiceClient()
+    let orgId = user.organization_id
     if (!orgId) {
-      return NextResponse.json({
-        totalBeds: 0, occupiedBeds: 0, availableBeds: 0, maintenanceBeds: 0,
-        occupancyRate: 0, activeResidents: 0,
-        monthExpectedPaise: 0, monthCollectedPaise: 0,
-        monthOutstandingPaise: 0, totalOutstandingPaise: 0, totalOverduePaise: 0,
-        todayCollectedPaise: 0, collectionRate: 0, depositsHeldPaise: 0,
-      })
+      const { data: defaultOrg } = await serviceClient.from('organizations').select('id').limit(1).single()
+      orgId = defaultOrg?.id || 'primary'
     }
 
     const now = new Date()
@@ -44,12 +31,12 @@ export async function GET(request: NextRequest) {
       { data: todayPayments },
       { data: deposits },
     ] = await Promise.all([
-      supabase.from('beds').select('status').eq('organization_id', orgId),
-      supabase.from('residents').select('*', { count: 'exact', head: true }).eq('organization_id', orgId).eq('status', 'active'),
-      supabase.from('invoices').select('total_paise, paid_paise, balance_paise, status').eq('organization_id', orgId).gte('period_start', monthStart).lte('period_start', monthEnd).not('status', 'in', '(cancelled,draft)'),
-      supabase.from('invoices').select('balance_paise, status, due_date').eq('organization_id', orgId).not('status', 'in', '(cancelled,draft,paid)'),
-      supabase.from('payments').select('amount_paise').eq('organization_id', orgId).eq('payment_date', today).eq('status', 'completed'),
-      supabase.from('deposits').select('amount_paise').eq('organization_id', orgId).eq('is_refunded', false),
+      serviceClient.from('beds').select('status').eq('organization_id', orgId),
+      serviceClient.from('residents').select('*', { count: 'exact', head: true }).eq('organization_id', orgId).eq('status', 'active'),
+      serviceClient.from('invoices').select('total_paise, paid_paise, balance_paise, status').eq('organization_id', orgId).gte('period_start', monthStart).lte('period_start', monthEnd).not('status', 'in', '(cancelled,draft)'),
+      serviceClient.from('invoices').select('balance_paise, status, due_date').eq('organization_id', orgId).not('status', 'in', '(cancelled,draft,paid)'),
+      serviceClient.from('payments').select('amount_paise').eq('organization_id', orgId).eq('payment_date', today).eq('status', 'completed'),
+      serviceClient.from('deposits').select('amount_paise').eq('organization_id', orgId).eq('is_refunded', false),
     ])
 
     const totalBeds = bedStats?.length ?? 0

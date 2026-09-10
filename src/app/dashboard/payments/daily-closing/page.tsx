@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import {
   Scale, ArrowLeft, CheckCircle2, AlertTriangle,
   Banknote, Loader2, Calendar
@@ -12,7 +11,6 @@ import { formatCurrency, rupeesToPaise } from '@/lib/money'
 
 export default function DailyCashClosingPage() {
   const router = useRouter()
-  const supabase = createClient()
 
   const [closingDate, setClosingDate] = useState(new Date().toISOString().split('T')[0])
   const [expectedCashPaise, setExpectedCashPaise] = useState(0)
@@ -27,20 +25,25 @@ export default function DailyCashClosingPage() {
   useEffect(() => {
     async function loadCashPayments() {
       setLoading(true)
-      const { data: payments } = await supabase
-        .from('payments')
-        .select('amount_paise')
-        .eq('payment_date', closingDate)
-        .eq('payment_method', 'cash')
-        .eq('status', 'completed')
-
-      const total = payments?.reduce((s, p) => s + p.amount_paise, 0) || 0
-      setExpectedCashPaise(total)
-      setActualCashRupees(total / 100)
+      try {
+        const res = await fetch(`/api/payments/daily-closing?date=${closingDate}`)
+        const data = await res.json()
+        const total = data.expectedCashPaise || 0
+        setExpectedCashPaise(total)
+        if (data.closing) {
+          setActualCashRupees((data.closing.recorded_cash_paise || 0) / 100)
+          setExplanation(data.closing.explanation || '')
+        } else {
+          setActualCashRupees(total / 100)
+          setExplanation('')
+        }
+      } catch (err) {
+        console.error('Failed to load daily closing:', err)
+      }
       setLoading(false)
     }
     loadCashPayments()
-  }, [closingDate, supabase])
+  }, [closingDate])
 
   const actualCashPaise = rupeesToPaise(actualCashRupees)
   const differencePaise = actualCashPaise - expectedCashPaise

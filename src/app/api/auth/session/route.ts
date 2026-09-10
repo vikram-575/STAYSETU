@@ -1,5 +1,35 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
+import { getAuthenticatedUser } from '@/lib/auth-session'
+import { createServiceClient } from '@/lib/supabase/server'
+
+export async function GET() {
+  try {
+    const user = await getAuthenticatedUser()
+    if (!user) {
+      return NextResponse.json({ user: null }, { status: 401 })
+    }
+
+    const serviceClient = await createServiceClient()
+    let staffUsers: any[] = []
+    if (user.organization_id) {
+      const { data } = await serviceClient
+        .from('users')
+        .select('id, full_name, email, phone, role, created_at')
+        .eq('organization_id', user.organization_id)
+        .order('created_at', { ascending: false })
+      staffUsers = data || []
+    }
+
+    return NextResponse.json({
+      user,
+      organization: user.organizations,
+      staffUsers,
+    })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {

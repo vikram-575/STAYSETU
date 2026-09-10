@@ -1,5 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getAuthenticatedUser } from '@/lib/auth-session'
+
+const isUuid = (id: string | null | undefined): boolean => {
+  if (!id) return false
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+}
 
 /**
  * POST /api/billing/invoice
@@ -7,22 +13,19 @@ import { createClient } from '@/lib/supabase/server'
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getAuthenticatedUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('organization_id, role')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile || !['owner', 'manager', 'accountant'].includes(profile.role)) {
+    if (!['owner', 'manager', 'accountant', 'staff', 'superadmin'].includes(user.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const orgId = profile.organization_id
-    if (!orgId) return NextResponse.json({ error: 'No active organization found' }, { status: 400 })
+    const serviceClient = await createServiceClient()
+    let orgId = user.organization_id
+    if (!orgId) {
+      const { data: defaultOrg } = await serviceClient.from('organizations').select('id').limit(1).single()
+      orgId = defaultOrg?.id || 'primary'
+    }
 
     const body = await request.json()
     const { resident_id, period_start, period_end, due_date, items, notes } = body
@@ -37,11 +40,13 @@ export async function POST(request: NextRequest) {
     const totalPaise = subtotalPaise + gstPaise
 
     // Generate invoice number
-    const { data: invNumber } = await supabase.rpc('generate_invoice_number', { p_org_id: orgId })
+    const { data: invNumber } = await serviceClient.rpc('generate_invoice_number', { p_org_id: orgId })
     const invoiceNumber = invNumber || `INV-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`
 
+    const validUserId = isUuid(user.id) ? user.id : null
+
     // 1. Create Invoice
-    const { data: invoice, error: invError } = await supabase
+    const { data: invoice, error: invError } = await serviceClient
       .from('invoices')
       .insert({
         organization_id: orgId,
@@ -57,7 +62,7 @@ export async function POST(request: NextRequest) {
         balance_paise: totalPaise,
         status: 'sent',
         notes: notes || null,
-        generated_by: user.id,
+        generated_by: validUserId,
       })
       .select()
       .single()
@@ -78,10 +83,10 @@ export async function POST(request: NextRequest) {
       sort_order: idx,
     }))
 
-    await supabase.from('invoice_items').insert(itemInserts)
+    await serviceClient.from('invoice_items').insert(itemInserts)
 
     // 3. Create Ledger Entry for each charge or consolidated invoice debit
-    await supabase.from('ledger_entries').insert({
+    await serviceClient.from('ledger_entries').insert({
       organization_id: orgId,
       resident_id,
       invoice_id: invoice.id,
@@ -91,14 +96,14 @@ export async function POST(request: NextRequest) {
       entry_type: 'charge',
       debit_paise: totalPaise,
       credit_paise: 0,
-      added_by: user.id,
+      added_by: validUserId,
       notes: `Billed for ${period_start} to ${period_end}`,
     })
 
     // 4. Audit Log
-    await supabase.from('audit_logs').insert({
+    await serviceClient.from('audit_logs').insert({
       organization_id: orgId,
-      user_id: user.id,
+      user_id: validUserId,
       action: 'invoice_generate',
       entity_type: 'invoice',
       entity_id: invoice.id,

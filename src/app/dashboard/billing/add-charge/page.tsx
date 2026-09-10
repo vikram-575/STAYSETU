@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import {
   PlusCircle, ArrowLeft, Coffee, Utensils, Shirt,
   Car, Sparkles, AlertTriangle, CheckCircle2, Loader2
@@ -15,7 +14,6 @@ export default function AddChargePage() {
   const searchParams = useSearchParams()
   const defaultResidentId = searchParams.get('resident') || ''
 
-  const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [residents, setResidents] = useState<any[]>([])
@@ -46,19 +44,19 @@ export default function AddChargePage() {
 
   useEffect(() => {
     async function loadResidents() {
-      const { data } = await supabase
-        .from('v_resident_current')
-        .select('*')
-        .eq('status', 'active')
-        .order('full_name')
-
-      if (data && data.length > 0) {
-        setResidents(data)
-        if (!selectedResidentId) setSelectedResidentId(data[0].resident_id)
+      try {
+        const res = await fetch('/api/residents?status=active')
+        const data = await res.json()
+        if (data.residents && data.residents.length > 0) {
+          setResidents(data.residents)
+          if (!selectedResidentId) setSelectedResidentId(data.residents[0].resident_id)
+        }
+      } catch (e) {
+        console.error('Failed to load residents:', e)
       }
     }
     loadResidents()
-  }, [selectedResidentId, supabase])
+  }, [selectedResidentId])
 
   const handlePickCatalog = (item: typeof catalogItems[0]) => {
     setDescription(item.label)

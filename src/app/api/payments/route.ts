@@ -1,5 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getAuthenticatedUser } from '@/lib/auth-session'
+
+const isUuid = (id: string | null | undefined): boolean => {
+  if (!id) return false
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+}
 
 /**
  * POST /api/payments
@@ -7,22 +13,19 @@ import { createClient } from '@/lib/supabase/server'
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getAuthenticatedUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('organization_id, role')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile || !['owner', 'manager', 'accountant'].includes(profile.role)) {
+    if (!['owner', 'manager', 'accountant', 'staff', 'superadmin'].includes(user.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const orgId = profile.organization_id
-    if (!orgId) return NextResponse.json({ error: 'No active organization found' }, { status: 400 })
+    const serviceClient = await createServiceClient()
+    let orgId = user.organization_id
+    if (!orgId) {
+      const { data: defaultOrg } = await serviceClient.from('organizations').select('id').limit(1).single()
+      orgId = defaultOrg?.id || 'primary'
+    }
 
     const body = await request.json()
     const {
@@ -36,12 +39,12 @@ export async function POST(request: NextRequest) {
 
     // Check Idempotency to prevent double clicks
     if (idempotency_key) {
-      const { data: existingPayment } = await supabase
+      const { data: existingPayment } = await serviceClient
         .from('payments')
         .select('id, payment_number')
         .eq('organization_id', orgId)
         .eq('idempotency_key', idempotency_key)
-        .single()
+        .maybeSingle()
 
       if (existingPayment) {
         return NextResponse.json({
@@ -54,11 +57,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate Payment Number
-    const { data: payNumber } = await supabase.rpc('generate_payment_number', { p_org_id: orgId })
+    const { data: payNumber } = await serviceClient.rpc('generate_payment_number', { p_org_id: orgId })
     const paymentNumber = payNumber || `PAY-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`
 
+    const validUserId = isUuid(user.id) ? user.id : null
+
     // 1. Create Payment record
-    const { data: payment, error: payError } = await supabase
+    const { data: payment, error: payError } = await serviceClient
       .from('payments')
       .insert({
         organization_id: orgId,
@@ -72,7 +77,7 @@ export async function POST(request: NextRequest) {
         reference_no: reference_no || null,
         status: 'completed',
         notes: notes || null,
-        collected_by: user.id,
+        collected_by: validUserId,
         idempotency_key: idempotency_key || null,
       })
       .select()
@@ -87,7 +92,7 @@ export async function POST(request: NextRequest) {
 
     // If specific invoice provided
     if (invoice_id) {
-      const { data: inv } = await supabase
+      const { data: inv } = await serviceClient
         .from('invoices')
         .select('*')
         .eq('id', invoice_id)
@@ -97,7 +102,7 @@ export async function POST(request: NextRequest) {
       if (inv) {
         const allocate = Math.min(remainingToAllocate, inv.balance_paise)
         if (allocate > 0) {
-          await supabase.from('payment_allocations').insert({
+          await serviceClient.from('payment_allocations').insert({
             organization_id: orgId,
             payment_id: payment.id,
             invoice_id: inv.id,
@@ -110,7 +115,7 @@ export async function POST(request: NextRequest) {
 
     // Otherwise allocate to oldest unpaid invoices of this resident in this org
     if (remainingToAllocate > 0) {
-      const { data: unpaidInvoices } = await supabase
+      const { data: unpaidInvoices } = await serviceClient
         .from('invoices')
         .select('*')
         .eq('organization_id', orgId)
@@ -124,7 +129,7 @@ export async function POST(request: NextRequest) {
           if (remainingToAllocate <= 0) break
           const allocate = Math.min(remainingToAllocate, inv.balance_paise)
           if (allocate > 0) {
-            await supabase.from('payment_allocations').insert({
+            await serviceClient.from('payment_allocations').insert({
               organization_id: orgId,
               payment_id: payment.id,
               invoice_id: inv.id,
@@ -137,7 +142,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Post Credit Entry into Resident's Digital Ledger
-    await supabase.from('ledger_entries').insert({
+    await serviceClient.from('ledger_entries').insert({
       organization_id: orgId,
       resident_id,
       payment_id: payment.id,
@@ -149,14 +154,14 @@ export async function POST(request: NextRequest) {
       credit_paise: amount_paise,
       payment_method,
       reference_no: transaction_id || reference_no || null,
-      added_by: user.id,
+      added_by: validUserId,
       notes: remainingToAllocate > 0 ? `Includes ₹${remainingToAllocate / 100} advance credit balance` : null,
     })
 
     // 4. Audit Log
-    await supabase.from('audit_logs').insert({
+    await serviceClient.from('audit_logs').insert({
       organization_id: orgId,
-      user_id: user.id,
+      user_id: validUserId,
       action: 'payment_add',
       entity_type: 'payment',
       entity_id: payment.id,

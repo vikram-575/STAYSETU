@@ -1,5 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getAuthenticatedUser } from '@/lib/auth-session'
+
+const isUuid = (id: string | null | undefined): boolean => {
+  if (!id) return false
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+}
 
 /**
  * POST /api/electricity/reading
@@ -7,22 +13,19 @@ import { createClient } from '@/lib/supabase/server'
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getAuthenticatedUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('organization_id, role')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile || !['owner', 'manager', 'staff'].includes(profile.role)) {
+    if (!['owner', 'manager', 'staff', 'superadmin'].includes(user.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const orgId = profile.organization_id
-    if (!orgId) return NextResponse.json({ error: 'No active organization found' }, { status: 400 })
+    const serviceClient = await createServiceClient()
+    let orgId = user.organization_id
+    if (!orgId) {
+      const { data: defaultOrg } = await serviceClient.from('organizations').select('id').limit(1).single()
+      orgId = defaultOrg?.id || 'primary'
+    }
 
     const body = await request.json()
     const {
@@ -40,9 +43,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify meter belongs to organization
-    const { data: meter } = await supabase
+    const { data: meter } = await serviceClient
       .from('electricity_meters')
-      .select('id')
+      .select('id, meter_number, room_id')
       .eq('id', meter_id)
       .eq('organization_id', orgId)
       .single()
@@ -51,8 +54,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Meter not found in this organization' }, { status: 404 })
     }
 
+    const validUserId = isUuid(user.id) ? user.id : null
+
     // 1. Insert Reading
-    const { data: reading, error: readError } = await supabase
+    const { data: reading, error: readError } = await serviceClient
       .from('electricity_readings')
       .insert({
         organization_id: orgId,
@@ -65,7 +70,7 @@ export async function POST(request: NextRequest) {
         period_month,
         period_year,
         notes: notes || null,
-        recorded_by: user.id,
+        recorded_by: validUserId,
       })
       .select()
       .single()
@@ -78,7 +83,7 @@ export async function POST(request: NextRequest) {
     if (resident_ids && resident_ids.length > 0 && per_resident_paise > 0) {
       const unitsPerResident = (reading.units_consumed || (current_reading - previous_reading)) / resident_ids.length
       for (const resId of resident_ids) {
-        await supabase.from('electricity_allocations').insert({
+        await serviceClient.from('electricity_allocations').insert({
           organization_id: orgId,
           reading_id: reading.id,
           resident_id: resId,
@@ -87,29 +92,29 @@ export async function POST(request: NextRequest) {
           allocation_method: 'equal_split',
         })
 
-        // Post Debit Entry to Ledger
-        await supabase.from('ledger_entries').insert({
+        // Post Debit Entry to Resident's Ledger
+        await serviceClient.from('ledger_entries').insert({
           organization_id: orgId,
           resident_id: resId,
           entry_date: reading_date,
-          description: `Electricity Consumption (${unitsPerResident.toFixed(1)} units)`,
+          description: `Electricity (${meter.meter_number}): ${unitsPerResident.toFixed(1)} units @ ₹${(rate_per_unit_paise / 100).toFixed(2)}/u`,
           category: 'electricity',
           entry_type: 'charge',
           debit_paise: per_resident_paise,
           credit_paise: 0,
-          added_by: user.id,
+          added_by: validUserId,
         })
       }
     }
 
     // 3. Audit Log
-    await supabase.from('audit_logs').insert({
+    await serviceClient.from('audit_logs').insert({
       organization_id: orgId,
-      user_id: user.id,
+      user_id: validUserId,
       action: 'create',
       entity_type: 'electricity_reading',
       entity_id: reading.id,
-      entity_label: `Reading ${current_reading} on meter ${meter_id}`,
+      entity_label: `Reading ${current_reading} on meter ${meter.meter_number}`,
       after_data: { units_consumed: reading.units_consumed, rate_per_unit_paise },
     })
 

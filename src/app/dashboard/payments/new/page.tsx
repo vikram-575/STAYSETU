@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import {
   CreditCard, ArrowLeft, CheckCircle2, Loader2,
   DollarSign, Smartphone, Banknote, Building2,
@@ -17,7 +16,6 @@ export default function NewPaymentPage() {
   const searchParams = useSearchParams()
   const defaultResidentId = searchParams.get('resident') || ''
 
-  const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
@@ -33,24 +31,24 @@ export default function NewPaymentPage() {
 
   useEffect(() => {
     async function loadResidents() {
-      const { data } = await supabase
-        .from('v_resident_current')
-        .select('*')
-        .eq('status', 'active')
-        .order('full_name')
-
-      if (data && data.length > 0) {
-        setResidents(data)
-        if (!selectedResidentId) {
-          setSelectedResidentId(data[0].resident_id)
-          if (data[0].total_outstanding_paise > 0) {
-            setAmountRupees(data[0].total_outstanding_paise / 100)
+      try {
+        const res = await fetch('/api/residents?status=active')
+        const data = await res.json()
+        if (data.residents && data.residents.length > 0) {
+          setResidents(data.residents)
+          if (!selectedResidentId) {
+            setSelectedResidentId(data.residents[0].resident_id)
+            if (data.residents[0].total_outstanding_paise > 0) {
+              setAmountRupees(data.residents[0].total_outstanding_paise / 100)
+            }
           }
         }
+      } catch (e) {
+        console.error('Failed to load residents:', e)
       }
     }
     loadResidents()
-  }, [selectedResidentId, supabase])
+  }, [selectedResidentId])
 
   const selectedResident = residents.find((r) => r.resident_id === selectedResidentId)
 

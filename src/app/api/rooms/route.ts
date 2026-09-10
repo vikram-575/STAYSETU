@@ -25,7 +25,7 @@ export async function GET() {
 
     const { data: rooms, error } = await serviceClient
       .from('rooms')
-      .select('*, floors(id, name, buildings(id, name)), beds(*)')
+      .select('*, floors(id, name, buildings(id, name)), beds(*, resident_assignments(*))')
       .eq('organization_id', orgId)
       .order('room_number')
 

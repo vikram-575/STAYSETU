@@ -3,7 +3,6 @@
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import {
   LogOut, ArrowLeft, ArrowRight, CheckCircle2,
   Zap, AlertTriangle, ShieldCheck, DollarSign, Loader2
@@ -17,7 +16,6 @@ interface Props {
 export default function CheckoutResidentPage({ params }: Props) {
   const { id: residentId } = use(params)
   const router = useRouter()
-  const supabase = createClient()
 
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -36,17 +34,17 @@ export default function CheckoutResidentPage({ params }: Props) {
 
   useEffect(() => {
     async function loadResident() {
-      const { data } = await supabase
-        .from('v_resident_current')
-        .select('*')
-        .eq('resident_id', residentId)
-        .single()
-
-      if (data) setResident(data)
+      try {
+        const res = await fetch(`/api/residents/${residentId}`)
+        const data = await res.json()
+        if (data.resident) setResident(data.resident)
+      } catch (err) {
+        console.error('Failed to load resident for checkout:', err)
+      }
       setLoading(false)
     }
     loadResident()
-  }, [residentId, supabase])
+  }, [residentId])
 
   if (loading) {
     return (

@@ -64,48 +64,35 @@ export default function SettingsPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          const { data: profile } = await supabase
-            .from('users')
-            .select('*, organizations(*)')
-            .eq('id', user.id)
-            .single()
+        const res = await fetch('/api/auth/session')
+        const data = await res.json()
+        if (data.user) {
+          setUserProfile({
+            id: data.user.id,
+            full_name: data.user.full_name || '',
+            email: data.user.email || '',
+            phone: data.user.phone || '',
+            role: data.user.role || 'owner',
+          })
 
-          if (profile) {
-            setUserProfile({
-              id: profile.id,
-              full_name: profile.full_name || '',
-              email: profile.email || user.email || '',
-              phone: profile.phone || '',
-              role: profile.role || 'owner',
+          if (data.organization) {
+            setOrg({
+              id: data.organization.id,
+              name: data.organization.name || '',
+              phone: data.organization.phone || '',
+              email: data.organization.email || '',
+              address: data.organization.address || '',
+              city: data.organization.city || '',
+              state: data.organization.state || '',
+              gst_enabled: !!data.organization.gst_enabled,
+              gstin: data.organization.gstin || '',
+              upi_id: (data.organization.settings as any)?.upi_id || '',
             })
-
-            if (profile.organizations) {
-              setOrg({
-                id: profile.organizations.id,
-                name: profile.organizations.name || '',
-                phone: profile.organizations.phone || '',
-                email: profile.organizations.email || '',
-                address: profile.organizations.address || '',
-                city: profile.organizations.city || '',
-                state: profile.organizations.state || '',
-                gst_enabled: !!profile.organizations.gst_enabled,
-                gstin: profile.organizations.gstin || '',
-                upi_id: (profile.organizations.settings as any)?.upi_id || '',
-              })
-            }
           }
         }
 
-        // Fetch staff users
-        const { data: users } = await supabase
-          .from('users')
-          .select('*')
-          .order('created_at', { ascending: false })
-
-        if (users) {
-          setStaffUsers(users)
+        if (data.staffUsers) {
+          setStaffUsers(data.staffUsers)
         }
       } catch (err: any) {
         console.error('Failed to load profile settings', err)
