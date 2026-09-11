@@ -315,6 +315,8 @@ export default function ErpSoftwareShowcasePage() {
 
                 <Link
                   href="/login"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-6 py-3.5 text-sm font-bold text-[#17211B] shadow-xs hover:bg-gray-50 active:scale-98 transition"
                 >
                   <Building2 className="h-4 w-4 text-[#16A34A]" />
@@ -372,6 +374,8 @@ export default function ErpSoftwareShowcasePage() {
                     </div>
                     <Link
                       href="/login"
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="mt-3 sm:mt-0 inline-flex items-center gap-1.5 rounded-xl bg-[#16A34A] px-4 py-2 text-xs font-bold text-white shadow-xs hover:opacity-95 transition"
                     >
                       <span>Open ERP Portal</span>
@@ -948,6 +952,8 @@ export default function ErpSoftwareShowcasePage() {
                   </Link>
                   <Link
                     href="/login"
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="rounded-xl border border-white/40 bg-white/10 px-8 py-3.5 text-sm font-bold text-white backdrop-blur-xs hover:bg-white/20 transition"
                   >
                     Log In to Existing PG

@@ -120,7 +120,12 @@ export function MarketplaceFooter() {
                 </Link>
               </li>
               <li>
-                <Link href="/login" className="hover:text-[#16A34A] font-semibold text-gray-700">
+                <Link
+                  href="/login"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-[#16A34A] font-semibold text-gray-700"
+                >
                   Owner ERP Login
                 </Link>
               </li>

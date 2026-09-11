@@ -155,6 +155,8 @@ function CompanyAdminLoginForm() {
             <div className="pt-1">
               <Link
                 href="/login"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-xs text-[#DCFCE7]/70 hover:text-white transition font-semibold inline-flex items-center gap-1"
               >
                 ← Back to PG Owner & Staff Login

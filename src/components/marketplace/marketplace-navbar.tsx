@@ -162,6 +162,8 @@ export function MarketplaceNavbar({
           {/* Owner Login Link */}
           <Link
             href="/login"
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 rounded-lg border border-transparent px-3 py-2 text-xs font-semibold text-[#647067] hover:text-[#14532D] hover:bg-gray-100/70 transition"
           >
             <LogIn className="h-3.5 w-3.5" />
@@ -300,6 +302,8 @@ export function MarketplaceNavbar({
               </Link>
               <Link
                 href="/login"
+                target="_blank"
+                rel="noopener noreferrer"
                 onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 py-2.5 text-xs font-semibold text-[#17211B] hover:bg-gray-50"
               >

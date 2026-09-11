@@ -244,6 +244,8 @@ export default function ResidentPortalPage() {
               </p>
               <Link
                 href="/login"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="inline-block text-xs font-extrabold text-[#16A34A] hover:text-[#14532D] transition"
               >
                 Owner & Staff Login Portal →
