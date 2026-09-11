@@ -28,13 +28,10 @@ export default async function DashboardPage() {
       .select('id, name')
       .order('created_at', { ascending: true })
       .limit(1)
-      .single()
+      .maybeSingle()
 
-    orgId = defaultOrg?.id
+    orgId = defaultOrg?.id || 'primary'
   }
-
-  if (!orgId && user.role !== 'superadmin') redirect('/onboarding')
-  if (!orgId) orgId = 'primary'
 
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]

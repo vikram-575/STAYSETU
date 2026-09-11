@@ -108,6 +108,24 @@ export async function POST(request: NextRequest) {
           .or(`id.eq.${authData.user.id},email.ilike.${cleanEmail}`)
           .maybeSingle()
 
+        if (profile && !profile.organization_id) {
+          const { data: matchedOrg } = await serviceClient
+            .from('organizations')
+            .select('id')
+            .or(`email.ilike.${cleanEmail},phone.eq.${profile.phone || 'none'}`)
+            .maybeSingle()
+
+          const { data: defaultOrg } = !matchedOrg
+            ? await serviceClient.from('organizations').select('id').order('created_at', { ascending: true }).limit(1).maybeSingle()
+            : { data: null }
+
+          const orgIdToLink = matchedOrg?.id || defaultOrg?.id
+          if (orgIdToLink) {
+            profile.organization_id = orgIdToLink
+            await serviceClient.from('users').update({ organization_id: orgIdToLink }).eq('id', profile.id)
+          }
+        }
+
         const role = profile?.role || (authData.user.user_metadata?.role as string) || 'owner'
         const isSuperAdmin = role === 'superadmin'
 
@@ -206,6 +224,24 @@ export async function POST(request: NextRequest) {
           .maybeSingle()
 
         if (dbUser) {
+          if (!dbUser.organization_id) {
+            const { data: matchedOrg } = await serviceClient
+              .from('organizations')
+              .select('id')
+              .or(`email.ilike.${cleanEmail},phone.eq.${dbUser.phone || 'none'}`)
+              .maybeSingle()
+
+            const { data: defaultOrg } = !matchedOrg
+              ? await serviceClient.from('organizations').select('id').order('created_at', { ascending: true }).limit(1).maybeSingle()
+              : { data: null }
+
+            const orgIdToLink = matchedOrg?.id || defaultOrg?.id
+            if (orgIdToLink) {
+              dbUser.organization_id = orgIdToLink
+              await serviceClient.from('users').update({ organization_id: orgIdToLink }).eq('id', dbUser.id)
+            }
+          }
+
           const role = dbUser.role || 'owner'
           const isSuperAdmin = role === 'superadmin'
           // Only force password change if db record says so OR an 8-digit pin was used

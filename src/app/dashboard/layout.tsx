@@ -27,7 +27,7 @@ export default async function DashboardLayout({
       .select('id, name, gst_enabled')
       .order('created_at', { ascending: true })
       .limit(1)
-      .single()
+      .maybeSingle()
 
     if (defaultOrg) {
       profile = {
@@ -35,8 +35,9 @@ export default async function DashboardLayout({
         organization_id: defaultOrg.id,
         organizations: defaultOrg,
       }
-    } else if (profile.role !== 'superadmin') {
-      redirect('/onboarding')
+      try {
+        await serviceClient.from('users').update({ organization_id: defaultOrg.id }).eq('id', profile.id)
+      } catch {}
     }
   }
 

@@ -120,12 +120,14 @@ export async function middleware(request: NextRequest) {
     return response
   }
 
-  // Protect /dashboard routes (All authenticated staff/owners/superadmins)
+  // Protect /dashboard and /onboarding routes (All authenticated staff/owners/superadmins)
   if (pathname.startsWith('/dashboard') || pathname.startsWith('/onboarding')) {
     if (!isAuthenticated) {
       const redirectUrl = request.nextUrl.clone()
       redirectUrl.pathname = '/login'
-      redirectUrl.searchParams.set('redirectTo', pathname)
+      if (pathname.startsWith('/dashboard')) {
+        redirectUrl.searchParams.set('redirectTo', pathname)
+      }
       return NextResponse.redirect(redirectUrl)
     }
     return response

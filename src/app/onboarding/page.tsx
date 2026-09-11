@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -29,6 +29,18 @@ function OnboardingContent() {
   const [error, setError] = useState('')
   const [onboardingSuccessData, setOnboardingSuccessData] = useState<any>(null)
   const [copied, setCopied] = useState(false)
+  const [existingOrg, setExistingOrg] = useState<{ id: string; name: string } | null>(null)
+
+  useEffect(() => {
+    fetch('/api/auth/session')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.organization?.name && !isFromAdmin) {
+          setExistingOrg(data.organization)
+        }
+      })
+      .catch(() => {})
+  }, [isFromAdmin])
 
   // Form State
   const [form, setForm] = useState({
@@ -304,6 +316,32 @@ function OnboardingContent() {
           <div className="mb-6 p-4 bg-rose-950/70 border border-rose-800/80 rounded-2xl text-xs text-rose-300 font-semibold flex items-center gap-3 animate-in fade-in">
             <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
             <span>{error}</span>
+          </div>
+        )}
+
+        {/* Existing Active Property Alert / Shortcut */}
+        {existingOrg && (
+          <div className="mb-6 p-4.5 bg-emerald-950/60 border border-emerald-600/50 rounded-2xl text-xs text-emerald-200 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl backdrop-blur-md animate-in fade-in">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-300 shrink-0">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              </div>
+              <div>
+                <p className="font-extrabold text-white text-sm">
+                  Active Property Found: "{existingOrg.name}"
+                </p>
+                <p className="text-slate-300 text-xs mt-0.5">
+                  Your PG operations are already running. You can open your dashboard immediately or continue below to set up an additional PG branch.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/dashboard"
+              className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black rounded-xl text-xs transition flex items-center gap-2 shrink-0 shadow-lg shadow-emerald-500/20 active:scale-95"
+            >
+              <span>Go to PG Dashboard</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
         )}
 

@@ -57,14 +57,16 @@ function LoginFormContent() {
           redirectTo &&
           !redirectTo.startsWith('/superman') &&
           !redirectTo.startsWith('/superadmin') &&
-          !redirectTo.startsWith('/admin')
+          !redirectTo.startsWith('/admin') &&
+          !redirectTo.startsWith('/onboarding')
             ? redirectTo
             : '/dashboard'
         destination = safeRedirect !== '/dashboard' ? safeRedirect : data.redirect || '/dashboard'
         if (
           destination.startsWith('/superman') ||
           destination.startsWith('/superadmin') ||
-          destination.startsWith('/admin')
+          destination.startsWith('/admin') ||
+          destination.startsWith('/onboarding')
         ) {
           destination = '/dashboard'
         }
