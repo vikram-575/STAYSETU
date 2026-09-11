@@ -18,7 +18,6 @@ import {
   Megaphone,
 } from 'lucide-react'
 import { useWebsiteContent } from '@/context/website-content-context'
-import { SectionEditButton } from './website-admin-quick-edit'
 
 interface MarketplaceNavbarProps {
   onOpenListModal: () => void
@@ -77,7 +76,6 @@ export function MarketplaceNavbar({
                   {announcement.linkText} →
                 </Link>
               )}
-              <SectionEditButton section="announcement" label="Edit Banner" className="scale-90" />
             </div>
           </div>
         </aside>

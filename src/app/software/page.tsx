@@ -32,7 +32,6 @@ import { MarketplaceNavbar } from '@/components/marketplace/marketplace-navbar'
 import { MarketplaceFooter } from '@/components/marketplace/marketplace-footer'
 import { ListPropertyModal } from '@/components/marketplace/list-property-modal'
 import { useWebsiteContent } from '@/context/website-content-context'
-import { SectionEditButton, FloatingWebsiteAdminBar } from '@/components/marketplace/website-admin-quick-edit'
 
 const ERP_MODULES = [
   {
@@ -293,7 +292,6 @@ export default function ErpSoftwareShowcasePage() {
                   <span className="text-gray-400">•</span>
                   <span className="text-[#F59E0B]">PRO Edition</span>
                 </div>
-                <SectionEditButton section="software" label="Edit Software Page" />
               </div>
 
               <h1 className="mt-6 text-3xl font-black tracking-tight text-[#14532D] sm:text-5xl lg:text-6xl leading-tight">
@@ -969,9 +967,6 @@ export default function ErpSoftwareShowcasePage() {
         isOpen={isListModalOpen}
         onClose={() => setIsListModalOpen(false)}
       />
-
-      {/* Floating Website Live Admin Editor Bar */}
-      <FloatingWebsiteAdminBar />
     </div>
   )
 }

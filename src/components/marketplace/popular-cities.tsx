@@ -4,7 +4,6 @@ import React from 'react'
 import Image from 'next/image'
 import { MapPin, ArrowRight, Building, Sparkles } from 'lucide-react'
 import { useWebsiteContent } from '@/context/website-content-context'
-import { SectionEditButton } from './website-admin-quick-edit'
 
 interface PopularCitiesProps {
   onSelectCity: (cityName: string) => void
@@ -35,7 +34,6 @@ export function PopularCities({ onSelectCity, activeCity }: PopularCitiesProps) 
                 <Building className="h-3.5 w-3.5 text-[#16A34A]" />
                 <span>{citiesData?.badge || 'Top Rental Hubs'}</span>
               </div>
-              <SectionEditButton section="cities" label="Edit Cities" />
             </div>
             <h2 className="mt-2 text-2xl font-bold tracking-tight text-[#14532D] sm:text-3xl">
               {citiesData?.title || 'Explore Popular Cities'}

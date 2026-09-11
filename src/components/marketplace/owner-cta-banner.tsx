@@ -12,7 +12,6 @@ import {
   CheckCircle,
 } from 'lucide-react'
 import { useWebsiteContent } from '@/context/website-content-context'
-import { SectionEditButton } from './website-admin-quick-edit'
 
 interface OwnerCtaBannerProps {
   onOpenListModal: () => void
@@ -35,7 +34,6 @@ export function OwnerCtaBanner({ onOpenListModal }: OwnerCtaBannerProps) {
                 <Building2 className="h-3.5 w-3.5" />
                 <span>{cta?.badge || 'For PG Owners, Hostels & Flat Landlords'}</span>
               </div>
-              <SectionEditButton section="owner-cta" label="Edit Banner" />
             </div>
 
             <h2 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl leading-tight">

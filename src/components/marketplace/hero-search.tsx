@@ -16,7 +16,6 @@ import {
 } from 'lucide-react'
 import { PropertyType } from '@/types/marketplace'
 import { useWebsiteContent } from '@/context/website-content-context'
-import { SectionEditButton } from './website-admin-quick-edit'
 
 interface HeroSearchProps {
   onSearch: (criteria: {
@@ -113,13 +112,12 @@ export function HeroSearch({ onSearch, selectedCity, onCityChange }: HeroSearchP
       </div>
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Top Tagline Pill & Edit Button */}
-        <div className="flex items-center justify-center gap-3">
+        {/* Top Tagline Pill */}
+        <div className="flex items-center justify-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#16A34A]/25 bg-[#DCFCE7]/60 px-3.5 py-1.5 text-xs font-semibold text-[#14532D] shadow-2xs backdrop-blur-xs">
             <ShieldCheck className="h-4 w-4 text-[#16A34A]" />
             <span>{hero?.badge || '#1 PropTech & PG Rental Network'}</span>
           </div>
-          <SectionEditButton section="hero" label="Edit Hero" />
         </div>
 
         {/* Main Hero Typography */}

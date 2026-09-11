@@ -4,7 +4,6 @@ import React from 'react'
 import Link from 'next/link'
 import { Building2, ShieldCheck, Mail, Phone, Heart, ExternalLink, MapPin, Clock } from 'lucide-react'
 import { useWebsiteContent } from '@/context/website-content-context'
-import { SectionEditButton } from './website-admin-quick-edit'
 
 export function MarketplaceFooter() {
   const { content } = useWebsiteContent()
@@ -17,14 +16,11 @@ export function MarketplaceFooter() {
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-5">
           {/* Col 1: Brand info */}
           <div className="lg:col-span-2 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#14532D] to-[#16A34A] text-white">
-                  <Building2 className="h-5 w-5" />
-                </div>
-                <span className="text-lg font-bold text-[#14532D]">PGSetu</span>
+            <div className="flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#14532D] to-[#16A34A] text-white">
+                <Building2 className="h-5 w-5" />
               </div>
-              <SectionEditButton section="footer" label="Edit Footer" />
+              <span className="text-lg font-bold text-[#14532D]">PGSetu</span>
             </div>
             <p className="max-w-sm text-xs leading-relaxed text-[#647067]">
               {footer?.aboutText ||

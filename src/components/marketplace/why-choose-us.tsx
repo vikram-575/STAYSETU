@@ -3,7 +3,6 @@
 import React from 'react'
 import { Check, X, Shield, Sparkles, TrendingUp, Users, Building, HeartHandshake } from 'lucide-react'
 import { useWebsiteContent } from '@/context/website-content-context'
-import { SectionEditButton } from './website-admin-quick-edit'
 
 const STAT_ICONS = [Building, Users, Shield, HeartHandshake]
 
@@ -23,7 +22,6 @@ export function WhyChooseUs() {
               <Sparkles className="h-3.5 w-3.5 text-[#16A34A]" />
               <span>{whyData?.badge || 'Why Choose PGSetu'}</span>
             </div>
-            <SectionEditButton section="comparison" label="Edit Comparison" />
           </div>
           <h2 className="mt-3 text-2xl sm:text-4xl font-extrabold text-[#14532D]">
             {whyData?.title || 'How We Are Rebuilding Renter Trust'}

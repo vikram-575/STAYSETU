@@ -3,7 +3,6 @@
 import React from 'react'
 import { ShieldCheck, UserCheck2, ReceiptText, Headphones, CheckCircle, Sparkles } from 'lucide-react'
 import { useWebsiteContent } from '@/context/website-content-context'
-import { SectionEditButton } from './website-admin-quick-edit'
 
 const ICON_MAP: Record<string, React.ElementType> = {
   ShieldCheck,
@@ -28,7 +27,6 @@ export function TrustSection() {
               <CheckCircle className="h-3.5 w-3.5 text-[#16A34A]" />
               <span>{trust?.badge || 'The PGSetu Trust Standard'}</span>
             </div>
-            <SectionEditButton section="trust" label="Edit Trust" />
           </div>
           <h2 className="mt-3 text-2xl font-bold tracking-tight text-[#14532D] sm:text-3xl lg:text-4xl">
             {trust?.title || 'Renting Made Honest, Transparent & Safe'}
