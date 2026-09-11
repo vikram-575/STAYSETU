@@ -5,8 +5,7 @@ const config: CapacitorConfig = {
   appName: 'PG-SETU',
   webDir: 'out',
   server: {
-    // If testing on a physical mobile device on local Wi-Fi, set your local IP here
-    // or point to your production deployment URL.
+    url: 'https://pgsetu.onrender.com',
     androidScheme: 'https',
     cleartext: true,
   },

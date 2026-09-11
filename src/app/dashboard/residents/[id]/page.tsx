@@ -147,7 +147,7 @@ export default async function ResidentDetailPage({ params, searchParams }: Props
     .maybeSingle()
 
   // Pre-filled WhatsApp message with Direct Live Passbook Link
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pgsetu.onrender.com'
   const waMsg = `Hello ${resident.full_name}, your PG account passbook & statement is available (Reg: ${resident.registration_number}). View your real-time balance, bills & official receipts directly at: ${baseUrl}/portal?token=${portalToken}&tab=ledger`
   const waLink = buildWhatsAppLink(resident.phone, waMsg)
   const smsLink = buildSmsLink(resident.phone, waMsg)

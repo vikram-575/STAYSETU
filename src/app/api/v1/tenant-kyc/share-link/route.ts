@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     remoteKYCTokens.set(token, tokenData)
 
     // Construct verification link
-    const origin = request.headers.get('origin') || 'https://staysetu-ruby.vercel.app'
+    const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'https://pgsetu.onrender.com'
     const verificationUrl = `${origin}/portal/kyc/${token}`
 
     // Compliant, generic reminder message without exposing sensitive details

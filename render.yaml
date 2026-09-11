@@ -1,0 +1,37 @@
+services:
+  - type: web
+    name: pgsetu
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/properties
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_APP_NAME
+        value: PG-SETU
+      - key: NEXT_PUBLIC_APP_URL
+        value: https://pgsetu.onrender.com
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        value: https://rygtyzwkhcuiwxzqmmlo.supabase.co
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+        value: sb_publishable_6OJmArhZRC4HcHd_IBFbmw_7hpaYGHO
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+        value: staysetu-1bf2f
+      - key: NEXT_PUBLIC_FIREBASE_APP_ID
+        value: 1:736756765234:web:3860429390129871dbe22b
+      - key: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+        value: staysetu-1bf2f.firebasestorage.app
+      - key: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+        value: staysetu-1bf2f.firebaseapp.com
+      - key: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+        value: "736756765234"
+      - key: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+        value: G-WDEQGD48CT
+      - key: NEXT_PUBLIC_FIREBASE_API_KEY
+        sync: false
