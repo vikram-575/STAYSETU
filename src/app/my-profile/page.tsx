@@ -256,6 +256,59 @@ function ProfileDashboardContent() {
               </Link>
             </div>
 
+            {/* Active PG Stay Card (Synced from PG Owner check-in) */}
+            {isTenant && profile.current_stay && (
+              <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white rounded-3xl p-5 sm:p-6 shadow-xl space-y-4 border border-blue-800">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-blue-800/80 pb-3">
+                  <div>
+                    <span className="text-[10px] font-bold text-blue-300 uppercase tracking-wider">Active PG Accommodation</span>
+                    <h3 className="text-lg sm:text-xl font-black text-white">{profile.current_stay.organization_name}</h3>
+                    {profile.current_stay.property_name && (
+                      <p className="text-xs text-blue-200 mt-0.5">{profile.current_stay.property_name}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full text-xs font-bold uppercase tracking-wider">
+                      ● {profile.current_stay.status || 'Active Stay'}
+                    </span>
+                    <Link
+                      href="/portal"
+                      className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition shadow-sm"
+                    >
+                      View Passbook →
+                    </Link>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10">
+                    <span className="text-blue-200 text-[10px] font-semibold uppercase block">Room &amp; Bed</span>
+                    <span className="font-black text-white text-sm">
+                      Room {profile.current_stay.room_number || '—'} · Bed {profile.current_stay.bed_label || '—'}
+                    </span>
+                  </div>
+                  <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10">
+                    <span className="text-blue-200 text-[10px] font-semibold uppercase block">Monthly Rent</span>
+                    <span className="font-black text-white text-sm">
+                      {profile.current_stay.monthly_rent_paise ? `₹${(profile.current_stay.monthly_rent_paise / 100).toLocaleString('en-IN')}` : '—'}
+                    </span>
+                  </div>
+                  <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10">
+                    <span className="text-blue-200 text-[10px] font-semibold uppercase block">Outstanding Balance</span>
+                    <span className={`font-black text-sm ${profile.current_stay.total_outstanding_paise > 0 ? 'text-rose-300' : 'text-emerald-300'}`}>
+                      {profile.current_stay.total_outstanding_paise > 0 ? `₹${(profile.current_stay.total_outstanding_paise / 100).toLocaleString('en-IN')}` : 'Paid (₹0)'}
+                    </span>
+                  </div>
+                  <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10">
+                    <span className="text-blue-200 text-[10px] font-semibold uppercase block">Check-in Date</span>
+                    <span className="font-black text-white text-sm">
+                      {profile.current_stay.check_in_date || '—'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Profile Details */}
             {isTenant ? (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

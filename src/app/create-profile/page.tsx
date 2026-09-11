@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   Building2, Users, Home, ArrowRight, ArrowLeft, CheckCircle2,
   Phone, User, Mail, MapPin, Calendar, Briefcase, Star,
@@ -271,6 +272,7 @@ function OwnerForm({ form, setForm }: { form: FormState; setForm: React.Dispatch
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
 export default function CreateProfilePage() {
+  const router = useRouter()
   const [profileType, setProfileType] = useState<ProfileType>(null)
   const [step, setStep] = useState<Step>('choose')
   const [form, setForm] = useState<FormState>(DEFAULT_FORM)
@@ -330,7 +332,13 @@ export default function CreateProfilePage() {
       })
 
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to create profile')
+      if (!res.ok) {
+        if (data.duplicate && data.existing_profile_id) {
+          router.push(`/my-profile?mobile=${form.mobile}`)
+          return
+        }
+        throw new Error(data.error || 'Failed to create profile')
+      }
 
       setCreatedProfile(data)
       // Save to localStorage for cross-platform access

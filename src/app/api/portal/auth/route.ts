@@ -75,10 +75,16 @@ export async function POST(request: NextRequest) {
 
     const inputDob = cleanDate(date_of_birth)
 
-    const matchedResident = residents.find((r) => {
+    // Prioritize active stays over checked-out / past stays
+    const sortedResidents = [...residents].sort((a, b) => {
+      if (a.status === 'active' && b.status !== 'active') return -1
+      if (b.status === 'active' && a.status !== 'active') return 1
+      return 0
+    })
+
+    const matchedResident = sortedResidents.find((r) => {
       if (!r.date_of_birth) {
-        // If resident has no DOB in DB and is the only record matching this identifier, permit login
-        return residents.length === 1
+        return true
       }
       const recordDob = cleanDate(r.date_of_birth)
       return recordDob === inputDob
@@ -107,6 +113,7 @@ export async function POST(request: NextRequest) {
       resident: {
         id: matchedResident.id,
         full_name: matchedResident.full_name,
+        tenant_id: matchedResident.registration_number,
         registration_number: matchedResident.registration_number,
         phone: matchedResident.phone,
         status: matchedResident.status,

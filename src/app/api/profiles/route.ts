@@ -7,6 +7,7 @@ import {
 } from '@/lib/profiles'
 import { queryCollection, createDocument, getDocument } from '@/lib/firebase/firestore'
 import { isSuperAdminFromRequest } from '@/lib/admin-auth'
+import { createServiceClient } from '@/lib/supabase/server'
 
 const TENANT_COL = 'tenant_profiles'
 const OWNER_COL = 'owner_profiles'
@@ -28,7 +29,92 @@ export async function GET(request: NextRequest) {
     // Lookup by mobile
     if (mobile) {
       const cleanedMobile = cleanMobile(mobile)
-      const results = await queryCollection(collection, [['mobile', '==', cleanedMobile]])
+      let results = await queryCollection(collection, [['mobile', '==', cleanedMobile]])
+
+      // If tenant, cross-check Supabase residents to ensure unified identity with PG owner registrations
+      if (type === 'tenant') {
+        try {
+          const serviceClient = await createServiceClient()
+          const { data: dbResidents } = await serviceClient
+            .from('residents')
+            .select(`
+              id, organization_id, registration_number, full_name, phone,
+              email, date_of_birth, gender, permanent_address, permanent_city,
+              permanent_state, permanent_pincode, emergency_name, emergency_phone,
+              emergency_relation, id_type, id_number, status, created_at
+            `)
+            .or(`phone.ilike.%${cleanedMobile}%,alternate_phone.ilike.%${cleanedMobile}%`)
+            .order('created_at', { ascending: false })
+
+          if (dbResidents && dbResidents.length > 0) {
+            const latestRes = dbResidents[0]
+            // Fetch live stay information from v_resident_current
+            const { data: currentView } = await serviceClient
+              .from('v_resident_current')
+              .select('*')
+              .eq('resident_id', latestRes.id)
+              .maybeSingle()
+
+            const { data: org } = await serviceClient
+              .from('organizations')
+              .select('name')
+              .eq('id', latestRes.organization_id)
+              .maybeSingle()
+
+            const currentStay = {
+              organization_name: org?.name || 'PG Property',
+              property_name: currentView?.property_name || null,
+              room_number: currentView?.room_number || null,
+              bed_label: currentView?.bed_label || null,
+              monthly_rent_paise: currentView?.monthly_rent_paise || null,
+              total_outstanding_paise: currentView?.total_outstanding_paise || 0,
+              status: latestRes.status,
+              check_in_date: currentView?.check_in_date || (latestRes.created_at ? latestRes.created_at.split('T')[0] : null),
+              registration_number: latestRes.registration_number,
+            }
+
+            if (results.length > 0) {
+              // Enrich existing profile with stay details & ensure ID matches
+              const enriched = {
+                ...results[0],
+                id: results[0].id || latestRes.registration_number,
+                current_stay: currentStay,
+              }
+              return NextResponse.json({ found: true, profile: enriched })
+            } else {
+              // Synthesize profile from PG Owner resident record
+              const synthesized = {
+                id: latestRes.registration_number,
+                type: 'tenant',
+                full_name: latestRes.full_name,
+                mobile: cleanedMobile,
+                email: latestRes.email || undefined,
+                dob: latestRes.date_of_birth || undefined,
+                gender: latestRes.gender || undefined,
+                current_city: latestRes.permanent_city || '',
+                preferred_cities: [latestRes.permanent_city || 'Noida'],
+                budget_min_paise: currentView?.monthly_rent_paise || 500000,
+                budget_max_paise: (currentView?.monthly_rent_paise || 500000) * 1.5,
+                required_amenities: ['wifi', 'ac'],
+                preferred_room_type: 'any',
+                profile_status: 'active',
+                verified_mobile: true,
+                created_at: latestRes.created_at || new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                current_stay: currentStay,
+              }
+              try {
+                await createDocument(TENANT_COL, synthesized, latestRes.registration_number)
+              } catch {}
+
+              return NextResponse.json({ found: true, profile: synthesized })
+            }
+          }
+        } catch (dbErr: any) {
+          console.warn('[Profiles GET Supabase sync warning]:', dbErr?.message)
+        }
+      }
+
       if (results.length === 0) {
         return NextResponse.json({ found: false, profile: null })
       }
@@ -152,15 +238,39 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate unique ID
-    let profileId: string
-    let attempts = 0
-    do {
-      profileId = type === 'tenant' ? generateTenantId() : generateOwnerId()
-      const conflict = await getDocument(collection, profileId)
-      if (!conflict) break
-      attempts++
-    } while (attempts < 10)
+    // Generate or Reuse unique ID
+    let profileId: string | null = null
+
+    // For tenants, check if an existing resident in Supabase already has a Unique Tenant ID
+    if (type === 'tenant') {
+      try {
+        const serviceClient = await createServiceClient()
+        const { data: dbRes } = await serviceClient
+          .from('residents')
+          .select('registration_number')
+          .or(`phone.ilike.%${cleanedMobile}%,alternate_phone.ilike.%${cleanedMobile}%`)
+          .order('created_at', { ascending: false })
+
+        const resWithTn = dbRes?.find((r) => r.registration_number?.startsWith('TN'))
+        if (resWithTn) {
+          profileId = resWithTn.registration_number
+        } else if (dbRes && dbRes.length > 0 && dbRes[0].registration_number) {
+          profileId = dbRes[0].registration_number
+        }
+      } catch (checkErr: any) {
+        console.warn('[Profiles POST Supabase lookup warning]:', checkErr?.message)
+      }
+    }
+
+    if (!profileId) {
+      let attempts = 0
+      do {
+        profileId = type === 'tenant' ? generateTenantId() : generateOwnerId()
+        const conflict = await getDocument(collection, profileId)
+        if (!conflict) break
+        attempts++
+      } while (attempts < 10)
+    }
 
     // Build the profile document
     const now = new Date().toISOString()

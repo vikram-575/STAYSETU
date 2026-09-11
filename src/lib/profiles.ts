@@ -109,6 +109,9 @@ export function cleanMobile(mobile: string): string {
   if (cleaned.startsWith('91') && cleaned.length === 12) {
     cleaned = cleaned.slice(2)
   }
+  if (cleaned.startsWith('0') && cleaned.length === 11) {
+    cleaned = cleaned.slice(1)
+  }
   return cleaned
 }
 

@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getAuthenticatedUser } from '@/lib/auth-session'
+import { generateTenantId, cleanMobile } from '@/lib/profiles'
+import { createDocument, getDocument, queryCollection } from '@/lib/firebase/firestore'
 
 /**
  * GET /api/residents/checkin
@@ -233,38 +235,120 @@ export async function POST(request: NextRequest) {
       if (dbU) validUserId = dbU.id
     }
 
-    // Generate unique registration number
-    const registrationNumber = `PG-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`
+    // 0. Resolve or Reuse Canonical Unique Tenant ID (TN...)
+    const cleanedPhone = cleanMobile(phone)
+    let registrationNumber = body.tenant_id?.trim() || null
 
-    // 1. Create Resident
-    const { data: resident, error: residentError } = await serviceClient
+    if (!registrationNumber) {
+      // Check if any resident already exists with this phone across ANY PG
+      const { data: existingResidents } = await serviceClient
+        .from('residents')
+        .select('registration_number')
+        .or(`phone.ilike.%${cleanedPhone}%,alternate_phone.ilike.%${cleanedPhone}%`)
+        .order('created_at', { ascending: false })
+
+      const residentWithTn = existingResidents?.find((r) => r.registration_number?.startsWith('TN'))
+      if (residentWithTn) {
+        registrationNumber = residentWithTn.registration_number
+      } else if (existingResidents && existingResidents.length > 0 && existingResidents[0].registration_number) {
+        registrationNumber = existingResidents[0].registration_number
+      }
+    }
+
+    if (!registrationNumber) {
+      // Check tenant_profiles from self-registration
+      try {
+        const existingProfiles = await queryCollection('tenant_profiles', [['mobile', '==', cleanedPhone]])
+        if (existingProfiles && existingProfiles.length > 0 && existingProfiles[0].id) {
+          registrationNumber = existingProfiles[0].id
+        }
+      } catch {}
+    }
+
+    // If still no canonical ID found, generate permanent Unique Tenant ID
+    if (!registrationNumber) {
+      registrationNumber = generateTenantId()
+    }
+
+    // 1. Create or Reactivate Resident in this Organization
+    let resident: any = null
+
+    // Check if resident already exists in this specific organization
+    const { data: existingOrgResident } = await serviceClient
       .from('residents')
-      .insert({
-        organization_id: orgId,
-        registration_number: registrationNumber,
-        full_name: full_name.trim(),
-        phone: phone.trim(),
-        alternate_phone: alternate_phone?.trim() || null,
-        email: email?.trim() || null,
-        date_of_birth: date_of_birth || null,
-        gender: gender || null,
-        permanent_address: permanent_address?.trim() || null,
-        permanent_city: permanent_city?.trim() || null,
-        permanent_state: permanent_state?.trim() || null,
-        emergency_name: emergency_name?.trim() || null,
-        emergency_phone: emergency_phone?.trim() || null,
-        emergency_relation: emergency_relation?.trim() || null,
-        id_type: id_type || null,
-        id_number: id_number?.trim() || null,
-        status: 'active',
-        notes: notes?.trim() || null,
-        created_by: validUserId,
-      })
-      .select()
-      .single()
+      .select('*')
+      .eq('organization_id', orgId)
+      .eq('registration_number', registrationNumber)
+      .maybeSingle()
 
-    if (residentError || !resident) {
-      return NextResponse.json({ error: residentError?.message || 'Failed to create resident record' }, { status: 500 })
+    if (existingOrgResident) {
+      if (existingOrgResident.status === 'active') {
+        return NextResponse.json({
+          error: `Resident ${existingOrgResident.full_name} (${registrationNumber}) is already actively checked in at this property.`
+        }, { status: 400 })
+      }
+
+      // Reactivate checked-out resident with updated details
+      const { data: updatedRes, error: updateErr } = await serviceClient
+        .from('residents')
+        .update({
+          full_name: full_name.trim(),
+          phone: cleanedPhone,
+          alternate_phone: alternate_phone?.trim() || null,
+          email: email?.trim() || null,
+          date_of_birth: date_of_birth || null,
+          gender: gender || null,
+          permanent_address: permanent_address?.trim() || null,
+          permanent_city: permanent_city?.trim() || null,
+          permanent_state: permanent_state?.trim() || null,
+          emergency_name: emergency_name?.trim() || null,
+          emergency_phone: emergency_phone?.trim() || null,
+          emergency_relation: emergency_relation?.trim() || null,
+          id_type: id_type || null,
+          id_number: id_number?.trim() || null,
+          status: 'active',
+          notes: notes?.trim() || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingOrgResident.id)
+        .select()
+        .single()
+
+      if (updateErr || !updatedRes) {
+        return NextResponse.json({ error: updateErr?.message || 'Failed to reactivate resident' }, { status: 500 })
+      }
+      resident = updatedRes
+    } else {
+      const { data: newResident, error: residentError } = await serviceClient
+        .from('residents')
+        .insert({
+          organization_id: orgId,
+          registration_number: registrationNumber,
+          full_name: full_name.trim(),
+          phone: cleanedPhone,
+          alternate_phone: alternate_phone?.trim() || null,
+          email: email?.trim() || null,
+          date_of_birth: date_of_birth || null,
+          gender: gender || null,
+          permanent_address: permanent_address?.trim() || null,
+          permanent_city: permanent_city?.trim() || null,
+          permanent_state: permanent_state?.trim() || null,
+          emergency_name: emergency_name?.trim() || null,
+          emergency_phone: emergency_phone?.trim() || null,
+          emergency_relation: emergency_relation?.trim() || null,
+          id_type: id_type || null,
+          id_number: id_number?.trim() || null,
+          status: 'active',
+          notes: notes?.trim() || null,
+          created_by: validUserId,
+        })
+        .select()
+        .single()
+
+      if (residentError || !newResident) {
+        return NextResponse.json({ error: residentError?.message || 'Failed to create resident record' }, { status: 500 })
+      }
+      resident = newResident
     }
 
     // 2. Create Assignment
@@ -338,7 +422,33 @@ export async function POST(request: NextRequest) {
       added_by: validUserId,
     })
 
-    // 6. Audit Log
+    // 6. Sync Unified Tenant Profile
+    try {
+      const profileData = {
+        type: 'tenant',
+        id: registrationNumber,
+        mobile: cleanedPhone,
+        full_name: full_name.trim(),
+        email: email?.trim().toLowerCase() || null,
+        dob: date_of_birth || null,
+        gender: gender || null,
+        current_city: permanent_city?.trim() || '',
+        permanent_address: permanent_address?.trim() || null,
+        permanent_city: permanent_city?.trim() || null,
+        permanent_state: permanent_state?.trim() || null,
+        emergency_name: emergency_name?.trim() || null,
+        emergency_phone: emergency_phone?.trim() || null,
+        id_type: id_type || 'aadhaar',
+        id_number: id_number?.trim() || null,
+        profile_status: 'active',
+        verified_mobile: true,
+      }
+      await createDocument('tenant_profiles', profileData, registrationNumber)
+    } catch (profileSyncErr: any) {
+      console.warn('[Checkin Profile Sync Warning]:', profileSyncErr?.message)
+    }
+
+    // 7. Audit Log
     try {
       await serviceClient.from('audit_logs').insert({
         organization_id: orgId,
@@ -347,13 +457,14 @@ export async function POST(request: NextRequest) {
         entity_type: 'resident',
         entity_id: resident.id,
         entity_label: `${full_name} (${registrationNumber})`,
-        after_data: { full_name, phone, bed_id, monthly_rent_paise },
+        after_data: { full_name, phone: cleanedPhone, bed_id, monthly_rent_paise, tenant_id: registrationNumber },
       })
     } catch {}
 
     return NextResponse.json({
       success: true,
       resident_id: resident.id,
+      tenant_id: registrationNumber,
       registration_number: registrationNumber,
     })
   } catch (err: any) {

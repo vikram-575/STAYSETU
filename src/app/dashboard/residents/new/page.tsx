@@ -29,7 +29,12 @@ export default function CheckInResidentPage() {
   }>({ properties: [], buildings: [], floors: [], rooms: [], beds: [] })
 
   // Form State
+  const [lookupLoading, setLookupLoading] = useState(false)
+  const [existingTenant, setExistingTenant] = useState<any | null>(null)
+  const [suggestedTenantId, setSuggestedTenantId] = useState<string | null>(null)
+
   const [form, setForm] = useState({
+    tenant_id: '',
     // Step 1: Personal
     full_name: '',
     phone: '',
@@ -165,6 +170,53 @@ export default function CheckInResidentPage() {
       bed_id: firstBed?.id || '',
       monthly_rent_rupees: roomObj?.base_rent_paise ? roomObj.base_rent_paise / 100 : prev.monthly_rent_rupees,
     }))
+  }
+
+  const handlePhoneLookup = async (phoneInput: string) => {
+    const digits = phoneInput.replace(/\D/g, '')
+    const clean = digits.length >= 10 ? digits.slice(-10) : ''
+    if (clean.length !== 10) {
+      setExistingTenant(null)
+      return
+    }
+
+    setLookupLoading(true)
+    try {
+      const res = await fetch(`/api/tenants/lookup?phone=${clean}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.tenant_id) {
+          setSuggestedTenantId(data.tenant_id)
+          setForm((prev) => ({ ...prev, tenant_id: data.tenant_id }))
+        }
+        if (data.found) {
+          setExistingTenant(data)
+          setForm((prev) => ({
+            ...prev,
+            tenant_id: data.tenant_id,
+            full_name: prev.full_name || data.full_name || '',
+            alternate_phone: prev.alternate_phone || data.alternate_phone || '',
+            email: prev.email || data.email || '',
+            date_of_birth: prev.date_of_birth || data.date_of_birth || '',
+            gender: prev.gender || data.gender || 'male',
+            permanent_address: prev.permanent_address || data.permanent_address || '',
+            permanent_city: prev.permanent_city || data.permanent_city || '',
+            permanent_state: prev.permanent_state || data.permanent_state || '',
+            emergency_name: prev.emergency_name || data.emergency_name || '',
+            emergency_phone: prev.emergency_phone || data.emergency_phone || '',
+            emergency_relation: prev.emergency_relation || data.emergency_relation || 'Parent',
+            id_type: prev.id_type || data.id_type || 'aadhaar',
+            id_number: prev.id_number || data.id_number || '',
+          }))
+        } else {
+          setExistingTenant(null)
+        }
+      }
+    } catch (e) {
+      console.warn('Phone lookup error:', e)
+    } finally {
+      setLookupLoading(false)
+    }
   }
 
   const nextStep = () => {
@@ -348,15 +400,73 @@ export default function CheckInResidentPage() {
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">Mobile Number *</label>
-                <input
-                  type="tel"
-                  required
-                  placeholder="10-digit mobile"
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                />
+                <div className="relative">
+                  <input
+                    type="tel"
+                    required
+                    placeholder="10-digit mobile"
+                    value={form.phone}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      setForm({ ...form, phone: val })
+                      const digits = val.replace(/\D/g, '')
+                      if (digits.length === 10) {
+                        handlePhoneLookup(digits)
+                      }
+                    }}
+                    onBlur={() => handlePhoneLookup(form.phone)}
+                    className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                  {lookupLoading && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                    </div>
+                  )}
+                </div>
               </div>
+            </div>
+
+            {/* Unified Tenant Identification Banner */}
+            {lookupLoading && (
+              <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-700 font-medium animate-in fade-in">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600 shrink-0" />
+                <span>Searching PG-Setu Unified Tenant Registry...</span>
+              </div>
+            )}
+
+            {existingTenant && (
+              <div className="p-3.5 sm:p-4 bg-emerald-50 border border-emerald-200 rounded-xl sm:rounded-2xl text-xs text-emerald-900 space-y-2 animate-in fade-in">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-2 font-bold">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Unified PG-Setu Tenant Found: {existingTenant.full_name || 'Registered Tenant'}</span>
+                  </div>
+                  <span className="self-start sm:self-auto px-2.5 py-0.5 bg-emerald-600 text-white rounded-full font-mono text-[11px] font-black tracking-wide">
+                    {existingTenant.tenant_id}
+                  </span>
+                </div>
+                <p className="text-[11px] text-emerald-700 leading-relaxed">
+                  Tenant already registered in PG-Setu. Personal profile &amp; KYC have been automatically pre-filled. Their permanent Unique Tenant ID (<strong>{existingTenant.tenant_id}</strong>) will be linked to this stay.
+                </p>
+                {existingTenant.stays && existingTenant.stays.length > 0 && (
+                  <div className="text-[10px] text-emerald-800 bg-white/80 p-2 rounded-lg border border-emerald-200">
+                    <span className="font-bold">Recorded Stays: </span>
+                    {existingTenant.stays.map((s: any) => `${s.organization_name} (${s.status})`).join(' · ')}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!existingTenant && suggestedTenantId && (
+              <div className="flex items-center justify-between p-3 bg-blue-50/70 border border-blue-200/80 rounded-xl text-xs text-blue-900 animate-in fade-in">
+                <span className="font-medium">Permanent PG-Setu Unique Tenant ID:</span>
+                <span className="px-2.5 py-0.5 bg-blue-600 text-white rounded-full font-mono text-[11px] font-black">
+                  {suggestedTenantId}
+                </span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">Alternate Phone</label>
                 <input
@@ -723,6 +833,12 @@ export default function CheckInResidentPage() {
             {/* Review Summary */}
             <div className="p-3.5 sm:p-4 bg-gray-50 border border-gray-200 rounded-xl sm:rounded-2xl space-y-2 text-xs">
               <h4 className="font-bold text-gray-900 mb-1">Check-in Summary:</h4>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500">Unique Tenant ID:</span>
+                <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                  {form.tenant_id || suggestedTenantId || 'Auto-generated (TN...)'}
+                </span>
+              </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Resident:</span>
                 <span className="font-bold text-gray-900">{form.full_name} ({form.phone})</span>

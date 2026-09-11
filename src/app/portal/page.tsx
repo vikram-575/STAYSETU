@@ -200,20 +200,18 @@ export default function ResidentPortalPage() {
 
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-[#17211B] mb-1.5 uppercase tracking-wider">Registered Mobile Number *</label>
+                <label className="block text-xs font-bold text-[#17211B] mb-1.5 uppercase tracking-wider">Registered Mobile Number or Unique Tenant ID *</label>
                 <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-extrabold text-[#647067]">+91</span>
                   <input
-                    type="tel"
+                    type="text"
                     required
-                    inputMode="tel"
-                    placeholder="10-digit phone number"
+                    placeholder="10-digit mobile number or TN... ID"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 bg-[#F7FAF7] border border-[#E5E7EB] rounded-xl text-xs sm:text-sm text-[#17211B] font-medium placeholder-[#647067]/60 focus:bg-white focus:border-[#16A34A] focus:ring-4 focus:ring-[#16A34A]/10 outline-none transition"
+                    className="w-full px-4 py-3 bg-[#F7FAF7] border border-[#E5E7EB] rounded-xl text-xs sm:text-sm text-[#17211B] font-medium placeholder-[#647067]/60 focus:bg-white focus:border-[#16A34A] focus:ring-4 focus:ring-[#16A34A]/10 outline-none transition"
                   />
                 </div>
-                <p className="text-[10px] text-[#647067] mt-1">The phone number given during your PG check-in.</p>
+                <p className="text-[10px] text-[#647067] mt-1">Enter the mobile number given at check-in or your PG-Setu Unique Tenant ID (e.g. TN4827K3M).</p>
               </div>
 
               <div>
@@ -335,7 +333,12 @@ export default function ResidentPortalPage() {
                   {resident.status || 'Active'}
                 </span>
               </div>
-              <p className="text-xs text-gray-500 font-mono font-medium">{resident.registration_number}</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Unique Tenant ID:</span>
+                <span className="text-xs text-blue-700 font-mono font-bold bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                  {resident.registration_number}
+                </span>
+              </div>
             </div>
           </div>
 
