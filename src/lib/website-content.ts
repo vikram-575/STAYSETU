@@ -175,7 +175,7 @@ export interface WebsiteContent {
 export const DEFAULT_WEBSITE_CONTENT: WebsiteContent = {
   announcement: {
     enabled: true,
-    text: '🎉 Summer Coliving Offer: Zero Security Deposit Booking on Verified PGs this month!',
+    text: 'Summer Coliving Offer: Zero Security Deposit Booking on Verified PGs this month!',
     badge: 'EXCLUSIVE',
     linkText: 'Explore PGs',
     linkUrl: '/#featured-properties',

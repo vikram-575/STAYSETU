@@ -1204,7 +1204,7 @@ function OnboardingContent() {
               </div>
 
               <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-[11px] text-slate-400 leading-relaxed">
-                💡 <strong>Instant Scale:</strong> Once launched, you can immediately check in tenants, split electricity units, and send WhatsApp rent links.
+                <strong>Instant Scale:</strong> Once launched, you can immediately check in tenants, split electricity units, and send WhatsApp rent links.
               </div>
             </div>
           </div>

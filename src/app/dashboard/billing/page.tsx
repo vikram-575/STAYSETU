@@ -215,7 +215,7 @@ export default async function BillingPage({ searchParams }: Props) {
               })
             ) : (
               <div className="py-12 text-center text-gray-400 text-xs bg-gray-50 rounded-2xl border border-gray-200">
-                🎉 No outstanding dues from any resident!
+                No outstanding dues from any resident!
               </div>
             )}
           </div>
@@ -284,7 +284,7 @@ export default async function BillingPage({ searchParams }: Props) {
                 ) : (
                   <tr>
                     <td colSpan={5} className="py-8 text-center text-gray-400">
-                      🎉 No outstanding dues from any resident!
+                      No outstanding dues from any resident!
                     </td>
                   </tr>
                 )}

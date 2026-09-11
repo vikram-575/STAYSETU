@@ -485,8 +485,9 @@ export function PropertyDetailModal({
                       <span>Schedule Free Visit</span>
                     </button>
 
-                    <p className="text-center text-[11px] text-[#647067]">
-                      🔒 Zero spam guarantee. Direct contact with verified property owner.
+                    <p className="text-center text-[11px] text-[#647067] flex items-center justify-center gap-1">
+                      <ShieldCheck className="h-3.5 w-3.5 text-[#16A34A]" />
+                      <span>Zero spam guarantee. Direct contact with verified property owner.</span>
                     </p>
                   </form>
                 )}

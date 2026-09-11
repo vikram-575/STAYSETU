@@ -30,14 +30,14 @@ export function FloatingWebsiteAdminBar() {
   const [expanded, setExpanded] = useState(false)
 
   const quickLinks = [
-    { section: 'announcement', label: '📢 Announcement Bar' },
-    { section: 'hero', label: '🚀 Hero & Search Header' },
-    { section: 'trust', label: '🛡️ Trust & Value Pillars' },
-    { section: 'cities', label: '🏙️ Popular Cities Grid' },
-    { section: 'comparison', label: '⚖️ Why Choose Us Table' },
-    { section: 'owner-cta', label: '🏢 Owner CTA Banner' },
-    { section: 'software', label: '💻 ERP Software Page' },
-    { section: 'footer', label: '📞 Footer & Contacts' },
+    { section: 'announcement', label: 'Announcement Bar' },
+    { section: 'hero', label: 'Hero & Search Header' },
+    { section: 'trust', label: 'Trust & Value Pillars' },
+    { section: 'cities', label: 'Popular Cities Grid' },
+    { section: 'comparison', label: 'Why Choose Us Table' },
+    { section: 'owner-cta', label: 'Owner CTA Banner' },
+    { section: 'software', label: 'ERP Software Page' },
+    { section: 'footer', label: 'Footer & Contacts' },
   ]
 
   return (

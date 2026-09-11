@@ -125,7 +125,7 @@ export default async function ResidentsPage({ searchParams }: Props) {
                   activeTab === 'verified' ? 'bg-white text-emerald-600 shadow-xs' : 'text-gray-600 hover:text-gray-900'
                 )}
               >
-                🟢 Verified
+                Verified
               </Link>
               <Link
                 href={`/dashboard/residents?tab=overdue${searchQuery ? `&search=${searchQuery}` : ''}`}

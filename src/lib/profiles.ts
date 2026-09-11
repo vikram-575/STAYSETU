@@ -1,4 +1,4 @@
-﻿/**
+/**
  * PG-SETU Profile System
  * Core types, ID generation, and utility functions for
  * Tenant Profiles and PG Owner Profiles
@@ -120,29 +120,29 @@ export function formatBudget(paise: number): string {
 }
 
 export const AMENITY_OPTIONS = [
-  { value: 'wifi', label: '📶 WiFi' },
-  { value: 'ac', label: '❄️ AC' },
-  { value: 'food', label: '🍽️ Meals Included' },
-  { value: 'laundry', label: '🧺 Laundry' },
-  { value: 'parking', label: '🚗 Parking' },
-  { value: 'gym', label: '💪 Gym' },
-  { value: 'cctv', label: '📹 CCTV Security' },
-  { value: 'power_backup', label: '🔋 Power Backup' },
-  { value: 'housekeeping', label: '🧹 Housekeeping' },
-  { value: 'water_purifier', label: '💧 Water Purifier' },
-  { value: 'attached_bathroom', label: '🚿 Attached Bathroom' },
-  { value: 'hot_water', label: '♨️ Hot Water' },
-  { value: 'refrigerator', label: '🧊 Refrigerator' },
-  { value: 'tv', label: '📺 TV' },
-  { value: 'study_table', label: '📚 Study Table' },
+  { value: 'wifi', label: 'WiFi' },
+  { value: 'ac', label: 'AC' },
+  { value: 'food', label: 'Meals Included' },
+  { value: 'laundry', label: 'Laundry' },
+  { value: 'parking', label: 'Parking' },
+  { value: 'gym', label: 'Gym' },
+  { value: 'cctv', label: 'CCTV Security' },
+  { value: 'power_backup', label: 'Power Backup' },
+  { value: 'housekeeping', label: 'Housekeeping' },
+  { value: 'water_purifier', label: 'Water Purifier' },
+  { value: 'attached_bathroom', label: 'Attached Bathroom' },
+  { value: 'hot_water', label: 'Hot Water' },
+  { value: 'refrigerator', label: 'Refrigerator' },
+  { value: 'tv', label: 'TV' },
+  { value: 'study_table', label: 'Study Table' },
 ]
 
 export const PROFESSION_OPTIONS = [
-  { value: 'student', label: '🎓 Student' },
-  { value: 'working_professional', label: '💼 Working Professional' },
-  { value: 'business', label: '🏢 Business Owner' },
-  { value: 'freelancer', label: '💻 Freelancer' },
-  { value: 'other', label: '👤 Other' },
+  { value: 'student', label: 'Student' },
+  { value: 'working_professional', label: 'Working Professional' },
+  { value: 'business', label: 'Business Owner' },
+  { value: 'freelancer', label: 'Freelancer' },
+  { value: 'other', label: 'Other' },
 ]
 
 export const CITY_OPTIONS = [
@@ -153,9 +153,9 @@ export const CITY_OPTIONS = [
 ]
 
 export const PROPERTY_TYPE_OPTIONS = [
-  { value: 'pg', label: '🏠 PG (Paying Guest)' },
-  { value: 'hostel', label: '🏨 Hostel' },
-  { value: 'flat', label: '🏢 Flat / Apartment' },
-  { value: 'independent_house', label: '🏡 Independent House' },
-  { value: 'coliving', label: '🤝 Co-living Space' },
+  { value: 'pg', label: 'PG (Paying Guest)' },
+  { value: 'hostel', label: 'Hostel' },
+  { value: 'flat', label: 'Flat / Apartment' },
+  { value: 'independent_house', label: 'Independent House' },
+  { value: 'coliving', label: 'Co-living Space' },
 ]

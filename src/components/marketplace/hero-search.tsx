@@ -31,12 +31,12 @@ interface HeroSearchProps {
   onCityChange: (city: string) => void
 }
 
-const SEARCH_TABS: { id: PropertyType | 'all'; label: string; icon: string }[] = [
-  { id: 'all', label: 'All Spaces', icon: '✨' },
-  { id: 'pg', label: 'PG / Co-living', icon: '🛏️' },
-  { id: 'flat', label: 'Independent Flat', icon: '🏢' },
-  { id: 'room', label: 'Private Room', icon: '🚪' },
-  { id: 'apartment', label: 'Luxury Apartment', icon: '🏰' },
+const SEARCH_TABS: { id: PropertyType | 'all'; label: string }[] = [
+  { id: 'all', label: 'All Spaces' },
+  { id: 'pg', label: 'PG / Co-living' },
+  { id: 'flat', label: 'Independent Flat' },
+  { id: 'room', label: 'Private Room' },
+  { id: 'apartment', label: 'Luxury Apartment' },
 ]
 
 const POPULAR_SUGGESTIONS = [
@@ -165,7 +165,6 @@ export function HeroSearch({ onSearch, selectedCity, onCityChange }: HeroSearchP
                         : 'text-[#647067] hover:bg-gray-100/80 hover:text-[#17211B]'
                     }`}
                   >
-                    <span>{tab.icon}</span>
                     <span>{tab.label}</span>
                   </button>
                 )

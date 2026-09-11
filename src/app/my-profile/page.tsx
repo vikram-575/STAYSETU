@@ -317,7 +317,7 @@ function ProfileDashboardContent() {
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-black text-slate-900">
-                  {isTenant ? '🏠 PGs Matching Your Preferences' : '👥 Tenants Looking in Your Cities'}
+                  {isTenant ? 'PGs Matching Your Preferences' : 'Tenants Looking in Your Cities'}
                 </h3>
                 <button
                   onClick={() => isTenant ? loadLeadsForTenant(profile) : loadLeadsForOwner(profile)}
@@ -335,7 +335,7 @@ function ProfileDashboardContent() {
 
               {!loadingLeads && tenantLeads.length === 0 && (
                 <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center">
-                  <div className="text-4xl mb-3">{isTenant ? '🔍' : '👀'}</div>
+                  <Search className="w-10 h-10 text-slate-300 mx-auto mb-3" />
                   <p className="text-slate-500 text-sm">
                     {isTenant
                       ? 'No PGs found in your preferred cities yet. More are being added daily!'
@@ -388,14 +388,14 @@ function ProfileDashboardContent() {
                         <div className="space-y-1">
                           {lead.budget_min_paise && (
                             <p className="text-xs text-slate-600">
-                              💰 Budget: {formatBudget(lead.budget_min_paise)} – {formatBudget(lead.budget_max_paise)}
+                              Budget: {formatBudget(lead.budget_min_paise)} – {formatBudget(lead.budget_max_paise)}
                             </p>
                           )}
                           {lead.preferred_room_type && (
-                            <p className="text-xs text-slate-600 capitalize">🛏️ Room: {lead.preferred_room_type}</p>
+                            <p className="text-xs text-slate-600 capitalize">Room: {lead.preferred_room_type}</p>
                           )}
                           {lead.move_in_date && (
-                            <p className="text-xs text-slate-600">📅 Move-in: {lead.move_in_date}</p>
+                            <p className="text-xs text-slate-600">Move-in: {lead.move_in_date}</p>
                           )}
                           {lead.preferred_cities?.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-2">

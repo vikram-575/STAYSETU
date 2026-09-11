@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
 import {
@@ -338,7 +338,9 @@ export default function ProfilesTab() {
           </div>
         ) : profiles.length === 0 ? (
           <div className="py-16 text-center">
-            <div className="text-4xl mb-3">{isTenant ? '👤' : '🏠'}</div>
+            <div className="w-12 h-12 rounded-2xl bg-slate-800 flex items-center justify-center mx-auto mb-3 text-slate-400">
+              {isTenant ? <Users className="w-6 h-6" /> : <Home className="w-6 h-6" />}
+            </div>
             <p className="text-slate-400 text-sm">No {subTab} profiles found</p>
             <a href="/create-profile" target="_blank" className="inline-block mt-3 text-xs text-emerald-400 hover:underline">
               Create the first profile →

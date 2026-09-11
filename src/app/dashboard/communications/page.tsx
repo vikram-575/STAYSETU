@@ -168,7 +168,7 @@ export default async function CommunicationsPage({ searchParams }: Props) {
               })
             ) : (
               <div className="py-12 text-center text-gray-400 text-xs bg-gray-50 rounded-2xl border border-gray-200">
-                🎉 No residents have overdue balances today.
+                No residents have overdue balances today.
               </div>
             )}
           </div>

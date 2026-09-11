@@ -106,8 +106,9 @@ export function KYCReportModal({
             </div>
 
             <div className="text-right space-y-1">
-              <span className="px-3 py-1 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-full font-black text-xs uppercase tracking-wider inline-block">
-                🟢 VERIFIED
+              <span className="px-3 py-1 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-full font-black text-xs uppercase tracking-wider inline-flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-600 inline-block" />
+                VERIFIED
               </span>
               <div className="text-[11px] font-mono text-slate-500">ID: {report?.verification_id || verificationId}</div>
             </div>

@@ -189,7 +189,7 @@ export default function GenerateInvoicesModal() {
                 </div>
 
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-800 font-medium">
-                  🛡️ <strong>Safe & Idempotent:</strong> Any resident who already has an invoice generated for this period will be automatically skipped.
+                  <strong>Safe & Idempotent:</strong> Any resident who already has an invoice generated for this period will be automatically skipped.
                 </div>
 
                 <div className="pt-2 flex justify-end gap-2">

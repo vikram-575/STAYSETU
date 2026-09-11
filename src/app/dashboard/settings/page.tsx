@@ -242,8 +242,9 @@ export default function SettingsPage() {
               </span>
             </div>
             <p className="text-xs text-slate-500 font-medium mt-0.5">{userProfile.email}</p>
-            <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-              🏢 {org.name || 'PG-SETU Accommodation'}
+            <p className="text-[11px] text-slate-400 font-medium mt-0.5 flex items-center gap-1">
+              <Building2 className="w-3.5 h-3.5 text-slate-400" />
+              <span>{org.name || 'PG-SETU Accommodation'}</span>
             </p>
           </div>
         </div>

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import React, { useState } from 'react'
 import Link from 'next/link'
@@ -405,7 +405,7 @@ export default function CreateProfilePage() {
                 </div>
                 <div className="space-y-1">
                   <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-blue-100 rounded-full text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-2">
-                    🏠 Tenant Profile <span className="font-mono">TN...</span>
+                    Tenant Profile <span className="font-mono">TN...</span>
                   </div>
                   <h2 className="text-xl font-black text-slate-900">I am Looking for PG</h2>
                   <p className="text-xs text-slate-500 leading-relaxed">
@@ -427,7 +427,7 @@ export default function CreateProfilePage() {
                 </div>
                 <div className="space-y-1">
                   <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-amber-100 rounded-full text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-2">
-                    🏢 Owner Profile <span className="font-mono">OW...</span>
+                    Owner Profile <span className="font-mono">OW...</span>
                   </div>
                   <h2 className="text-xl font-black text-slate-900">I am a PG Owner</h2>
                   <p className="text-xs text-slate-500 leading-relaxed">
@@ -442,7 +442,7 @@ export default function CreateProfilePage() {
 
             {/* Info strip */}
             <div className="flex flex-wrap justify-center gap-6 text-xs text-slate-500">
-              {['🔒 No login required', '📱 Mobile as your identity', '🆔 Unique Profile ID assigned', '🔄 Use everywhere on PG-Setu'].map(item => (
+              {['No login required', 'Mobile as your identity', 'Unique Profile ID assigned', 'Use everywhere on PG-Setu'].map(item => (
                 <span key={item} className="flex items-center gap-1">{item}</span>
               ))}
             </div>
@@ -463,7 +463,7 @@ export default function CreateProfilePage() {
           </div>
 
           <div>
-            <h1 className="text-3xl font-black text-slate-900">Profile Created! 🎉</h1>
+            <h1 className="text-3xl font-black text-slate-900">Profile Created!</h1>
             <p className="text-slate-500 mt-2 text-sm">
               Your {isTenant ? 'Tenant' : 'PG Owner'} profile has been registered on PG-Setu
             </p>
@@ -578,7 +578,7 @@ export default function CreateProfilePage() {
         <form onSubmit={handleSubmit} className="bg-white rounded-3xl border border-slate-200 shadow-lg p-6 sm:p-8 space-y-6">
           {error && (
             <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 font-medium">
-              ⚠️ {error}
+              {error}
             </div>
           )}
 

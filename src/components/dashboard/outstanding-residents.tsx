@@ -16,7 +16,7 @@ export default function OutstandingResidentsList({ residents }: Props) {
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h2 className="text-base font-semibold text-gray-900 mb-4">Outstanding Residents</h2>
         <div className="flex items-center justify-center h-32 text-sm text-gray-400">
-          🎉 No outstanding balances!
+          No outstanding balances!
         </div>
       </div>
     )
