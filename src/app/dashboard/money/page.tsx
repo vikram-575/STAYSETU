@@ -11,34 +11,40 @@ import {
 
 import { getAuthenticatedUser } from '@/lib/auth-session'
 import { createServiceClient } from '@/lib/supabase/server'
+import { resolveEffectiveOrgId, isValidUUID } from '@/lib/org-helper'
 
 export default async function MoneyCenterPage() {
   const user = await getAuthenticatedUser()
   if (!user) redirect('/login')
 
   const supabase = await createServiceClient()
-  let orgId = user.organization_id
-  if (!orgId) {
-    const { data: defaultOrg } = await supabase.from('organizations').select('id').limit(1).single()
-    orgId = defaultOrg?.id || 'primary'
-  }
+  const orgId = await resolveEffectiveOrgId(user)
 
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
   const today = now.toISOString().split('T')[0]
 
-  // High-performance parallel fetch
-  const [
-    { data: invoices },
-    { data: deposits },
-    { data: expenses },
-    { data: invoiceItems },
-  ] = await Promise.all([
-    supabase.from('invoices').select('total_paise, paid_paise, balance_paise, status, due_date').eq('organization_id', orgId).not('status', 'in', '(cancelled,draft)'),
-    supabase.from('deposits').select('amount_paise').eq('organization_id', orgId).eq('is_refunded', false),
-    supabase.from('expenses').select('*').eq('organization_id', orgId),
-    supabase.from('invoice_items').select('category, total_paise, invoices!inner(organization_id, status)').eq('invoices.organization_id', orgId).not('invoices.status', 'in', '(cancelled,draft)'),
-  ])
+  let invoices: any[] = []
+  let deposits: any[] = []
+  let expenses: any[] = []
+  let invoiceItems: any[] = []
+
+  if (orgId && isValidUUID(orgId)) {
+    try {
+      const [invRes, depRes, expRes, itemRes] = await Promise.all([
+        supabase.from('invoices').select('total_paise, paid_paise, balance_paise, status, due_date').eq('organization_id', orgId).not('status', 'in', '(cancelled,draft)'),
+        supabase.from('deposits').select('amount_paise').eq('organization_id', orgId).eq('is_refunded', false),
+        supabase.from('expenses').select('*').eq('organization_id', orgId),
+        supabase.from('invoice_items').select('category, total_paise, invoices!inner(organization_id, status)').eq('invoices.organization_id', orgId).not('invoices.status', 'in', '(cancelled,draft)'),
+      ])
+      invoices = invRes.data ?? []
+      deposits = depRes.data ?? []
+      expenses = expRes.data ?? []
+      invoiceItems = itemRes.data ?? []
+    } catch (err) {
+      console.error('Failed fetching money center data:', err)
+    }
+  }
 
   const totalExpectedPaise = invoices?.reduce((s, i) => s + i.total_paise, 0) || 0
   const totalCollectedPaise = invoices?.reduce((s, i) => s + i.paid_paise, 0) || 0

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-session'
+import { resolveEffectiveOrgId } from '@/lib/org-helper'
 import { createServiceClient } from '@/lib/supabase/server'
 import { buildWhatsAppLink, buildSmsLink } from '@/lib/utils'
 import { logKYCEvent } from '@/lib/kyc/audit'
@@ -14,11 +15,7 @@ export async function POST(request: NextRequest) {
     const user = await getAuthenticatedUser()
     const supabase = await createServiceClient()
 
-    let orgId: string = user?.organization_id || ''
-    if (!orgId) {
-      const { data: defaultOrg } = await supabase.from('organizations').select('id, name').limit(1).single()
-      orgId = defaultOrg?.id || 'primary'
-    }
+    const orgId: string = (await resolveEffectiveOrgId(user)) || ''
 
     const { data: org } = await supabase.from('organizations').select('name').eq('id', orgId).single()
     const orgName = org?.name || 'PG-SETU Accommodation'

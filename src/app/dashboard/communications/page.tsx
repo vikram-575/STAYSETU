@@ -16,6 +16,7 @@ interface Props {
 
 import { getAuthenticatedUser } from '@/lib/auth-session'
 import { createServiceClient } from '@/lib/supabase/server'
+import { resolveEffectiveOrg, isValidUUID } from '@/lib/org-helper'
 
 export default async function CommunicationsPage({ searchParams }: Props) {
   const params = await searchParams
@@ -25,35 +26,42 @@ export default async function CommunicationsPage({ searchParams }: Props) {
   if (!user) redirect('/login')
 
   const supabase = await createServiceClient()
-  let orgId = user.organization_id
-  if (!orgId) {
-    const { data: defaultOrg } = await supabase.from('organizations').select('id, name').limit(1).single()
-    orgId = defaultOrg?.id || 'primary'
+  const effectiveOrg = await resolveEffectiveOrg(user)
+  const orgId = effectiveOrg?.id && isValidUUID(effectiveOrg.id) ? effectiveOrg.id : null
+  const orgName = effectiveOrg?.name || user.organizations?.name || 'PG Management'
+
+  let overdueResidents: any[] = []
+  let templates: any[] = []
+  let logs: any[] = []
+
+  if (orgId && isValidUUID(orgId)) {
+    try {
+      const [resData, tData, lData] = await Promise.all([
+        supabase
+          .from('v_resident_current')
+          .select('*')
+          .eq('organization_id', orgId)
+          .gt('total_outstanding_paise', 0)
+          .eq('status', 'active')
+          .order('total_outstanding_paise', { ascending: false }),
+        supabase
+          .from('message_templates')
+          .select('*')
+          .eq('organization_id', orgId),
+        supabase
+          .from('message_logs')
+          .select('*, residents(full_name, registration_number)')
+          .eq('organization_id', orgId)
+          .order('created_at', { ascending: false })
+          .limit(25),
+      ])
+      overdueResidents = resData.data ?? []
+      templates = tData.data ?? []
+      logs = lData.data ?? []
+    } catch (err) {
+      console.error('Failed fetching communications data:', err)
+    }
   }
-  const orgName = user.organizations?.name || 'PG Management'
-
-  // Outstanding residents for bulk reminders
-  const { data: overdueResidents } = await supabase
-    .from('v_resident_current')
-    .select('*')
-    .eq('organization_id', orgId)
-    .gt('total_outstanding_paise', 0)
-    .eq('status', 'active')
-    .order('total_outstanding_paise', { ascending: false })
-
-  // Templates
-  const { data: templates } = await supabase
-    .from('message_templates')
-    .select('*')
-    .eq('organization_id', orgId)
-
-  // Message Logs
-  const { data: logs } = await supabase
-    .from('message_logs')
-    .select('*, residents(full_name, registration_number)')
-    .eq('organization_id', orgId)
-    .order('created_at', { ascending: false })
-    .limit(25)
 
   return (
     <div className="space-y-4 sm:space-y-6 max-w-screen-2xl">

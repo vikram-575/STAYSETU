@@ -10,23 +10,30 @@ import {
 
 import { getAuthenticatedUser } from '@/lib/auth-session'
 import { createServiceClient } from '@/lib/supabase/server'
+import { resolveEffectiveOrgId, isValidUUID } from '@/lib/org-helper'
 
 export default async function ElectricityPage() {
   const user = await getAuthenticatedUser()
   if (!user) redirect('/login')
 
   const supabase = await createServiceClient()
-  let orgId = user.organization_id
-  if (!orgId) {
-    const { data: defaultOrg } = await supabase.from('organizations').select('id').limit(1).single()
-    orgId = defaultOrg?.id || 'primary'
-  }
+  const orgId = await resolveEffectiveOrgId(user)
 
-  // Parallel Fetch Meters and Readings History
-  const [{ data: meters }, { data: readings }] = await Promise.all([
-    supabase.from('electricity_meters').select('*, rooms(*, floors(*, buildings(*)))').eq('organization_id', orgId).order('meter_number'),
-    supabase.from('electricity_readings').select('*, electricity_meters(*, rooms(*))').eq('organization_id', orgId).order('reading_date', { ascending: false }).limit(20),
-  ])
+  let meters: any[] = []
+  let readings: any[] = []
+
+  if (orgId && isValidUUID(orgId)) {
+    try {
+      const [{ data: mData }, { data: rData }] = await Promise.all([
+        supabase.from('electricity_meters').select('*, rooms(*, floors(*, buildings(*)))').eq('organization_id', orgId).order('meter_number'),
+        supabase.from('electricity_readings').select('*, electricity_meters(*, rooms(*))').eq('organization_id', orgId).order('reading_date', { ascending: false }).limit(20),
+      ])
+      meters = mData ?? []
+      readings = rData ?? []
+    } catch (err) {
+      console.error('Failed fetching electricity data:', err)
+    }
+  }
 
   // Total consumption this month
   const totalUnits = readings?.reduce((s, r) => s + (r.units_consumed || 0), 0) || 0

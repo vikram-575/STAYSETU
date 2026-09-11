@@ -17,6 +17,7 @@ interface Props {
 
 import { getAuthenticatedUser } from '@/lib/auth-session'
 import { createServiceClient } from '@/lib/supabase/server'
+import { resolveEffectiveOrgId, isValidUUID } from '@/lib/org-helper'
 
 export default async function PaymentsPage({ searchParams }: Props) {
   const params = await searchParams
@@ -27,34 +28,40 @@ export default async function PaymentsPage({ searchParams }: Props) {
   if (!user) redirect('/login')
 
   const supabase = await createServiceClient()
-  let orgId = user.organization_id
-  if (!orgId) {
-    const { data: defaultOrg } = await supabase.from('organizations').select('id').limit(1).single()
-    orgId = defaultOrg?.id || 'primary'
-  }
+  const orgId = await resolveEffectiveOrgId(user)
   const now = new Date()
   const today = now.toISOString().split('T')[0]
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
 
-  // Payments Query
-  let query = supabase
-    .from('payments')
-    .select('*, residents(id, full_name, registration_number, phone)')
-    .eq('organization_id', orgId)
-    .order('payment_time', { ascending: false })
+  let payments: any[] = []
+  let allMonthPayments: any[] = []
 
-  if (selectedMethod !== 'all') {
-    query = query.eq('payment_method', selectedMethod)
-  }
-  if (selectedDate) {
-    query = query.eq('payment_date', selectedDate)
-  }
+  if (orgId && isValidUUID(orgId)) {
+    // Payments Query
+    let query = supabase
+      .from('payments')
+      .select('*, residents(id, full_name, registration_number, phone)')
+      .eq('organization_id', orgId)
+      .order('payment_time', { ascending: false })
 
-  // Parallel Fetch Payments and Monthly Summary
-  const [{ data: payments }, { data: allMonthPayments }] = await Promise.all([
-    query,
-    supabase.from('payments').select('amount_paise, payment_method, payment_date').eq('organization_id', orgId).gte('payment_date', monthStart).eq('status', 'completed'),
-  ])
+    if (selectedMethod !== 'all') {
+      query = query.eq('payment_method', selectedMethod)
+    }
+    if (selectedDate) {
+      query = query.eq('payment_date', selectedDate)
+    }
+
+    try {
+      const [pRes, mRes] = await Promise.all([
+        query,
+        supabase.from('payments').select('amount_paise, payment_method, payment_date').eq('organization_id', orgId).gte('payment_date', monthStart).eq('status', 'completed'),
+      ])
+      payments = pRes.data ?? []
+      allMonthPayments = mRes.data ?? []
+    } catch (err) {
+      console.error('Failed fetching payments:', err)
+    }
+  }
 
   let upiTotal = 0
   let cashTotal = 0

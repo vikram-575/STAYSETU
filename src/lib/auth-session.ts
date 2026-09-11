@@ -67,8 +67,8 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
             email: SUPER_ADMIN_EMAIL,
             full_name: adminProfile.full_name || 'Vikram Tomar (Super Admin)',
             role: 'superadmin',
-            organization_id: adminProfile.organization_id,
-            organizations: adminProfile.organizations || { id: 'primary', name: 'PG-SETU Platform' },
+            organization_id: adminProfile.organization_id || null,
+            organizations: adminProfile.organizations || null,
           }
         }
       } catch {}
@@ -79,7 +79,7 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
         full_name: 'Vikram Tomar (Super Admin)',
         role: 'superadmin',
         organization_id: null,
-        organizations: { id: 'platform', name: 'PG-SETU Platform Enterprise' },
+        organizations: null,
       }
     }
 

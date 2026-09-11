@@ -16,6 +16,7 @@ interface Props {
 
 import { getAuthenticatedUser } from '@/lib/auth-session'
 import { createServiceClient } from '@/lib/supabase/server'
+import { resolveEffectiveOrgId, isValidUUID } from '@/lib/org-helper'
 
 export default async function ReportsPage({ searchParams }: Props) {
   const params = await searchParams
@@ -25,24 +26,29 @@ export default async function ReportsPage({ searchParams }: Props) {
   if (!user) redirect('/login')
 
   const supabase = await createServiceClient()
-  let orgId = user.organization_id
-  if (!orgId) {
-    const { data: defaultOrg } = await supabase.from('organizations').select('id').limit(1).single()
-    orgId = defaultOrg?.id || 'primary'
-  }
+  const orgId = await resolveEffectiveOrgId(user)
 
-  // Parallel Data Fetching
-  const [
-    { data: invoices },
-    { data: payments },
-    { data: expenses },
-    { data: residents },
-  ] = await Promise.all([
-    supabase.from('invoices').select('*, residents(*)').eq('organization_id', orgId).order('created_at', { ascending: false }),
-    supabase.from('payments').select('*, residents(*)').eq('organization_id', orgId).order('payment_date', { ascending: false }),
-    supabase.from('expenses').select('*').eq('organization_id', orgId).order('expense_date', { ascending: false }),
-    supabase.from('v_resident_current').select('*').eq('organization_id', orgId).order('full_name'),
-  ])
+  let invoices: any[] = []
+  let payments: any[] = []
+  let expenses: any[] = []
+  let residents: any[] = []
+
+  if (orgId && isValidUUID(orgId)) {
+    try {
+      const [invRes, payRes, expRes, resRes] = await Promise.all([
+        supabase.from('invoices').select('*, residents(*)').eq('organization_id', orgId).order('created_at', { ascending: false }),
+        supabase.from('payments').select('*, residents(*)').eq('organization_id', orgId).order('payment_date', { ascending: false }),
+        supabase.from('expenses').select('*').eq('organization_id', orgId).order('expense_date', { ascending: false }),
+        supabase.from('v_resident_current').select('*').eq('organization_id', orgId).order('full_name'),
+      ])
+      invoices = invRes.data ?? []
+      payments = payRes.data ?? []
+      expenses = expRes.data ?? []
+      residents = resRes.data ?? []
+    } catch (err) {
+      console.error('Failed fetching reports data:', err)
+    }
+  }
 
   return (
     <div className="space-y-4 sm:space-y-6 max-w-screen-2xl">

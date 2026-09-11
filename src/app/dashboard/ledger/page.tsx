@@ -1,5 +1,6 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { getAuthenticatedUser } from '@/lib/auth-session'
+import { resolveEffectiveOrgId, isValidUUID } from '@/lib/org-helper'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { formatCurrency } from '@/lib/money'
@@ -26,39 +27,49 @@ export default async function DigitalLedgerPage({ searchParams }: Props) {
   if (!user) redirect('/login')
 
   const supabase = await createServiceClient()
-  let orgId = user.organization_id
-  if (!orgId) {
-    const { data: defaultOrg } = await supabase.from('organizations').select('id').limit(1).single()
-    orgId = defaultOrg?.id || 'primary'
-  }
+  const orgId = await resolveEffectiveOrgId(user)
 
   // Active residents list for picker
-  const { data: residents } = await supabase
-    .from('v_resident_current')
-    .select('*')
-    .eq('organization_id', orgId)
-    .order('full_name')
+  let residents: any[] = []
+  if (orgId && isValidUUID(orgId)) {
+    try {
+      const { data } = await supabase
+        .from('v_resident_current')
+        .select('*')
+        .eq('organization_id', orgId)
+        .order('full_name')
+      residents = data ?? []
+    } catch (err) {
+      console.error('Failed fetching ledger residents:', err)
+    }
+  }
 
   // Target resident
   const currentResidentId = selectedResidentId || (residents && residents.length > 0 ? residents[0].resident_id : '')
   const currentResident = residents?.find((r) => r.resident_id === currentResidentId)
 
   // Ledger query for resident
-  let ledgerQuery = supabase
-    .from('ledger_entries')
-    .select('*')
-    .eq('organization_id', orgId)
-    .order('entry_date', { ascending: false })
-    .order('entry_time', { ascending: false })
+  let entries: any[] = []
+  if (orgId && isValidUUID(orgId) && currentResidentId) {
+    let ledgerQuery = supabase
+      .from('ledger_entries')
+      .select('*')
+      .eq('organization_id', orgId)
+      .order('entry_date', { ascending: false })
+      .order('entry_time', { ascending: false })
 
-  if (currentResidentId) {
     ledgerQuery = ledgerQuery.eq('resident_id', currentResidentId)
-  }
-  if (selectedCategory !== 'all') {
-    ledgerQuery = ledgerQuery.eq('category', selectedCategory)
-  }
+    if (selectedCategory !== 'all') {
+      ledgerQuery = ledgerQuery.eq('category', selectedCategory)
+    }
 
-  const { data: entries } = await ledgerQuery
+    try {
+      const { data } = await ledgerQuery
+      entries = data ?? []
+    } catch (err) {
+      console.error('Failed fetching ledger entries:', err)
+    }
+  }
 
   // Calculations
   const totalDebitsPaise = entries?.reduce((s, e) => s + e.debit_paise, 0) || 0

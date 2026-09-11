@@ -18,6 +18,7 @@ interface Props {
 
 import { getAuthenticatedUser } from '@/lib/auth-session'
 import { createServiceClient } from '@/lib/supabase/server'
+import { resolveEffectiveOrgId, isValidUUID } from '@/lib/org-helper'
 
 export default async function BillingPage({ searchParams }: Props) {
   const params = await searchParams
@@ -28,36 +29,40 @@ export default async function BillingPage({ searchParams }: Props) {
   if (!user) redirect('/login')
 
   const supabase = await createServiceClient()
-  let orgId = user.organization_id
-  if (!orgId) {
-    const { data: defaultOrg } = await supabase.from('organizations').select('id').limit(1).single()
-    orgId = defaultOrg?.id || 'primary'
-  }
+  const orgId = await resolveEffectiveOrgId(user)
   const today = new Date().toISOString().split('T')[0]
 
-  // Build query
-  let invoicesQuery = supabase
-    .from('invoices')
-    .select('*, residents(*, resident_assignments(*, beds(*, rooms(*))))')
-    .eq('organization_id', orgId)
-    .order('created_at', { ascending: false })
+  let monthInvoices: any[] = []
+  let invoices: any[] = []
+  let outstandingResidents: any[] = []
 
-  if (activeTab === 'overdue') {
-    invoicesQuery = invoicesQuery.or(`status.eq.overdue,and(due_date.lt.${today},balance_paise.gt.0)`)
-  } else if (activeTab === 'unpaid') {
-    invoicesQuery = invoicesQuery.gt('balance_paise', 0)
+  if (orgId && isValidUUID(orgId)) {
+    // Build query
+    let invoicesQuery = supabase
+      .from('invoices')
+      .select('*, residents(*, resident_assignments(*, beds(*, rooms(*))))')
+      .eq('organization_id', orgId)
+      .order('created_at', { ascending: false })
+
+    if (activeTab === 'overdue') {
+      invoicesQuery = invoicesQuery.or(`status.eq.overdue,and(due_date.lt.${today},balance_paise.gt.0)`)
+    } else if (activeTab === 'unpaid') {
+      invoicesQuery = invoicesQuery.gt('balance_paise', 0)
+    }
+
+    try {
+      const [mInv, inv, outRes] = await Promise.all([
+        supabase.from('invoices').select('total_paise, paid_paise, balance_paise, status, due_date').eq('organization_id', orgId).not('status', 'in', '(cancelled,draft)'),
+        invoicesQuery,
+        supabase.from('v_resident_current').select('*').eq('organization_id', orgId).gt('total_outstanding_paise', 0).order('total_outstanding_paise', { ascending: false }),
+      ])
+      monthInvoices = mInv.data ?? []
+      invoices = inv.data ?? []
+      outstandingResidents = outRes.data ?? []
+    } catch (err) {
+      console.error('Failed fetching billing data:', err)
+    }
   }
-
-  // Parallel Fetch Stats, Invoices, and Outstanding Residents
-  const [
-    { data: monthInvoices },
-    { data: invoices },
-    { data: outstandingResidents },
-  ] = await Promise.all([
-    supabase.from('invoices').select('total_paise, paid_paise, balance_paise, status, due_date').eq('organization_id', orgId).not('status', 'in', '(cancelled,draft)'),
-    invoicesQuery,
-    supabase.from('v_resident_current').select('*').eq('organization_id', orgId).gt('total_outstanding_paise', 0).order('total_outstanding_paise', { ascending: false }),
-  ])
 
   const totalBilledPaise = monthInvoices?.reduce((s, i) => s + i.total_paise, 0) ?? 0
   const totalCollectedPaise = monthInvoices?.reduce((s, i) => s + i.paid_paise, 0) ?? 0

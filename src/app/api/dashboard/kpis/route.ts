@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getAuthenticatedUser } from '@/lib/auth-session'
 
+import { resolveEffectiveOrgId, isValidUUID } from '@/lib/org-helper'
+
 /**
  * GET /api/dashboard/kpis
  * Returns dashboard KPIs for the authenticated user's organization
@@ -12,32 +14,36 @@ export async function GET(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const serviceClient = await createServiceClient()
-    let orgId = user.organization_id
-    if (!orgId) {
-      const { data: defaultOrg } = await serviceClient.from('organizations').select('id').limit(1).single()
-      orgId = defaultOrg?.id || 'primary'
-    }
+    const orgId = await resolveEffectiveOrgId(user)
 
     const now = new Date()
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
     const today = now.toISOString().split('T')[0]
 
-    const [
-      { data: bedStats },
-      { count: activeResidents },
-      { data: monthInvoices },
-      { data: allOutstandingInvoices },
-      { data: todayPayments },
-      { data: deposits },
-    ] = await Promise.all([
-      serviceClient.from('beds').select('status').eq('organization_id', orgId),
-      serviceClient.from('residents').select('*', { count: 'exact', head: true }).eq('organization_id', orgId).eq('status', 'active'),
-      serviceClient.from('invoices').select('total_paise, paid_paise, balance_paise, status').eq('organization_id', orgId).gte('period_start', monthStart).lte('period_start', monthEnd).not('status', 'in', '(cancelled,draft)'),
-      serviceClient.from('invoices').select('balance_paise, status, due_date').eq('organization_id', orgId).not('status', 'in', '(cancelled,draft,paid)'),
-      serviceClient.from('payments').select('amount_paise').eq('organization_id', orgId).eq('payment_date', today).eq('status', 'completed'),
-      serviceClient.from('deposits').select('amount_paise').eq('organization_id', orgId).eq('is_refunded', false),
-    ])
+    let bedStats: any[] = []
+    let activeResidents = 0
+    let monthInvoices: any[] = []
+    let allOutstandingInvoices: any[] = []
+    let todayPayments: any[] = []
+    let deposits: any[] = []
+
+    if (orgId && isValidUUID(orgId)) {
+      const results = await Promise.allSettled([
+        serviceClient.from('beds').select('status').eq('organization_id', orgId),
+        serviceClient.from('residents').select('*', { count: 'exact', head: true }).eq('organization_id', orgId).eq('status', 'active'),
+        serviceClient.from('invoices').select('total_paise, paid_paise, balance_paise, status').eq('organization_id', orgId).gte('period_start', monthStart).lte('period_start', monthEnd).not('status', 'in', '(cancelled,draft)'),
+        serviceClient.from('invoices').select('balance_paise, status, due_date').eq('organization_id', orgId).not('status', 'in', '(cancelled,draft,paid)'),
+        serviceClient.from('payments').select('amount_paise').eq('organization_id', orgId).eq('payment_date', today).eq('status', 'completed'),
+        serviceClient.from('deposits').select('amount_paise').eq('organization_id', orgId).eq('is_refunded', false),
+      ])
+      if (results[0].status === 'fulfilled') bedStats = results[0].value.data ?? []
+      if (results[1].status === 'fulfilled') activeResidents = results[1].value.count ?? 0
+      if (results[2].status === 'fulfilled') monthInvoices = results[2].value.data ?? []
+      if (results[3].status === 'fulfilled') allOutstandingInvoices = results[3].value.data ?? []
+      if (results[4].status === 'fulfilled') todayPayments = results[4].value.data ?? []
+      if (results[5].status === 'fulfilled') deposits = results[5].value.data ?? []
+    }
 
     const totalBeds = bedStats?.length ?? 0
     const occupiedBeds = bedStats?.filter((b) => b.status === 'occupied').length ?? 0

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getAuthenticatedUser } from '@/lib/auth-session'
+import { resolveEffectiveOrgId } from '@/lib/org-helper'
 import { generateTenantId, cleanMobile } from '@/lib/profiles'
 import { createDocument, getDocument, queryCollection } from '@/lib/firebase/firestore'
 
@@ -17,16 +18,9 @@ export async function GET() {
     }
 
     const serviceClient = await createServiceClient()
-    let orgId = user.organization_id
-
-    // Fallback if user has no assigned org
+    const orgId = await resolveEffectiveOrgId(user)
     if (!orgId) {
-      const { data: defaultOrg } = await serviceClient
-        .from('organizations')
-        .select('id')
-        .limit(1)
-        .single()
-      orgId = defaultOrg?.id || 'primary'
+      return NextResponse.json({ error: 'Organization not found' }, { status: 400 })
     }
 
     // 1. Fetch properties belonging to this organization

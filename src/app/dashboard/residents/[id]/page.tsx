@@ -18,6 +18,7 @@ interface Props {
 
 import { getAuthenticatedUser } from '@/lib/auth-session'
 import { createServiceClient } from '@/lib/supabase/server'
+import { resolveEffectiveOrgId, isValidUUID } from '@/lib/org-helper'
 
 export default async function ResidentDetailPage({ params, searchParams }: Props) {
   const { id: residentId } = await params
@@ -27,11 +28,8 @@ export default async function ResidentDetailPage({ params, searchParams }: Props
   if (!user) redirect('/login')
 
   const supabase = await createServiceClient()
-  let orgId = user.organization_id
-  if (!orgId) {
-    const { data: defaultOrg } = await supabase.from('organizations').select('id').limit(1).single()
-    orgId = defaultOrg?.id || 'primary'
-  }
+  const orgId = await resolveEffectiveOrgId(user)
+  if (!orgId || !isValidUUID(orgId)) notFound()
 
   // Fetch resident with view info
   const { data: resident } = await supabase

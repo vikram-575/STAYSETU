@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-session'
+import { resolveEffectiveOrgId, isValidUUID } from '@/lib/org-helper'
 import { getAadhaarProvider, globalKYCSessions } from '@/lib/kyc/provider'
 import { createServiceClient } from '@/lib/supabase/server'
 
@@ -17,14 +18,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const body = await request.json()
     const { otp } = body
 
-    if (!otp) {
-      return NextResponse.json({ error: '6-digit OTP is required' }, { status: 400 })
+    if (!otp || String(otp).trim().length !== 6) {
+      return NextResponse.json({ error: 'Valid 6-digit OTP is required' }, { status: 400 })
     }
 
     const provider = getAadhaarProvider()
     const verificationResult = await provider.verifyAuthentication({
       session_id: sessionId,
-      otp,
+      otp: String(otp).trim(),
     })
 
     if (!verificationResult.success && verificationResult.status === 'not_verified') {
@@ -37,7 +38,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       try {
         const supabase = await createServiceClient()
         const user = await getAuthenticatedUser()
-        const orgId = session.organization_id || user?.organization_id || 'primary'
+        const effectiveOrgId = await resolveEffectiveOrgId(user)
+        const orgId = (session.organization_id && isValidUUID(session.organization_id)) ? session.organization_id : effectiveOrgId
 
         // 1. Insert/Upsert into tenant_kyc
         const { data: kycRecord, error: kycErr } = await supabase

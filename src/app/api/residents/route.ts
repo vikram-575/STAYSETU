@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getAuthenticatedUser } from '@/lib/auth-session'
+import { resolveEffectiveOrgId } from '@/lib/org-helper'
 
 /**
  * GET /api/residents
@@ -15,15 +16,9 @@ export async function GET(request: NextRequest) {
     }
 
     const serviceClient = await createServiceClient()
-    let orgId = user.organization_id
-
+    const orgId = await resolveEffectiveOrgId(user)
     if (!orgId) {
-      const { data: defaultOrg } = await serviceClient
-        .from('organizations')
-        .select('id')
-        .limit(1)
-        .single()
-      orgId = defaultOrg?.id || 'primary'
+      return NextResponse.json({ residents: [], total: 0 })
     }
 
     const { searchParams } = request.nextUrl

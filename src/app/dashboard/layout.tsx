@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getAuthenticatedUser } from '@/lib/auth-session'
-import { createServiceClient } from '@/lib/supabase/server'
+import { resolveEffectiveOrg } from '@/lib/org-helper'
 import AppSidebar from '@/components/layout/app-sidebar'
 import AppHeader from '@/components/layout/app-header'
 import MobileBottomNav from '@/components/layout/mobile-bottom-nav'
@@ -17,28 +17,20 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
-  // If user is superadmin, ensure default org context is provided
-  let profile = user
+  // Ensure robust effective organization context is provided
+  const effectiveOrg = await resolveEffectiveOrg(user)
 
-  if (!profile.organization_id) {
-    const serviceClient = await createServiceClient()
-    const { data: defaultOrg } = await serviceClient
-      .from('organizations')
-      .select('id, name, gst_enabled')
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle()
-
-    if (defaultOrg) {
-      profile = {
-        ...profile,
-        organization_id: defaultOrg.id,
-        organizations: defaultOrg,
-      }
-      try {
-        await serviceClient.from('users').update({ organization_id: defaultOrg.id }).eq('id', profile.id)
-      } catch {}
-    }
+  const profile = {
+    ...user,
+    organization_id: effectiveOrg?.id || user.organization_id || null,
+    organizations: effectiveOrg
+      ? {
+          id: effectiveOrg.id,
+          name: effectiveOrg.name,
+          slug: effectiveOrg.slug || 'pg-setu',
+          gst_enabled: effectiveOrg.gst_enabled,
+        }
+      : user.organizations || null,
   }
 
   return (

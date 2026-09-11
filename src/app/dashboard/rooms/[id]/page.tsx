@@ -14,6 +14,7 @@ interface Props {
 
 import { getAuthenticatedUser } from '@/lib/auth-session'
 import { createServiceClient } from '@/lib/supabase/server'
+import { resolveEffectiveOrgId, isValidUUID } from '@/lib/org-helper'
 
 export default async function RoomDetailPage({ params }: Props) {
   const { id: roomId } = await params
@@ -22,11 +23,8 @@ export default async function RoomDetailPage({ params }: Props) {
   if (!user) redirect('/login')
 
   const supabase = await createServiceClient()
-  let orgId = user.organization_id
-  if (!orgId) {
-    const { data: defaultOrg } = await supabase.from('organizations').select('id').limit(1).single()
-    orgId = defaultOrg?.id || 'primary'
-  }
+  const orgId = await resolveEffectiveOrgId(user)
+  if (!orgId || !isValidUUID(orgId)) notFound()
 
   // Room details
   const { data: room } = await supabase

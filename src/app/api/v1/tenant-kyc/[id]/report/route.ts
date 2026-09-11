@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-session'
 import { createServiceClient } from '@/lib/supabase/server'
+import { resolveEffectiveOrgId } from '@/lib/org-helper'
 import { globalKYCSessions } from '@/lib/kyc/provider'
 
 interface RouteParams {
@@ -17,11 +18,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const user = await getAuthenticatedUser()
     const supabase = await createServiceClient()
 
-    let orgId = user?.organization_id
-    if (!orgId) {
-      const { data: defaultOrg } = await supabase.from('organizations').select('id, name').limit(1).single()
-      orgId = defaultOrg?.id || 'primary'
-    }
+    const orgId = await resolveEffectiveOrgId(user)
 
     const { data: org } = await supabase.from('organizations').select('name, address, city, state').eq('id', orgId).single()
 

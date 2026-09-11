@@ -16,6 +16,7 @@ interface Props {
 
 import { getAuthenticatedUser } from '@/lib/auth-session'
 import { createServiceClient } from '@/lib/supabase/server'
+import { resolveEffectiveOrgId, isValidUUID } from '@/lib/org-helper'
 
 export default async function ExpensesPage({ searchParams }: Props) {
   const params = await searchParams
@@ -25,27 +26,32 @@ export default async function ExpensesPage({ searchParams }: Props) {
   if (!user) redirect('/login')
 
   const supabase = await createServiceClient()
-  let orgId = user.organization_id
-  if (!orgId) {
-    const { data: defaultOrg } = await supabase.from('organizations').select('id').limit(1).single()
-    orgId = defaultOrg?.id || 'primary'
-  }
+  const orgId = await resolveEffectiveOrgId(user)
 
   // Month stats
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
 
-  let query = supabase
-    .from('expenses')
-    .select('*')
-    .eq('organization_id', orgId)
-    .order('expense_date', { ascending: false })
+  let expenses: any[] = []
 
-  if (selectedCat !== 'all') {
-    query = query.eq('category', selectedCat)
+  if (orgId && isValidUUID(orgId)) {
+    let query = supabase
+      .from('expenses')
+      .select('*')
+      .eq('organization_id', orgId)
+      .order('expense_date', { ascending: false })
+
+    if (selectedCat !== 'all') {
+      query = query.eq('category', selectedCat)
+    }
+
+    try {
+      const { data } = await query
+      expenses = data ?? []
+    } catch (err) {
+      console.error('Failed fetching expenses:', err)
+    }
   }
-
-  const { data: expenses } = await query
 
   const totalExpensePaise = expenses?.reduce((s, e) => s + e.amount_paise, 0) || 0
 

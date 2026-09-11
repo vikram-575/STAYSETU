@@ -19,6 +19,7 @@ interface Props {
 
 import { getAuthenticatedUser } from '@/lib/auth-session'
 import { createServiceClient } from '@/lib/supabase/server'
+import { resolveEffectiveOrgId, isValidUUID } from '@/lib/org-helper'
 
 export default async function ResidentsPage({ searchParams }: Props) {
   const params = await searchParams
@@ -30,48 +31,53 @@ export default async function ResidentsPage({ searchParams }: Props) {
   if (!user) redirect('/login')
 
   const supabase = await createServiceClient()
-  let orgId = user.organization_id
-  if (!orgId) {
-    const { data: defaultOrg } = await supabase.from('organizations').select('id').limit(1).single()
-    orgId = defaultOrg?.id || 'primary'
+  const orgId = await resolveEffectiveOrgId(user)
+
+  let residents: any[] = []
+  let totalCount = 0
+  let activeCount = 0
+  let checkedOutCount = 0
+
+  if (orgId && isValidUUID(orgId)) {
+    // Query resident view
+    let query = supabase
+      .from('v_resident_current')
+      .select('*')
+      .eq('organization_id', orgId)
+
+    if (activeTab === 'active') {
+      query = query.eq('status', 'active')
+    } else if (activeTab === 'checked_out') {
+      query = query.eq('status', 'checked_out')
+    } else if (activeTab === 'overdue') {
+      query = query.gt('total_outstanding_paise', 0).eq('status', 'active')
+    }
+
+    if (searchQuery) {
+      query = query.or(`full_name.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%,registration_number.ilike.%${searchQuery}%`)
+    }
+
+    if (sortBy === 'outstanding') {
+      query = query.order('total_outstanding_paise', { ascending: false })
+    } else {
+      query = query.order('full_name', { ascending: true })
+    }
+
+    try {
+      const [resResult, totalRes, activeRes, checkedOutRes] = await Promise.all([
+        query,
+        supabase.from('residents').select('*', { count: 'exact', head: true }).eq('organization_id', orgId),
+        supabase.from('residents').select('*', { count: 'exact', head: true }).eq('organization_id', orgId).eq('status', 'active'),
+        supabase.from('residents').select('*', { count: 'exact', head: true }).eq('organization_id', orgId).eq('status', 'checked_out'),
+      ])
+      residents = resResult.data ?? []
+      totalCount = totalRes.count ?? 0
+      activeCount = activeRes.count ?? 0
+      checkedOutCount = checkedOutRes.count ?? 0
+    } catch (err) {
+      console.error('Failed fetching residents:', err)
+    }
   }
-
-  // Query resident view
-  let query = supabase
-    .from('v_resident_current')
-    .select('*')
-    .eq('organization_id', orgId)
-
-  if (activeTab === 'active') {
-    query = query.eq('status', 'active')
-  } else if (activeTab === 'checked_out') {
-    query = query.eq('status', 'checked_out')
-  } else if (activeTab === 'overdue') {
-    query = query.gt('total_outstanding_paise', 0).eq('status', 'active')
-  }
-
-  if (searchQuery) {
-    query = query.or(`full_name.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%,registration_number.ilike.%${searchQuery}%`)
-  }
-
-  if (sortBy === 'outstanding') {
-    query = query.order('total_outstanding_paise', { ascending: false })
-  } else {
-    query = query.order('full_name', { ascending: true })
-  }
-
-  // Parallel Fetch Residents and Tab Counters
-  const [
-    { data: residents },
-    { count: totalCount },
-    { count: activeCount },
-    { count: checkedOutCount },
-  ] = await Promise.all([
-    query,
-    supabase.from('residents').select('*', { count: 'exact', head: true }).eq('organization_id', orgId),
-    supabase.from('residents').select('*', { count: 'exact', head: true }).eq('organization_id', orgId).eq('status', 'active'),
-    supabase.from('residents').select('*', { count: 'exact', head: true }).eq('organization_id', orgId).eq('status', 'checked_out'),
-  ])
 
   return (
     <div className="space-y-4 sm:space-y-6 max-w-screen-2xl">

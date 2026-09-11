@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-session'
+import { resolveEffectiveOrgId } from '@/lib/org-helper'
 import { globalKYCSessions } from '@/lib/kyc/provider'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getKYCAuditLogs } from '@/lib/kyc/audit'
@@ -18,11 +19,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const user = await getAuthenticatedUser()
     const supabase = await createServiceClient()
 
-    let orgId: string = user?.organization_id || ''
-    if (!orgId) {
-      const { data: defaultOrg } = await supabase.from('organizations').select('id').limit(1).single()
-      orgId = defaultOrg?.id || 'primary'
-    }
+    const orgId: string = (await resolveEffectiveOrgId(user)) || ''
 
     // 1. Check in-memory transient session
     const session = globalKYCSessions.get(identifier)

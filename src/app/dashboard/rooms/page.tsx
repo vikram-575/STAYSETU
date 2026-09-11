@@ -18,6 +18,7 @@ interface Props {
 
 import { getAuthenticatedUser } from '@/lib/auth-session'
 import { createServiceClient } from '@/lib/supabase/server'
+import { resolveEffectiveOrgId, isValidUUID } from '@/lib/org-helper'
 
 export default async function RoomsPage({ searchParams }: Props) {
   const params = await searchParams
@@ -29,20 +30,26 @@ export default async function RoomsPage({ searchParams }: Props) {
   if (!user) redirect('/login')
 
   const supabase = await createServiceClient()
-  let orgId = user.organization_id
-  if (!orgId) {
-    const { data: defaultOrg } = await supabase.from('organizations').select('id').limit(1).single()
-    orgId = defaultOrg?.id || 'primary'
-  }
+  const orgId = await resolveEffectiveOrgId(user)
 
-  // Parallel Fetch Buildings & Rooms
-  const [{ data: buildings }, { data: rooms }] = await Promise.all([
-    supabase.from('buildings').select('*, floors(*)').eq('organization_id', orgId).order('name'),
-    (selectedFloor
-      ? supabase.from('rooms').select('*, floors(*, buildings(*)), beds(*, resident_assignments(*, residents(*)))').eq('organization_id', orgId).eq('floor_id', selectedFloor).order('room_number')
-      : supabase.from('rooms').select('*, floors(*, buildings(*)), beds(*, resident_assignments(*, residents(*)))').eq('organization_id', orgId).order('room_number')
-    ),
-  ])
+  let buildings: any[] = []
+  let rooms: any[] = []
+
+  if (orgId && isValidUUID(orgId)) {
+    try {
+      const [{ data: bData }, { data: rData }] = await Promise.all([
+        supabase.from('buildings').select('*, floors(*)').eq('organization_id', orgId).order('name'),
+        (selectedFloor
+          ? supabase.from('rooms').select('*, floors(*, buildings(*)), beds(*, resident_assignments(*, residents(*)))').eq('organization_id', orgId).eq('floor_id', selectedFloor).order('room_number')
+          : supabase.from('rooms').select('*, floors(*, buildings(*)), beds(*, resident_assignments(*, residents(*)))').eq('organization_id', orgId).order('room_number')
+        ),
+      ])
+      buildings = bData ?? []
+      rooms = rData ?? []
+    } catch (err) {
+      console.error('Failed fetching rooms:', err)
+    }
+  }
 
   // Total summary calculation
   let totalRooms = rooms?.length || 0

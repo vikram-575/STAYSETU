@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-session'
+import { resolveEffectiveOrgId } from '@/lib/org-helper'
 import { getAadhaarProvider } from '@/lib/kyc/provider'
 import { createServiceClient } from '@/lib/supabase/server'
 
@@ -12,11 +13,7 @@ export async function POST(request: NextRequest) {
     const user = await getAuthenticatedUser()
     const supabase = await createServiceClient()
 
-    let orgId: string = user?.organization_id || ''
-    if (!orgId) {
-      const { data: defaultOrg } = await supabase.from('organizations').select('id').limit(1).single()
-      orgId = defaultOrg?.id || 'primary'
-    }
+    const orgId: string = (await resolveEffectiveOrgId(user)) || ''
 
     const body = await request.json()
     const { aadhaar_number, tenant_id, tenant_name, tenant_phone, tenant_dob, tenant_gender } = body
