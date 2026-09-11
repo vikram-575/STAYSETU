@@ -14,11 +14,11 @@ services:
       - key: NEXT_PUBLIC_APP_URL
         value: https://pgsetu.onrender.com
       - key: NEXT_PUBLIC_SUPABASE_URL
-        value: https://rygtyzwkhcuiwxzqmmlo.supabase.co
+        value: https://ouefslqwkxviijqtvgtv.supabase.co
       - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
         sync: false
       - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-        value: sb_publishable_6OJmArhZRC4HcHd_IBFbmw_7hpaYGHO
+        value: sb_publishable_Jvgcn9tD7UVUzxKoPN4UVw_7HZEePeG
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
       - key: NEXT_PUBLIC_FIREBASE_PROJECT_ID
