@@ -48,17 +48,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!residents || residents.length === 0) {
-      return NextResponse.json(
-        {
-          error:
-            'No resident record found with this mobile number or registration ID. Please check the details or contact your PG owner.',
-        },
-        { status: 404 }
-      )
-    }
-
-    // 2. Verify date of birth with robust format normalization
+    // 2. Helper to normalize date of birth
     function cleanDate(d: string): string {
       if (!d) return ''
       const trimmed = d.trim().split('T')[0]
@@ -74,6 +64,80 @@ export async function POST(request: NextRequest) {
     }
 
     const inputDob = cleanDate(date_of_birth)
+
+    // If no resident record exists in PostgreSQL, check tenant_profiles or auto-login as new user
+    if (!residents || residents.length === 0) {
+      const { queryCollection, getDocument, createDocument } = await import('@/lib/firebase/firestore')
+      const { generateTenantId } = await import('@/lib/profiles')
+
+      let tenantProfile: any = null
+
+      if (rawInput.toUpperCase().startsWith('TN')) {
+        try {
+          tenantProfile = await getDocument('tenant_profiles', rawInput.toUpperCase())
+        } catch {}
+      }
+
+      if (!tenantProfile && searchPhone.length >= 10) {
+        try {
+          const profiles = await queryCollection('tenant_profiles', [['mobile', '==', searchPhone]])
+          tenantProfile = profiles[0] || null
+        } catch {}
+      }
+
+      let unifiedTenantId: string =
+        tenantProfile?.id?.startsWith('TN') ? tenantProfile.id : generateTenantId()
+      const tenantName: string = tenantProfile?.full_name || 'New Resident'
+
+      // If tenant profile doesn't exist yet, auto-provision a new user record
+      if (!tenantProfile && searchPhone.length >= 10) {
+        try {
+          await createDocument(
+            'tenant_profiles',
+            {
+              full_name: 'New Resident',
+              mobile: searchPhone,
+              type: 'tenant',
+              dob: inputDob,
+              status: 'new_user',
+              source: 'portal_self_login',
+            },
+            unifiedTenantId
+          )
+        } catch {}
+      }
+
+      // Generate secure signed token for new user session
+      const token = signPortalToken({
+        residentId: unifiedTenantId,
+        orgId: 'new_user',
+        phone: searchPhone,
+      })
+
+      const response = NextResponse.json({
+        success: true,
+        isNewUser: true,
+        token,
+        resident: {
+          id: unifiedTenantId,
+          full_name: tenantName,
+          tenant_id: unifiedTenantId,
+          registration_number: unifiedTenantId,
+          phone: searchPhone,
+          status: 'new_user',
+        },
+      })
+
+      response.cookies.set('resident_portal_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 86400 * 30,
+      })
+
+      return response
+    }
 
     // Prioritize active stays over checked-out / past stays
     const sortedResidents = [...residents].sort((a, b) => {

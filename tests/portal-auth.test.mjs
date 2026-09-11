@@ -220,4 +220,44 @@ describe('Portal Auth — Senior QA Test Suite', () => {
       assert.notStrictEqual(verified, null)
     })
   })
+
+  // ==========================================
+  // 6. NEW USER TENANT FALLBACK SESSION
+  // ==========================================
+  describe('Technique 6: New User Tenant Fallback Session', () => {
+    it('[New User Fallback] signs and verifies new user session with TN ID and new_user org', () => {
+      const newUserPayload = {
+        residentId: 'TN8892X1P',
+        orgId: 'new_user',
+        phone: '9876500000',
+      }
+
+      const token = signPortalToken(newUserPayload, 86400 * 30)
+      const verified = verifyPortalToken(token)
+
+      assert.notStrictEqual(verified, null)
+      assert.strictEqual(verified.residentId, 'TN8892X1P')
+      assert.strictEqual(verified.orgId, 'new_user')
+      assert.strictEqual(verified.phone, '9876500000')
+      assert.ok(verified.exp > Math.floor(Date.now() / 1000))
+    })
+
+    it('[New User Fallback] rejects tampered new user tenant tokens', () => {
+      const newUserPayload = {
+        residentId: 'TN8892X1P',
+        orgId: 'new_user',
+        phone: '9876500000',
+      }
+
+      const token = signPortalToken(newUserPayload)
+      const [payloadB64, sig] = token.split('.')
+
+      // Attacker attempts to escalate org from new_user to an enterprise org
+      const forged = { ...newUserPayload, orgId: 'org_real_victim' }
+      const forgedB64 = Buffer.from(JSON.stringify(forged)).toString('base64url')
+      const tamperedToken = `${forgedB64}.${sig}`
+
+      assert.strictEqual(verifyPortalToken(tamperedToken), null)
+    })
+  })
 })

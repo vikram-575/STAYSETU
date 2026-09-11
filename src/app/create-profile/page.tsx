@@ -379,19 +379,43 @@ export default function CreateProfilePage() {
               </div>
               <span className="text-base font-black text-slate-900 tracking-tight">PG-Setu</span>
             </Link>
-            <Link href="/" className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1">
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Back to Home
-            </Link>
+
+            <div className="flex items-center gap-2 sm:gap-3">
+              <Link
+                href="/my-profile"
+                className="px-3.5 py-1.5 rounded-full text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 transition flex items-center gap-1.5 shadow-2xs"
+              >
+                <User className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Login / My Profile</span>
+              </Link>
+              <Link
+                href="/portal"
+                className="hidden sm:inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 transition"
+              >
+                <span>Passbook Login</span>
+              </Link>
+              <Link
+                href="/login"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden md:inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition"
+              >
+                <span>Owner Login</span>
+              </Link>
+              <Link href="/" className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1">
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Back to Home</span>
+              </Link>
+            </div>
           </div>
         </header>
 
-        <main className="flex-1 flex flex-col items-center justify-center px-4 py-12">
-          <div className="max-w-2xl w-full space-y-8">
+        <main className="flex-1 flex flex-col items-center justify-center px-4 py-10">
+          <div className="max-w-2xl w-full space-y-7">
             {/* Hero */}
             <div className="text-center space-y-3">
               <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-100 rounded-full text-emerald-700 text-xs font-bold">
-                <Star className="w-3 h-3" /> Free Profile — No Login Required
+                <Star className="w-3 h-3" /> Free Profile — No Password Needed
               </div>
               <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
                 Create Your PG-Setu Profile
@@ -399,6 +423,41 @@ export default function CreateProfilePage() {
               <p className="text-slate-500 text-sm max-w-md mx-auto">
                 Get a unique Profile ID and connect with the right people. Tenant profiles browse PGs, Owner profiles discover tenants.
               </p>
+            </div>
+
+            {/* Prominent Login Bar for Existing Users */}
+            <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 border-2 border-emerald-200/80 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3.5">
+              <div className="text-left space-y-0.5">
+                <span className="text-xs font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  Already have an account or profile?
+                </span>
+                <p className="text-xs text-slate-600">
+                  Log in directly to access your profile, rent passbook, or owner dashboard.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                <Link
+                  href="/my-profile"
+                  className="flex-1 sm:flex-initial text-center px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
+                >
+                  Tenant Profile Login →
+                </Link>
+                <Link
+                  href="/portal"
+                  className="flex-1 sm:flex-initial text-center px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
+                >
+                  Passbook Login →
+                </Link>
+                <Link
+                  href="/login"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hidden md:inline-block px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 rounded-xl text-xs font-bold transition shadow-2xs"
+                >
+                  Owner Login →
+                </Link>
+              </div>
             </div>
 
             {/* Cards */}
@@ -552,13 +611,22 @@ export default function CreateProfilePage() {
             </div>
             <span className="text-base font-black text-slate-900 tracking-tight">PG-Setu</span>
           </Link>
-          <button
-            onClick={() => { setStep('choose'); setProfileType(null); setError('') }}
-            className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Change Type
-          </button>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link
+              href="/my-profile"
+              className="px-3 py-1.5 rounded-full text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 transition flex items-center gap-1"
+            >
+              <User className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Login to Profile</span>
+            </Link>
+            <button
+              onClick={() => { setStep('choose'); setProfileType(null); setError('') }}
+              className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Change Type
+            </button>
+          </div>
         </div>
       </header>
 
@@ -601,7 +669,7 @@ export default function CreateProfilePage() {
               type="submit"
               disabled={loading || !form.full_name || !form.mobile}
               className={cn(
-                'w-full py-3.5 px-6 rounded-xl text-white font-black text-sm flex items-center justify-center gap-2 transition shadow-lg disabled:opacity-50',
+                'w-full py-3.5 px-6 rounded-xl text-white font-black text-sm flex items-center justify-center gap-2 transition shadow-lg disabled:opacity-50 cursor-pointer',
                 isTenant
                   ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-blue-500/20'
                   : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 shadow-amber-500/20'
@@ -610,7 +678,18 @@ export default function CreateProfilePage() {
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               {loading ? 'Creating Profile...' : `Create ${isTenant ? 'Tenant' : 'Owner'} Profile →`}
             </button>
-            <p className="text-center text-xs text-slate-400 mt-3">
+            <div className="mt-4 pt-3 border-t border-slate-100 text-center">
+              <p className="text-xs text-slate-500">
+                Already registered with this mobile number?{' '}
+                <Link
+                  href={form.mobile ? `/my-profile?mobile=${form.mobile}` : '/my-profile'}
+                  className="font-bold text-emerald-600 hover:text-emerald-700 underline"
+                >
+                  Login to Access Profile →
+                </Link>
+              </p>
+            </div>
+            <p className="text-center text-xs text-slate-400 mt-2">
               <Shield className="w-3 h-3 inline mr-1" />
               Your mobile number is never shared publicly. Profile can be updated anytime.
             </p>

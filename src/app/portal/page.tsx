@@ -236,17 +236,27 @@ export default function ResidentPortalPage() {
               </button>
             </form>
 
-            <div className="pt-3 border-t border-[#E5E7EB] text-center space-y-1">
-              <p className="text-[11px] text-[#647067] font-medium">
-                Are you a property owner or manager?
-              </p>
+            {/* New Resident Auto-Login Guidance */}
+            <div className="p-3 bg-emerald-50/80 border border-emerald-200/70 rounded-xl text-[11px] text-emerald-800 leading-relaxed">
+              <span className="font-extrabold block mb-0.5">🌟 New Resident or Not Checked In Yet?</span>
+              Enter your mobile number and date of birth above to automatically log in as a <strong>New Tenant</strong> and get your permanent <strong>PG-Setu Unique Tenant ID (TN...)</strong>.
+            </div>
+
+            <div className="pt-3 border-t border-[#E5E7EB] flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px]">
+              <Link
+                href="/create-profile"
+                className="text-xs font-bold text-[#16A34A] hover:text-[#14532D] transition flex items-center gap-1"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Create New Profile Free →</span>
+              </Link>
               <Link
                 href="/login"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-block text-xs font-extrabold text-[#16A34A] hover:text-[#14532D] transition"
+                className="text-xs font-bold text-[#647067] hover:text-[#14532D] transition"
               >
-                Owner & Staff Login Portal →
+                Owner & Staff Login →
               </Link>
             </div>
           </div>
@@ -329,8 +339,13 @@ export default function ResidentPortalPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base sm:text-lg font-black text-gray-900">{resident.full_name}</h2>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-green-100 text-green-800">
-                  {resident.status || 'Active'}
+                <span className={cn(
+                  "px-2 py-0.5 rounded-full text-[10px] font-black uppercase",
+                  (portalData?.is_new_user || resident.status === 'new_user')
+                    ? "bg-blue-100 text-blue-800"
+                    : "bg-green-100 text-green-800"
+                )}>
+                  {(portalData?.is_new_user || resident.status === 'new_user') ? 'New Tenant' : (resident.status || 'Active')}
                 </span>
               </div>
               <div className="flex items-center gap-1.5 mt-0.5">
@@ -344,7 +359,9 @@ export default function ResidentPortalPage() {
 
           <div className="flex flex-wrap items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100 text-xs">
             <span className="px-3 py-1.5 bg-blue-50 text-blue-700 font-bold rounded-xl border border-blue-200/60 shadow-2xs">
-              Room {resident.room_number || '—'} · Bed {resident.bed_label || '—'}
+              {(portalData?.is_new_user || resident.status === 'new_user')
+                ? 'Pending PG Check-In'
+                : `Room ${resident.room_number || '—'} · Bed ${resident.bed_label || '—'}`}
             </span>
             {resident.floor_name && (
               <span className="px-3 py-1.5 bg-gray-50 text-gray-700 font-semibold rounded-xl border border-gray-200">
@@ -354,8 +371,70 @@ export default function ResidentPortalPage() {
           </div>
         </div>
 
-        {/* Hero Due Banner */}
-        {hasOutstandingDue ? (
+        {/* Hero Due / Welcome Banner */}
+        {(portalData?.is_new_user || resident.status === 'new_user') ? (
+          <div className="bg-gradient-to-br from-[#14532D] via-[#0F3E22] to-[#16A34A] text-white rounded-2xl sm:rounded-3xl p-6 sm:p-7 shadow-xl shadow-[#16A34A]/20 space-y-4 border border-[#16A34A]/30">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="space-y-1">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#DCFCE7]/20 text-[#DCFCE7] text-xs font-bold border border-[#DCFCE7]/30">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  Verified PG-Setu Tenant Account
+                </span>
+                <h3 className="text-2xl sm:text-3xl font-black tracking-tight text-white mt-1">
+                  Welcome to Your Stay Passbook!
+                </h3>
+              </div>
+              <div className="bg-white/10 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/20 text-center sm:text-right">
+                <p className="text-[10px] uppercase font-bold text-[#DCFCE7] tracking-wider">Your Permanent Tenant ID</p>
+                <div className="flex items-center justify-center sm:justify-end gap-2 mt-0.5">
+                  <span className="text-xl font-mono font-black text-amber-300">{resident.registration_number}</span>
+                  <button
+                    onClick={() => {
+                      if (resident.registration_number) {
+                        navigator.clipboard.writeText(resident.registration_number)
+                        alert('Unique Tenant ID copied to clipboard!')
+                      }
+                    }}
+                    className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
+                    title="Copy Tenant ID"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs sm:text-sm text-emerald-100/90 leading-relaxed">
+              You are signed in as a <strong>Verified PG-Setu Tenant</strong>. You are not currently checked into an active PG property.
+              Provide your <strong>Unique Tenant ID ({resident.registration_number})</strong> or registered mobile number to your PG owner or manager. Once checked in, your room allocation, rent bills, payment receipts, and electricity meter readings will automatically show up here.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-2.5 pt-2">
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(
+                  `Hi, I am registered on PG-Setu with Unique Tenant ID: ${resident.registration_number} (Mobile: ${resident.phone}). Please use this ID to check me into the PG!`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-4 py-2.5 bg-white text-[#14532D] hover:bg-slate-100 rounded-xl text-xs font-black transition shadow-sm"
+              >
+                <MessageSquare className="w-4 h-4 text-[#16A34A]" /> Share Tenant ID via WhatsApp
+              </a>
+              <Link
+                href={`/my-profile?mobile=${resident.phone || ''}`}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white/15 hover:bg-white/25 text-white rounded-xl text-xs font-bold transition border border-white/20"
+              >
+                <User className="w-4 h-4" /> View / Edit Profile
+              </Link>
+              <Link
+                href="/"
+                className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition border border-white/15"
+              >
+                <Building2 className="w-4 h-4" /> Explore Available PGs
+              </Link>
+            </div>
+          </div>
+        ) : hasOutstandingDue ? (
           <div className="bg-gradient-to-br from-red-600 to-rose-700 text-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xl shadow-red-500/20 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>

@@ -60,7 +60,72 @@ export async function GET(request: NextRequest) {
         .single()
 
       if (!rawRes) {
-        return NextResponse.json({ error: 'Resident record not found.' }, { status: 404 })
+        // If resident is not in PostgreSQL 'residents' table, check if this is a self-registered tenant or new user
+        const { getDocument, queryCollection } = await import('@/lib/firebase/firestore')
+        let tenantProfile: any = null
+        try {
+          tenantProfile = await getDocument('tenant_profiles', residentId)
+          if (!tenantProfile && session.phone) {
+            const profiles = await queryCollection('tenant_profiles', [['mobile', '==', session.phone]])
+            tenantProfile = profiles[0] || null
+          }
+        } catch {}
+
+        const profileName = tenantProfile?.full_name || 'New Resident'
+        const profilePhone = tenantProfile?.mobile || session.phone || ''
+
+        const newUserData = {
+          success: true,
+          is_new_user: true,
+          resident: {
+            id: residentId,
+            full_name: profileName,
+            registration_number: residentId,
+            phone: profilePhone,
+            email: tenantProfile?.email || null,
+            photo_url: null,
+            status: 'new_user',
+            check_in_date: null,
+            monthly_rent_paise: 0,
+            billing_cycle_day: 1,
+            room_number: null,
+            room_name: null,
+            bed_label: null,
+            floor_name: null,
+            building_name: null,
+            property_name: 'Pending PG Check-In',
+            property_address: 'Not currently checked into an active PG property',
+            total_outstanding_paise: 0,
+            total_paid_paise: 0,
+            deposit_held_paise: 0,
+          },
+          pg_info: {
+            name: 'PG-Setu Resident Network',
+            manager_phone: '',
+            manager_whatsapp_link: '',
+            upi_id: '',
+            upi_pay_link: '',
+            address: 'India',
+            city: tenantProfile?.current_city || 'India',
+            is_new_user: true,
+          },
+          invoices: [],
+          payments: [],
+          ledger: [],
+          electricity_readings: [],
+        }
+
+        const res = NextResponse.json(newUserData)
+        if (tokenFromParam) {
+          res.cookies.set('resident_portal_token', tokenFromParam, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 86400 * 30,
+            path: '/',
+          })
+        }
+        return res
       }
 
       resident = {
