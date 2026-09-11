@@ -1,7 +1,20 @@
-import { createClient } from '@supabase/supabase-js'
+import fs from 'fs'
 
-const url = 'https://rygtyzwkhcuiwxzqmmlo.supabase.co'
-const serviceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5Z3R5endraGN1aXd4enFtbWxvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwNzE5NjcsImV4cCI6MjA5ODY0Nzk2N30.wbG8zerewUJae0nMldQYbHJheE0yp1gnyjFBp5BqpdQ'
+let url = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+let serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+
+if (fs.existsSync('.env.local')) {
+  const envContent = fs.readFileSync('.env.local', 'utf8')
+  const urlMatch = envContent.match(/NEXT_PUBLIC_SUPABASE_URL=([^\r\n]+)/)
+  const keyMatch = envContent.match(/SUPABASE_SERVICE_ROLE_KEY=([^\r\n]+)/)
+  if (urlMatch) url = urlMatch[1].trim()
+  if (keyMatch) serviceKey = keyMatch[1].trim()
+}
+
+if (!url || !serviceKey) {
+  console.error('Error: Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment or .env.local')
+  process.exit(1)
+}
 
 const supabase = createClient(url, serviceKey)
 
