@@ -27,6 +27,7 @@ interface FeaturedListingsProps {
   onToggleCompare: (property: PropertyListing) => void
   activeCity: string
   onCityChange: (city: string) => void
+  isLoading?: boolean
   initialFilterCriteria?: {
     city?: string
     locality?: string
@@ -48,6 +49,7 @@ export function FeaturedListings({
   onToggleCompare,
   activeCity,
   onCityChange,
+  isLoading = false,
   initialFilterCriteria,
 }: FeaturedListingsProps) {
   const [activeTab, setActiveTab] = useState<TabCategory>('all')
@@ -60,6 +62,15 @@ export function FeaturedListings({
   )
   const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid')
   const [showFilterDrawer, setShowFilterDrawer] = useState(false)
+
+  // Dynamically compute unique cities present in actual listings
+  const availableCities = useMemo(() => {
+    const set = new Set<string>()
+    properties.forEach((p) => {
+      if (p.city && p.city.trim()) set.add(p.city.trim())
+    })
+    return Array.from(set).sort()
+  }, [properties])
 
   // Filtered & Sorted properties
   const filteredProperties = useMemo(() => {
@@ -227,15 +238,10 @@ export function FeaturedListings({
                 onChange={(e) => onCityChange(e.target.value)}
                 className="rounded-xl border border-gray-200 bg-[#F7FAF7] py-1.5 px-3 text-xs font-semibold text-[#17211B] focus:border-[#16A34A] focus:outline-hidden"
               >
-                <option value="all">All Cities</option>
-                <option value="Bangalore">Bangalore</option>
-                <option value="Gurgaon">Gurgaon</option>
-                <option value="Noida">Noida</option>
-                <option value="Delhi">Delhi</option>
-                <option value="Pune">Pune</option>
-                <option value="Hyderabad">Hyderabad</option>
-                <option value="Mumbai">Mumbai</option>
-                <option value="Chennai">Chennai</option>
+                <option value="all">All Cities ({properties.length})</option>
+                {availableCities.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
               </select>
 
               {/* Sort By */}
@@ -257,7 +263,20 @@ export function FeaturedListings({
         </div>
 
         {/* View Content: Grid or Interactive Split Map */}
-        {viewMode === 'map' ? (
+        {isLoading ? (
+          <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3, 4, 5, 6].map((n) => (
+              <div key={n} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-xs animate-pulse space-y-4">
+                <div className="aspect-16/10 w-full bg-gray-200 rounded-xl" />
+                <div className="space-y-2">
+                  <div className="h-4 bg-gray-200 rounded w-3/4" />
+                  <div className="h-3 bg-gray-200 rounded w-1/2" />
+                </div>
+                <div className="h-8 bg-gray-100 rounded-xl" />
+              </div>
+            ))}
+          </div>
+        ) : viewMode === 'map' ? (
           <div className="mt-6">
             <MapDiscoveryModal
               properties={filteredProperties}

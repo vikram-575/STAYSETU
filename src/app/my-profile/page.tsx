@@ -10,7 +10,6 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatBudget, AMENITY_OPTIONS } from '@/lib/profiles'
-import { MOCK_PROPERTIES } from '@/data/mock-properties'
 
 function getAmenityLabel(val: string) {
   return AMENITY_OPTIONS.find(a => a.value === val)?.label || val
@@ -91,14 +90,22 @@ function ProfileDashboardContent() {
   }
 
   const loadLeadsForTenant = async (prof: any) => {
-    // For tenant: show available PGs from mock data matching their preferences
+    // For tenant: show available real PGs matching their preferences
     setLoadingLeads(true)
     try {
       const matchedCities = prof.preferred_cities || []
-      const matchedProps = MOCK_PROPERTIES.filter(p =>
-        matchedCities.length === 0 || matchedCities.some((c: string) => p.city?.toLowerCase().includes(c.toLowerCase()) || p.locality?.toLowerCase().includes(c.toLowerCase()))
-      ).slice(0, 6)
-      setTenantLeads(matchedProps)
+      const cityParam = matchedCities[0] ? `?city=${encodeURIComponent(matchedCities[0])}` : ''
+      const res = await fetch(`/api/properties${cityParam}`)
+      const data = await res.json()
+      let props = data.success && Array.isArray(data.properties) ? data.properties : []
+      if (props.length === 0 && cityParam) {
+        const allRes = await fetch('/api/properties')
+        const allData = await allRes.json()
+        props = allData.success && Array.isArray(allData.properties) ? allData.properties : []
+      }
+      setTenantLeads(props.slice(0, 6))
+    } catch {
+      setTenantLeads([])
     } finally {
       setLoadingLeads(false)
     }

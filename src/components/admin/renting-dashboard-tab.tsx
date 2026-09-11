@@ -171,12 +171,12 @@ export default function RentingDashboardTab({
           <div className="grid grid-cols-2 gap-3">
             <div className="p-3.5 bg-slate-800/50 rounded-xl border border-slate-800">
               <span className="text-[10px] font-bold text-slate-400 uppercase">Featured Properties</span>
-              <div className="text-2xl font-black text-amber-300 mt-1">4 Slots Active</div>
+              <div className="text-2xl font-black text-amber-300 mt-1">{stats.featured_slots_active || 0} Slots Active</div>
               <p className="text-[10px] text-slate-400 mt-0.5">Top rank in city search</p>
             </div>
             <div className="p-3.5 bg-slate-800/50 rounded-xl border border-slate-800">
               <span className="text-[10px] font-bold text-slate-400 uppercase">Hero Carousel</span>
-              <div className="text-2xl font-black text-emerald-400 mt-1">100% Filled</div>
+              <div className="text-2xl font-black text-emerald-400 mt-1">{stats.featured_slots_active ? 'Active' : 'Open'}</div>
               <p className="text-[10px] text-slate-400 mt-0.5">High-visibility placement</p>
             </div>
           </div>
@@ -189,20 +189,21 @@ export default function RentingDashboardTab({
           <MapPin className="w-4 h-4 text-blue-400" /> City Listing Supply & Demand
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {(stats.city_distribution || [
-            { city: 'Bengaluru', properties: 12, beds: 240 },
-            { city: 'Gurugram', properties: 8, beds: 160 },
-            { city: 'Hyderabad', properties: 6, beds: 110 },
-            { city: 'Pune', properties: 5, beds: 90 },
-          ]).map((c: any, idx: number) => (
-            <div key={idx} className="p-3.5 bg-slate-800/50 rounded-xl border border-slate-800 space-y-1">
-              <div className="font-bold text-slate-200 text-sm">{c.city}</div>
-              <div className="flex items-center justify-between text-xs text-slate-400 pt-1">
-                <span>{c.properties} Listings</span>
-                <span className="font-mono text-emerald-400 font-bold">{c.beds} Available Beds</span>
-              </div>
+          {(!stats.city_distribution || stats.city_distribution.length === 0) ? (
+            <div className="col-span-full py-8 text-center text-slate-500 text-xs">
+              No city distribution recorded yet.
             </div>
-          ))}
+          ) : (
+            stats.city_distribution.map((c: any, idx: number) => (
+              <div key={idx} className="p-3.5 bg-slate-800/50 rounded-xl border border-slate-800 space-y-1">
+                <div className="font-bold text-slate-200 text-sm">{c.city}</div>
+                <div className="flex items-center justify-between text-xs text-slate-400 pt-1">
+                  <span>{c.properties} Listings</span>
+                  <span className="font-mono text-emerald-400 font-bold">{c.beds} Available Beds</span>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

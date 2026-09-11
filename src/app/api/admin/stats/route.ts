@@ -132,22 +132,45 @@ export async function GET(request: NextRequest) {
       openComplaintsCount = count || 0
     } catch {}
 
-    // City Breakdown
+    // Real leads and visits from Firestore
+    let newEnquiriesCount = 0
+    let scheduledVisitsCount = 0
+    try {
+      const { queryCollection } = await import('@/lib/firebase/firestore')
+      const leads = await queryCollection('leads')
+      newEnquiriesCount = (leads || []).filter((l: any) => l.status === 'new' || l.type === 'enquiry').length
+      scheduledVisitsCount = (leads || []).filter((l: any) => l.status === 'visit_scheduled' || l.type === 'visit').length
+    } catch {}
+
+    // City Breakdown from real properties
     const cityMap: Record<
       string,
       { properties: number; beds: number; occupancy: number; rent_paise: number }
     > = {}
 
-    const orgs = allOrgs || []
-    orgs.forEach((o) => {
-      const c = (o.city || 'Bengaluru').trim()
+    props.forEach((p) => {
+      const c = (p.city || 'Other').trim()
       if (!cityMap[c]) {
-        cityMap[c] = { properties: 0, beds: 0, occupancy: 85, rent_paise: 0 }
+        cityMap[c] = { properties: 0, beds: 0, occupancy: occupancyRate, rent_paise: 0 }
       }
       cityMap[c].properties += 1
-      cityMap[c].beds += Math.round(totalBeds / Math.max(1, orgs.length))
-      cityMap[c].rent_paise += Math.round(totalCollectedPaise / Math.max(1, orgs.length))
+      cityMap[c].beds += Math.round(totalBeds / Math.max(1, props.length))
+      cityMap[c].rent_paise += Math.round(totalCollectedPaise / Math.max(1, props.length))
     })
+
+    const cityDistribution = Object.entries(cityMap).map(([city, data]) => ({
+      city,
+      properties: data.properties,
+      beds: data.beds,
+    }))
+
+    const activeListings = props.filter((p) => p.is_active).length
+    const totalPgs = props.filter((p: any) => p.settings?.property_type !== 'flat' && p.settings?.property_type !== 'apartment').length
+    const totalFlats = props.filter((p: any) => p.settings?.property_type === 'flat' || p.settings?.property_type === 'apartment').length
+    const reportedListingsCount = props.filter((p: any) => p.settings?.flagged_reason).length
+    const featuredSlotsCount = props.filter((p: any) => p.settings?.is_featured).length
+
+    const orgs = allOrgs || []
 
     return NextResponse.json({
       success: true,
@@ -160,9 +183,9 @@ export async function GET(request: NextRequest) {
         users_admins: adminsCount,
 
         total_properties: totalProperties,
-        active_listings: Math.round(totalProperties * 0.9),
-        total_pgs: Math.round(totalProperties * 0.75),
-        total_flats: Math.round(totalProperties * 0.25),
+        active_listings: activeListings,
+        total_pgs: totalPgs,
+        total_flats: totalFlats,
 
         total_beds: totalBeds,
         occupied_beds: occupiedBeds,
@@ -184,9 +207,21 @@ export async function GET(request: NextRequest) {
 
         pending_verifications_count: Math.max(0, orgs.filter((o) => o.settings?.verification_status === 'submitted' || o.settings?.verification_status === 'under_review').length),
         open_complaints_count: openComplaintsCount,
-        new_enquiries_count: 14,
-        scheduled_visits_count: 6,
-        reported_listings_count: 2,
+        new_enquiries_count: newEnquiriesCount,
+        scheduled_visits_count: scheduledVisitsCount,
+        reported_listings_count: reportedListingsCount,
+        featured_slots_active: featuredSlotsCount,
+
+        properties: {
+          total: totalProperties,
+          active_listings: activeListings,
+          pending_listings: 0,
+          suspended_listings: reportedListingsCount,
+        },
+        activity: {
+          new_enquiries: newEnquiriesCount,
+          scheduled_visits: scheduledVisitsCount,
+        },
 
         properties_growth: {
           today: propsToday,
@@ -199,6 +234,7 @@ export async function GET(request: NextRequest) {
           new_tenants_month: newTenantsMonth,
         },
         city_breakdown: cityMap,
+        city_distribution: cityDistribution,
       },
     })
   } catch (err: any) {

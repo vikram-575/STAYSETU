@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     let propQuery = supabase
       .from('properties')
       .select(`
-        id, name, city, locality, address, is_active, created_at, organization_id,
+        id, name, city, state, address, is_active, created_at, settings, organization_id,
         organizations(id, name, email, phone)
       `)
       .order('name', { ascending: true })
@@ -151,8 +151,8 @@ export async function GET(request: NextRequest) {
       return {
         id: prop.id,
         name: prop.name,
-        city: prop.city || 'Bengaluru',
-        locality: prop.locality || 'Koramangala',
+        city: prop.city || '',
+        locality: prop.settings?.locality || prop.city || '',
         address: prop.address || '',
         owner_name: (prop.organizations as any)?.name || 'Property Owner',
         owner_email: (prop.organizations as any)?.email || '',

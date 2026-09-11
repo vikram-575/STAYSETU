@@ -47,11 +47,11 @@ export async function GET() {
         .from('properties')
         .insert({
           organization_id: orgId,
-          name: `${orgName} Main Campus`,
-          address: orgInfo?.address || 'Main Road',
-          city: orgInfo?.city || 'Bengaluru',
-          state: orgInfo?.state || 'Karnataka',
-          pincode: orgInfo?.pincode || '560001',
+          name: `${orgName} Campus`,
+          address: orgInfo?.address || '',
+          city: orgInfo?.city || '',
+          state: orgInfo?.state || '',
+          pincode: orgInfo?.pincode || '',
           is_active: true,
         })
         .select()

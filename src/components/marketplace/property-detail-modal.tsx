@@ -49,16 +49,41 @@ export function PropertyDetailModal({
     message: 'Hi, I found this property on PGSetu and would like to schedule a visit.',
   })
   const [enquirySubmitted, setEnquirySubmitted] = useState(false)
+  const [submittingEnquiry, setSubmittingEnquiry] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
 
   if (!property) return null
 
-  const handleEnquirySubmit = (e: React.FormEvent) => {
+  const handleEnquirySubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setEnquirySubmitted(true)
-    setTimeout(() => {
-      // simulate inquiry confirmation
-    }, 1500)
+    if (!enquiryForm.fullName.trim() || !enquiryForm.phone.trim()) return
+    setSubmittingEnquiry(true)
+    try {
+      await fetch('/api/enquiries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          property_id: property.id,
+          property_name: property.title,
+          property_city: property.city,
+          owner_name: property.owner.name,
+          owner_phone: property.owner.phone,
+          tenant_name: enquiryForm.fullName,
+          tenant_phone: enquiryForm.phone,
+          tenant_email: enquiryForm.email,
+          sharing_choice: enquiryForm.sharingChoice,
+          move_in_date: enquiryForm.moveInDate,
+          notes: enquiryForm.message,
+          type: 'visit',
+        }),
+      })
+      setEnquirySubmitted(true)
+    } catch (err) {
+      console.error('Failed to submit enquiry:', err)
+      setEnquirySubmitted(true)
+    } finally {
+      setSubmittingEnquiry(false)
+    }
   }
 
   const handleShare = () => {
@@ -479,10 +504,11 @@ export function PropertyDetailModal({
 
                     <button
                       type="submit"
-                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] py-3 text-sm font-bold text-white shadow-md hover:opacity-95 active:scale-98 transition"
+                      disabled={submittingEnquiry}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] py-3 text-sm font-bold text-white shadow-md hover:opacity-95 active:scale-98 transition disabled:opacity-60"
                     >
                       <Send className="h-4 w-4" />
-                      <span>Schedule Free Visit</span>
+                      <span>{submittingEnquiry ? 'Sending Request...' : 'Schedule Free Visit'}</span>
                     </button>
 
                     <p className="text-center text-[11px] text-[#647067] flex items-center justify-center gap-1">

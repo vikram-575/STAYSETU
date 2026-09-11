@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { MOCK_PROPERTIES } from '@/data/mock-properties'
 import { PropertyListing, PropertyType } from '@/types/marketplace'
 import { MarketplaceNavbar } from '@/components/marketplace/marketplace-navbar'
 import { HeroSearch } from '@/components/marketplace/hero-search'
@@ -18,12 +17,36 @@ import { MobileBottomNav } from '@/components/marketplace/mobile-bottom-nav'
 import { FloatingWebsiteAdminBar } from '@/components/marketplace/website-admin-quick-edit'
 
 export default function MarketplaceHomePage() {
-  const [properties, setProperties] = useState<PropertyListing[]>(MOCK_PROPERTIES)
+  const [properties, setProperties] = useState<PropertyListing[]>([])
+  const [loadingProperties, setLoadingProperties] = useState(true)
   const [selectedProperty, setSelectedProperty] = useState<PropertyListing | null>(null)
   const [savedIds, setSavedIds] = useState<string[]>([])
   const [comparedProperties, setComparedProperties] = useState<PropertyListing[]>([])
   const [isListModalOpen, setIsListModalOpen] = useState(false)
   const [activeCity, setActiveCity] = useState<string>('all')
+
+  // Fetch real database properties on mount
+  useEffect(() => {
+    let isMounted = true
+    async function loadProperties() {
+      try {
+        setLoadingProperties(true)
+        const res = await fetch('/api/properties')
+        const data = await res.json()
+        if (isMounted && data.success && Array.isArray(data.properties)) {
+          setProperties(data.properties)
+        }
+      } catch (err) {
+        console.error('Failed to load properties:', err)
+      } finally {
+        if (isMounted) setLoadingProperties(false)
+      }
+    }
+    loadProperties()
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   // Load wishlist favorites from localStorage on mount
   useEffect(() => {
@@ -178,6 +201,7 @@ export default function MarketplaceHomePage() {
         {/* 5. Featured Properties Feed & Split Map */}
         <FeaturedListings
           properties={properties}
+          isLoading={loadingProperties}
           onSelectDetails={(prop) => setSelectedProperty(prop)}
           savedIds={savedIds}
           onToggleSave={handleToggleSave}

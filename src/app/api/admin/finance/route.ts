@@ -91,7 +91,13 @@ export async function GET(request: NextRequest) {
     }
 
     if (section === 'plans') {
-      // Platform Subscription Plans
+      // Platform Subscription Plans based on real organization subscriptions
+      const { data: orgs } = await supabase.from('organizations').select('id, settings')
+      const orgList = orgs || []
+      const starterCount = orgList.filter((o: any) => o.settings?.plan === 'starter' || o.settings?.plan_tier === 'starter').length
+      const growthCount = orgList.filter((o: any) => o.settings?.plan === 'growth' || o.settings?.plan_tier === 'growth').length
+      const enterpriseCount = orgList.filter((o: any) => o.settings?.plan === 'enterprise' || o.settings?.plan_tier === 'enterprise').length
+
       const plans = [
         {
           id: 'plan_starter',
@@ -101,7 +107,7 @@ export async function GET(request: NextRequest) {
           max_beds: 30,
           max_properties: 1,
           features: ['1-Click Invoicing', 'Smart Sub-Meters', 'Digital Passbooks', 'Aadhaar KYC (5/mo)'],
-          subscribers_count: 18,
+          subscribers_count: starterCount,
           status: 'active',
         },
         {
@@ -112,7 +118,7 @@ export async function GET(request: NextRequest) {
           max_beds: 100,
           max_properties: 3,
           features: ['All Starter Features', 'Daily Cash Closing', 'WhatsApp Payment Reminders', 'Marketplace Priority 2x', 'Unlimited e-KYC'],
-          subscribers_count: 54,
+          subscribers_count: growthCount,
           status: 'active',
         },
         {
@@ -123,7 +129,7 @@ export async function GET(request: NextRequest) {
           max_beds: 500,
           max_properties: 10,
           features: ['All Growth Features', 'Multi-Branch Master HQ', 'Dedicated Support Manager', 'Custom SMS Header', 'Custom Domain Branding'],
-          subscribers_count: 12,
+          subscribers_count: enterpriseCount,
           status: 'active',
         },
       ]

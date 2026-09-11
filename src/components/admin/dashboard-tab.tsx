@@ -346,20 +346,19 @@ export default function DashboardTab({
             <Store className="w-4 h-4 text-blue-400" /> Geographic Fleet Concentration
           </h3>
           <div className="space-y-2">
-            {(stats.city_distribution || [
-              { city: 'Bengaluru', properties: 12, beds: 240 },
-              { city: 'Gurugram', properties: 8, beds: 160 },
-              { city: 'Hyderabad', properties: 6, beds: 110 },
-              { city: 'Pune', properties: 5, beds: 90 },
-            ]).slice(0, 4).map((c: any, i: number) => (
-              <div key={i} className="flex items-center justify-between p-2.5 bg-slate-800/50 rounded-xl text-xs">
-                <span className="font-bold text-slate-200">{c.city}</span>
-                <div className="flex items-center gap-3 text-slate-400 text-[11px]">
-                  <span>{c.properties} properties</span>
-                  <span className="font-bold text-emerald-400">{c.beds} beds</span>
+            {(!stats.city_distribution || stats.city_distribution.length === 0) ? (
+              <p className="text-xs text-slate-500 py-4 text-center">No geographic distribution recorded yet.</p>
+            ) : (
+              stats.city_distribution.slice(0, 4).map((c: any, i: number) => (
+                <div key={i} className="flex items-center justify-between p-2.5 bg-slate-800/50 rounded-xl text-xs">
+                  <span className="font-bold text-slate-200">{c.city}</span>
+                  <div className="flex items-center gap-3 text-slate-400 text-[11px]">
+                    <span>{c.properties} properties</span>
+                    <span className="font-bold text-emerald-400">{c.beds} beds</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>
