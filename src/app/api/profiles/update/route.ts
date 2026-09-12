@@ -1,13 +1,25 @@
 import { NextResponse, type NextRequest } from 'next/server'
+import { cookies } from 'next/headers'
 import { getAuthenticatedUser } from '@/lib/auth-session'
 import { createServiceClient } from '@/lib/supabase/server'
 import { cleanMobile } from '@/lib/profiles'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 export async function PATCH(request: NextRequest) {
   try {
     const user = await getAuthenticatedUser()
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized: Please sign in' }, { status: 401 })
+      return NextResponse.json(
+        { error: 'Unauthorized: Please sign in' },
+        {
+          status: 401,
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          },
+        }
+      )
     }
 
     const body = await request.json()
@@ -181,6 +193,38 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    // Sync session cookies for immediate persistence across tabs/browsers
+    try {
+      const cookieStore = await cookies()
+      if (email) {
+        cookieStore.set('auth_email', email.trim().toLowerCase(), {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 30,
+          path: '/',
+        })
+      }
+      if (cleanedMobile) {
+        cookieStore.set('auth_mobile', cleanedMobile, {
+          httpOnly: false,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 30,
+          path: '/',
+        })
+      }
+      if (residentId) {
+        cookieStore.set('resident_id', residentId, {
+          httpOnly: false,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 30,
+          path: '/',
+        })
+      }
+    } catch {}
+
     // Assemble unified profile response
     const finalProfile = {
       id: tenantRegId,
@@ -188,7 +232,7 @@ export async function PATCH(request: NextRequest) {
       email: savedResident?.email || email?.trim() || user.email,
       mobile: cleanedMobile,
       gender: savedResident?.gender || gender || 'male',
-      age: updatedNotesObj.age || (age ? Number(age) : 25),
+      age: updatedNotesObj.age || (age ? Number(age) : null),
       profession: updatedNotesObj.profession || profession?.trim() || '',
       college_or_company: updatedNotesObj.college_or_company || college_or_company?.trim() || '',
       emergency_name: savedResident?.emergency_name || emergency_name?.trim() || '',
@@ -197,21 +241,41 @@ export async function PATCH(request: NextRequest) {
       permanent_address: savedResident?.permanent_address || permanent_address?.trim() || '',
       permanent_city: savedResident?.permanent_city || permanent_city?.trim() || '',
       aadhaar_verified: updatedNotesObj.aadhaar_verified ?? Boolean(aadhaar_verified),
-      aadhaar_last4: updatedNotesObj.aadhaar_last4 || aadhaar_last4 || savedResident?.id_number || '4921',
-      aadhaar_verified_date: updatedNotesObj.aadhaar_verified_date,
+      aadhaar_last4: updatedNotesObj.aadhaar_last4 || aadhaar_last4 || savedResident?.id_number || '',
+      aadhaar_verified_date: updatedNotesObj.aadhaar_verified_date || '',
     }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Profile saved and maintained in Supabase database successfully',
-      user: {
-        ...user,
-        ...userUpdates,
+    return NextResponse.json(
+      {
+        success: true,
+        message: 'Profile saved and maintained in Supabase database successfully',
+        user: {
+          ...user,
+          ...userUpdates,
+        },
+        profile: finalProfile,
       },
-      profile: finalProfile,
-    })
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
+        },
+      }
+    )
   } catch (err: any) {
     console.error('[Profile Update Route Error]:', err)
-    return NextResponse.json({ error: err?.message || 'Failed to update profile in database' }, { status: 500 })
+    return NextResponse.json(
+      { error: err?.message || 'Failed to update profile in database' },
+      {
+        status: 500,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        },
+      }
+    )
   }
 }
+
+// Export aliases for robust client and form compatibility
+export { PATCH as POST, PATCH as PUT }

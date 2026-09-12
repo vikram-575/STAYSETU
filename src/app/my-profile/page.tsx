@@ -68,7 +68,10 @@ function MyProfileContent() {
     async function loadSession() {
       try {
         setLoading(true)
-        const res = await fetch('/api/auth/session')
+        const res = await fetch('/api/auth/session', {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' },
+        })
         if (res.ok) {
           const data = await res.json()
           if (data.user) {
@@ -79,26 +82,22 @@ function MyProfileContent() {
             if (data.passbookSummary) setPassbookSummary(data.passbookSummary)
             if (data.transactions) setTransactions(data.transactions)
 
-            // Merge server profile metadata or local storage
-            let mergedProfile = data.profile || {}
-            const savedProfile = localStorage.getItem('pgsetu_profile_data')
-            if (savedProfile) {
-              try {
-                const parsed = JSON.parse(savedProfile)
-                mergedProfile = { ...parsed, ...mergedProfile }
-              } catch {}
-            }
+            // Server profile is the authoritative source of truth
+            const serverProfile = data.profile || {}
+            setProfileData(serverProfile)
+            try {
+              localStorage.setItem('pgsetu_profile_data', JSON.stringify(serverProfile))
+            } catch {}
 
-            setProfileData(mergedProfile)
-            setEditGender(mergedProfile.gender || 'male')
-            setEditAge(mergedProfile.age?.toString() || '25')
-            setEditProfession(mergedProfile.profession || 'Software Professional')
-            setEditCollegeCompany(mergedProfile.college_or_company || 'Infosys / Tech Mahindra')
-            setEditEmergencyName(mergedProfile.emergency_name || 'Rajendra Tomar')
-            setEditEmergencyPhone(mergedProfile.emergency_phone || '9876543210')
-            setEditEmergencyRelation(mergedProfile.emergency_relation || 'Father')
-            setEditPermanentAddress(mergedProfile.permanent_address || 'Flat 402, Green Meadows')
-            setEditPermanentCity(mergedProfile.permanent_city || 'Kanpur, UP')
+            setEditGender(serverProfile.gender || 'male')
+            setEditAge(serverProfile.age ? serverProfile.age.toString() : '')
+            setEditProfession(serverProfile.profession || '')
+            setEditCollegeCompany(serverProfile.college_or_company || '')
+            setEditEmergencyName(serverProfile.emergency_name || '')
+            setEditEmergencyPhone(serverProfile.emergency_phone || '')
+            setEditEmergencyRelation(serverProfile.emergency_relation || 'Parent')
+            setEditPermanentAddress(serverProfile.permanent_address || '')
+            setEditPermanentCity(serverProfile.permanent_city || '')
           }
         }
       } catch (err) {
@@ -115,8 +114,8 @@ function MyProfileContent() {
     profileData?.id ||
     `TN-${currentUser?.phone?.slice(-4) || '2026'}-7AB`
 
-  const isAadhaarVerified = Boolean(profileData?.aadhaar_verified ?? true)
-  const aadhaarLast4 = profileData?.aadhaar_last4 || '4921'
+  const isAadhaarVerified = Boolean(profileData?.aadhaar_verified)
+  const aadhaarLast4 = profileData?.aadhaar_last4 || ''
   const activeStay = stays.find((s) => s.status === 'active') || stays[0]
 
   const totalRentFormatted = passbookSummary
@@ -201,6 +200,15 @@ function MyProfileContent() {
         const resData = await res.json()
         if (resData.profile) {
           setProfileData(resData.profile)
+          setEditGender(resData.profile.gender || 'male')
+          setEditAge(resData.profile.age ? resData.profile.age.toString() : '')
+          setEditProfession(resData.profile.profession || '')
+          setEditCollegeCompany(resData.profile.college_or_company || '')
+          setEditEmergencyName(resData.profile.emergency_name || '')
+          setEditEmergencyPhone(resData.profile.emergency_phone || '')
+          setEditEmergencyRelation(resData.profile.emergency_relation || 'Parent')
+          setEditPermanentAddress(resData.profile.permanent_address || '')
+          setEditPermanentCity(resData.profile.permanent_city || '')
           try {
             localStorage.setItem('pgsetu_profile_data', JSON.stringify(resData.profile))
           } catch {}
@@ -432,10 +440,10 @@ function MyProfileContent() {
                   )}
                 </h1>
                 <p className="text-xs text-emerald-200/90 font-medium">
-                  {profileData?.profession || 'Software Professional'} • {activeStay?.city || 'Noida NCR'}
+                  {profileData?.profession || 'Verified Member'} • {activeStay?.city || 'PG-Setu Resident'}
                 </p>
                 <p className="text-[11px] text-white/70 font-mono">
-                  +91 {currentUser.phone || profileData?.mobile || '9453522757'}
+                  +91 {currentUser.phone || profileData?.mobile || 'Verified Mobile'}
                 </p>
               </div>
             </div>
@@ -1089,48 +1097,73 @@ function MyProfileContent() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
                 <div className="rounded-xl bg-gray-50 p-2.5">
                   <span className="text-gray-400 text-[10px] font-bold block">Full Name</span>
-                  <p className="font-bold text-gray-900 mt-0.5">{currentUser.full_name || 'Vikram Tomar'}</p>
+                  <p className="font-bold text-gray-900 mt-0.5">{currentUser.full_name || profileData?.full_name || 'PG-Setu Member'}</p>
                 </div>
 
                 <div className="rounded-xl bg-gray-50 p-2.5">
                   <span className="text-gray-400 text-[10px] font-bold block">Mobile (Verified)</span>
-                  <p className="font-bold text-gray-900 mt-0.5">+91 {currentUser.phone || profileData?.mobile || '9453522757'}</p>
+                  <p className="font-bold text-gray-900 mt-0.5">+91 {currentUser.phone || profileData?.mobile || 'Not set'}</p>
                 </div>
 
                 <div className="rounded-xl bg-gray-50 p-2.5">
                   <span className="text-gray-400 text-[10px] font-bold block">Email</span>
-                  <p className="font-bold text-gray-900 mt-0.5 truncate">{currentUser.email || 'vikramtomar0505@gmail.com'}</p>
+                  <p className="font-bold text-gray-900 mt-0.5 truncate">{currentUser.email || profileData?.email || 'Not provided'}</p>
                 </div>
 
                 <div className="rounded-xl bg-gray-50 p-2.5">
                   <span className="text-gray-400 text-[10px] font-bold block">Gender & Age</span>
                   <p className="font-bold text-gray-900 mt-0.5 capitalize">
-                    {profileData?.gender || 'Male'} • {profileData?.age ? `${profileData.age} Yrs` : '25 Yrs'}
+                    {profileData?.gender || 'Not set'} {profileData?.age ? `• ${profileData.age} Yrs` : ''}
                   </p>
                 </div>
 
                 <div className="rounded-xl bg-gray-50 p-2.5">
                   <span className="text-gray-400 text-[10px] font-bold block">Profession / College</span>
                   <p className="font-bold text-gray-900 mt-0.5">
-                    {profileData?.profession || 'Software Professional'} ({profileData?.college_or_company || 'Infosys'})
+                    {profileData?.profession || 'Not set'}
+                    {profileData?.college_or_company ? ` (${profileData.college_or_company})` : ''}
                   </p>
                 </div>
 
                 <div className="rounded-xl bg-gray-50 p-2.5">
                   <span className="text-gray-400 text-[10px] font-bold block">Emergency Contact</span>
-                  <p className="font-bold text-gray-900 mt-0.5">
-                    {profileData?.emergency_name || 'Rajendra Tomar'} ({profileData?.emergency_relation || 'Father'})
-                  </p>
-                  <p className="text-[10px] text-gray-500 font-mono mt-0.5">
-                    +91 {profileData?.emergency_phone || '9876543210'}
-                  </p>
+                  {profileData?.emergency_name ? (
+                    <>
+                      <p className="font-bold text-gray-900 mt-0.5">
+                        {profileData.emergency_name} {profileData.emergency_relation ? `(${profileData.emergency_relation})` : ''}
+                      </p>
+                      {profileData.emergency_phone && (
+                        <p className="text-[10px] text-gray-500 font-mono mt-0.5">
+                          +91 {profileData.emergency_phone}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setIsEditing(true)}
+                      className="text-xs font-bold text-[#16A34A] hover:underline mt-0.5 text-left block"
+                    >
+                      + Add Emergency Contact
+                    </button>
+                  )}
                 </div>
 
                 <div className="rounded-xl bg-gray-50 p-2.5 sm:col-span-2">
                   <span className="text-gray-400 text-[10px] font-bold block">Permanent Address</span>
-                  <p className="font-bold text-gray-900 mt-0.5">
-                    {profileData?.permanent_address || 'Flat 402, Green Meadows'}, {profileData?.permanent_city || 'Kanpur, UP'}
-                  </p>
+                  {profileData?.permanent_address ? (
+                    <p className="font-bold text-gray-900 mt-0.5">
+                      {profileData.permanent_address}{profileData.permanent_city ? `, ${profileData.permanent_city}` : ''}
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setIsEditing(true)}
+                      className="text-xs font-bold text-[#16A34A] hover:underline mt-0.5 text-left block"
+                    >
+                      + Add Permanent Address
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

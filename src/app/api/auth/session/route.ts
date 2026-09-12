@@ -3,11 +3,22 @@ import { cookies } from 'next/headers'
 import { getAuthenticatedUser } from '@/lib/auth-session'
 import { createServiceClient } from '@/lib/supabase/server'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export async function GET() {
   try {
     const user = await getAuthenticatedUser()
     if (!user) {
-      return NextResponse.json({ user: null }, { status: 401 })
+      return NextResponse.json(
+        { user: null },
+        {
+          status: 401,
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          },
+        }
+      )
     }
 
     const serviceClient = await createServiceClient()
@@ -212,54 +223,71 @@ export async function GET() {
           email: residentRow.email || user.email,
           mobile: residentRow.phone || cleanMobile,
           gender: residentRow.gender || 'male',
-          age: notesObj.age || 25,
-          profession: notesObj.profession || 'Software Professional',
-          college_or_company: notesObj.college_or_company || 'Tech Company',
-          emergency_name: residentRow.emergency_name || 'Rajendra Tomar',
-          emergency_phone: residentRow.emergency_phone || '9876543210',
-          emergency_relation: residentRow.emergency_relation || 'Father',
-          permanent_address: residentRow.permanent_address || 'Green Meadows',
-          permanent_city: residentRow.permanent_city || 'Kanpur, UP',
+          age: notesObj.age || null,
+          profession: notesObj.profession || '',
+          college_or_company: notesObj.college_or_company || '',
+          emergency_name: residentRow.emergency_name || '',
+          emergency_phone: residentRow.emergency_phone || '',
+          emergency_relation: residentRow.emergency_relation || '',
+          permanent_address: residentRow.permanent_address || '',
+          permanent_city: residentRow.permanent_city || '',
           aadhaar_verified: notesObj.aadhaar_verified ?? Boolean(residentRow.id_number),
-          aadhaar_last4: notesObj.aadhaar_last4 || residentRow.id_number || '4921',
-          aadhaar_verified_date: notesObj.aadhaar_verified_date || '12 Sep 2026',
+          aadhaar_last4: notesObj.aadhaar_last4 || residentRow.id_number || '',
+          aadhaar_verified_date: notesObj.aadhaar_verified_date || '',
         }
       } else {
-        // Synthesize fallback profile for user
+        // Synthesize fallback profile for user from users table
         profileData = {
           id: (user as any).registration_number || `TN-${cleanMobile.slice(-4) || '2026'}`,
           full_name: user.full_name || 'PG-Setu Member',
           email: user.email,
           mobile: cleanMobile,
-          gender: 'male',
-          age: 25,
-          profession: 'Software Professional',
-          college_or_company: 'Infosys / Tech',
-          emergency_name: 'Rajendra Tomar',
-          emergency_phone: '9876543210',
-          emergency_relation: 'Father',
-          permanent_address: 'Flat 402, Green Meadows',
-          permanent_city: 'Kanpur, UP',
-          aadhaar_verified: true,
-          aadhaar_last4: '4921',
-          aadhaar_verified_date: '12 Sep 2026',
+          gender: (user as any).gender || 'male',
+          age: (user as any).age || null,
+          profession: (user as any).profession || '',
+          college_or_company: '',
+          emergency_name: '',
+          emergency_phone: '',
+          emergency_relation: '',
+          permanent_address: '',
+          permanent_city: '',
+          aadhaar_verified: false,
+          aadhaar_last4: '',
+          aadhaar_verified_date: '',
         }
       }
     } catch (err: any) {
       console.warn('[Session Route Profile Resolution Warning]:', err?.message)
     }
 
-    return NextResponse.json({
-      user,
-      organization: user.organizations,
-      staffUsers,
-      stays: userStays,
-      passbookSummary,
-      transactions,
-      profile: profileData,
-    })
+    return NextResponse.json(
+      {
+        user,
+        organization: user.organizations,
+        staffUsers,
+        stays: userStays,
+        passbookSummary,
+        transactions,
+        profile: profileData,
+      },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
+        },
+      }
+    )
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    return NextResponse.json(
+      { error: err.message },
+      {
+        status: 500,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        },
+      }
+    )
   }
 }
 

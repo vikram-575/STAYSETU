@@ -3,6 +3,9 @@ import { cookies } from 'next/headers'
 import { createServiceClient } from '@/lib/supabase/server'
 import { cleanMobile, isValidMobile, generateTenantId } from '@/lib/profiles'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // In-memory OTP cache for instant verification (TTL: 5 minutes)
 const OTP_STORE = new Map<string, { code: string; expiresAt: number }>()
 
@@ -264,10 +267,10 @@ export async function POST(request: NextRequest) {
         try {
           const defaultNotes = {
             age: 25,
-            profession: firestoreProfile?.profession || 'Verified Member',
-            aadhaar_verified: true,
-            aadhaar_last4: '4921',
-            aadhaar_verified_date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+            profession: firestoreProfile?.profession || 'Verified Resident',
+            aadhaar_verified: false,
+            aadhaar_last4: '',
+            aadhaar_verified_date: '',
             created_at: now,
           }
           const { data: newRes } = await serviceClient
@@ -280,13 +283,13 @@ export async function POST(request: NextRequest) {
               email: effectiveEmail,
               gender: firestoreProfile?.gender || 'male',
               status: 'active',
-              emergency_name: 'Rajendra Tomar',
-              emergency_phone: '9876543210',
-              emergency_relation: 'Father',
-              permanent_address: 'Flat 402, Green Meadows',
-              permanent_city: 'Kanpur, UP',
-              id_type: 'aadhaar',
-              id_number: '4921',
+              emergency_name: null,
+              emergency_phone: null,
+              emergency_relation: null,
+              permanent_address: null,
+              permanent_city: null,
+              id_type: null,
+              id_number: null,
               notes: JSON.stringify(defaultNotes),
               created_at: now,
               updated_at: now,
@@ -573,30 +576,79 @@ export async function POST(request: NextRequest) {
         maxAge: 60 * 60 * 24 * 30,
         path: '/',
       })
+      if (residentId) {
+        cookieStore.set('resident_id', residentId, {
+          httpOnly: false,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 30,
+          path: '/',
+        })
+      }
 
-      return NextResponse.json({
-        success: true,
-        message: 'Profile created and saved in Supabase successfully.',
-        redirect: '/my-profile',
-        user: savedUser || {
-          id: targetUserId,
-          full_name: full_name.trim(),
-          email: effectiveEmail,
-          phone: cleanedMobile,
-          role: 'resident',
+      const returnedProfile = {
+        id: uniqueTenantId,
+        full_name: full_name.trim(),
+        mobile: cleanedMobile,
+        email: effectiveEmail,
+        gender: gender || 'male',
+        age: Number(age),
+        profession: profession.trim(),
+        college_or_company: '',
+        emergency_name: '',
+        emergency_phone: '',
+        emergency_relation: 'Parent',
+        permanent_address: '',
+        permanent_city: '',
+        aadhaar_verified: Boolean(aadhaar_verified),
+        aadhaar_last4: aadhaar_number ? aadhaar_number.replace(/\D/g, '').slice(-4) : '',
+        aadhaar_verified_date: aadhaar_verified ? new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
+      }
+
+      return NextResponse.json(
+        {
+          success: true,
+          message: 'Profile created and saved in Supabase successfully.',
+          redirect: '/my-profile',
+          user: savedUser || {
+            id: targetUserId,
+            full_name: full_name.trim(),
+            email: effectiveEmail,
+            phone: cleanedMobile,
+            role: 'resident',
+            resident_id: residentId,
+          },
+          profile: returnedProfile,
         },
-        profile: {
-          id: uniqueTenantId,
-          full_name: full_name.trim(),
-          mobile: cleanedMobile,
-          email: effectiveEmail,
-        },
-      })
+        {
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            Pragma: 'no-cache',
+            Expires: '0',
+          },
+        }
+      )
     }
 
-    return NextResponse.json({ error: 'Invalid action requested.' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Invalid action requested.' },
+      {
+        status: 400,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        },
+      }
+    )
   } catch (err: any) {
     console.error('Error in /api/auth/mobile-flow:', err)
-    return NextResponse.json({ error: err.message || 'Internal server error.' }, { status: 500 })
+    return NextResponse.json(
+      { error: err.message || 'Internal server error.' },
+      {
+        status: 500,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        },
+      }
+    )
   }
 }
