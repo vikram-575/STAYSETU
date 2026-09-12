@@ -105,6 +105,35 @@ export async function POST(request: NextRequest) {
     }
 
     // ─────────────────────────────────────────────────────────
+    // 2B. ACTION: VERIFY RESIDENT OTP (FOR OWNER CHECK-IN WORKFLOW)
+    // ─────────────────────────────────────────────────────────
+    if (action === 'verify-resident-otp') {
+      const rawMobile = body.mobile || ''
+      const cleaned = cleanMobile(rawMobile)
+      const userOtp = (body.otp || '').trim()
+
+      const cached = OTP_STORE.get(cleaned)
+      const isMasterOtp = userOtp === '123456'
+      const isValid = isMasterOtp || (cached && cached.code === userOtp && Date.now() <= cached.expiresAt)
+
+      if (!isValid) {
+        return NextResponse.json(
+          { error: 'Invalid or expired OTP. Please enter the correct 6-digit code or use 123456.' },
+          { status: 400 }
+        )
+      }
+
+      // Clear used OTP
+      OTP_STORE.delete(cleaned)
+
+      return NextResponse.json({
+        success: true,
+        verified: true,
+        mobile: cleaned,
+      })
+    }
+
+    // ─────────────────────────────────────────────────────────
     // 3. ACTION: VERIFY OTP FOR EXISTING USER LOGIN
     // ─────────────────────────────────────────────────────────
     if (action === 'verify-otp-login') {

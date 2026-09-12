@@ -64,11 +64,17 @@ export async function GET(request: NextRequest) {
       // Ignore if Firestore is unavailable
     }
 
+    // 3. Search in Supabase users table (Users registered via mobile OTP or portal)
+    const { data: userRecord } = await serviceClient
+      .from('users')
+      .select('id, full_name, email, phone, role')
+      .ilike('phone', `%${cleanedPhone}%`)
+      .maybeSingle()
+
     const primaryProfile = tenantProfiles[0] || null
     const latestResident = residents && residents.length > 0 ? residents[0] : null
 
     // Determine the permanent Unique Tenant ID:
-    // Check if latest resident or profile already has a TN... ID
     let unifiedTenantId: string | null = null
 
     // Priority 1: Check if any resident record already has a TN... registration_number
@@ -125,29 +131,30 @@ export async function GET(request: NextRequest) {
       }))
     }
 
-    const isFound = Boolean(latestResident || primaryProfile)
+    const isFound = Boolean(latestResident || primaryProfile || userRecord)
 
     // Build the resolved data object
     const result = {
       found: isFound,
       tenant_id: unifiedTenantId,
-      full_name: latestResident?.full_name || primaryProfile?.full_name || '',
+      full_name: latestResident?.full_name || primaryProfile?.full_name || userRecord?.full_name || '',
       phone: cleanedPhone,
-      alternate_phone: latestResident?.alternate_phone || '',
-      email: latestResident?.email || primaryProfile?.email || '',
+      alternate_phone: latestResident?.alternate_phone || primaryProfile?.alternate_phone || '',
+      email: latestResident?.email || primaryProfile?.email || userRecord?.email || '',
       date_of_birth: latestResident?.date_of_birth || primaryProfile?.dob || '',
       gender: latestResident?.gender || primaryProfile?.gender || 'male',
-      permanent_address: latestResident?.permanent_address || '',
+      permanent_address: latestResident?.permanent_address || primaryProfile?.permanent_address || '',
       permanent_city: latestResident?.permanent_city || primaryProfile?.current_city || '',
-      permanent_state: latestResident?.permanent_state || '',
-      permanent_pincode: latestResident?.permanent_pincode || '',
-      emergency_name: latestResident?.emergency_name || '',
-      emergency_phone: latestResident?.emergency_phone || '',
-      emergency_relation: latestResident?.emergency_relation || 'Parent',
-      id_type: latestResident?.id_type || 'aadhaar',
-      id_number: latestResident?.id_number || '',
-      kyc_verified: kycVerified || Boolean(primaryProfile?.verified_mobile),
-      source: latestResident ? 'existing_resident' : primaryProfile ? 'tenant_profile' : 'new',
+      permanent_state: latestResident?.permanent_state || primaryProfile?.permanent_state || '',
+      permanent_pincode: latestResident?.permanent_pincode || primaryProfile?.permanent_pincode || '',
+      emergency_name: latestResident?.emergency_name || primaryProfile?.emergency_name || '',
+      emergency_phone: latestResident?.emergency_phone || primaryProfile?.emergency_phone || '',
+      emergency_relation: latestResident?.emergency_relation || primaryProfile?.emergency_relation || 'Parent',
+      id_type: latestResident?.id_type || primaryProfile?.id_type || 'aadhaar',
+      id_number: latestResident?.id_number || primaryProfile?.aadhaar_number || '',
+      kyc_verified: kycVerified || Boolean(primaryProfile?.verified_mobile) || Boolean(primaryProfile?.aadhaar_verified),
+      profession: primaryProfile?.profession || 'Corporate Professional',
+      source: latestResident ? 'existing_resident' : primaryProfile ? 'tenant_profile' : userRecord ? 'registered_user' : 'new',
       stays,
     }
 
