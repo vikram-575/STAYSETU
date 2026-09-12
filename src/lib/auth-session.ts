@@ -9,6 +9,7 @@ export interface AuthSessionUser {
   role: 'superadmin' | 'owner' | 'manager' | 'accountant' | 'staff' | 'resident'
   organization_id: string | null
   phone?: string | null
+  resident_id?: string | null
   registration_number?: string | null
   organizations?: {
     id: string
@@ -193,6 +194,7 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
             role: fallbackProfile.role || 'owner',
             organization_id: orgId,
             phone: fallbackProfile.phone || authMobile,
+            resident_id: fallbackProfile.resident_id || residentId || null,
             organizations: orgObj,
           }
         }

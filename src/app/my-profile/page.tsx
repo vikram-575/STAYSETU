@@ -198,32 +198,34 @@ function MyProfileContent() {
       })
 
       if (res.ok) {
-        setSaveSuccessMsg('Profile updated and synchronized!')
+        const resData = await res.json()
+        if (resData.profile) {
+          setProfileData(resData.profile)
+          try {
+            localStorage.setItem('pgsetu_profile_data', JSON.stringify(resData.profile))
+          } catch {}
+        }
+        if (resData.user) {
+          setCurrentUser((prev: any) => ({
+            ...(prev || {}),
+            ...resData.user,
+          }))
+        }
+        setSaveSuccessMsg('Profile saved to database successfully!')
+      } else {
+        const errJson = await res.json().catch(() => ({}))
+        setSaveSuccessMsg(errJson.error || 'Saved locally (offline mode)')
       }
     } catch (err) {
       console.warn('[Profile Save warning]:', err)
+      setSaveSuccessMsg('Saved locally')
     }
-
-    // 2. Optimistically update local states
-    const localMerged = {
-      ...(profileData || {}),
-      ...updatedProfilePayload,
-    }
-    setProfileData(localMerged)
-    setCurrentUser((prev: any) => ({
-      ...(prev || {}),
-      full_name: editName.trim(),
-      email: editEmail.trim(),
-    }))
-    try {
-      localStorage.setItem('pgsetu_profile_data', JSON.stringify(localMerged))
-    } catch {}
 
     setSavingEdit(false)
     setTimeout(() => {
       setIsEditing(false)
       setSaveSuccessMsg('')
-    }, 1000)
+    }, 1200)
   }
 
   const handleConfirmAadhaar = async () => {

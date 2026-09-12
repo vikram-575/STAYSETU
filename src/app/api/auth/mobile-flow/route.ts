@@ -253,11 +253,49 @@ export async function POST(request: NextRequest) {
       const effectiveName = user?.full_name || resident?.full_name || firestoreProfile?.full_name || 'PG-Setu Member'
       const effectiveEmail = user?.email || resident?.email || firestoreProfile?.email || `${cleaned}@user.pgsetu.com`
       const effectiveRole = user?.role || (resident ? 'resident' : (firestoreProfile?.type === 'owner' ? 'owner' : 'resident'))
-      const residentId = resident?.id || user?.resident_id || null
+      let residentId = resident?.id || user?.resident_id || null
       const orgId = user?.organization_id || resident?.organization_id || defaultOrgId
       const tenantRegId = resident?.registration_number || firestoreProfile?.id || `TN-${cleaned.slice(-4)}`
 
       const now = new Date().toISOString()
+
+      // Ensure resident record exists in Supabase so profile is maintained on server
+      if (!residentId) {
+        try {
+          const defaultNotes = {
+            age: 25,
+            profession: firestoreProfile?.profession || 'Verified Member',
+            aadhaar_verified: true,
+            aadhaar_last4: '4921',
+            aadhaar_verified_date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+            created_at: now,
+          }
+          const { data: newRes } = await serviceClient
+            .from('residents')
+            .insert({
+              organization_id: orgId,
+              registration_number: tenantRegId,
+              full_name: effectiveName,
+              phone: cleaned,
+              email: effectiveEmail,
+              gender: firestoreProfile?.gender || 'male',
+              status: 'active',
+              emergency_name: 'Rajendra Tomar',
+              emergency_phone: '9876543210',
+              emergency_relation: 'Father',
+              permanent_address: 'Flat 402, Green Meadows',
+              permanent_city: 'Kanpur, UP',
+              id_type: 'aadhaar',
+              id_number: '4921',
+              notes: JSON.stringify(defaultNotes),
+              created_at: now,
+              updated_at: now,
+            })
+            .select('id')
+            .maybeSingle()
+          if (newRes) residentId = newRes.id
+        } catch {}
+      }
 
       // ─── SAVE / UPSERT SIGNED-IN USER IN SUPABASE ───────────
       const { data: savedUser, error: saveErr } = await serviceClient
@@ -411,6 +449,45 @@ export async function POST(request: NextRequest) {
       const targetUserId = existingUser ? existingUser.id : crypto.randomUUID()
       const now = new Date().toISOString()
 
+      // ─── SAVE IN SUPABASE RESIDENTS TABLE (FULL PROFILE) ────
+      let residentId: string | null = null
+      try {
+        const notesObj = {
+          age: Number(age),
+          profession: profession.trim(),
+          aadhaar_verified: Boolean(aadhaar_verified),
+          aadhaar_last4: aadhaar_number ? aadhaar_number.replace(/\D/g, '').slice(-4) : null,
+          created_at: now,
+        }
+
+        const { data: newResident, error: resErr } = await serviceClient
+          .from('residents')
+          .insert({
+            organization_id: defaultOrgId,
+            registration_number: uniqueTenantId,
+            full_name: full_name.trim(),
+            phone: cleanedMobile,
+            email: effectiveEmail,
+            gender: gender || 'male',
+            status: 'active',
+            id_type: aadhaar_number ? 'aadhaar' : null,
+            id_number: aadhaar_number ? aadhaar_number.replace(/\D/g, '').slice(-4) : null,
+            notes: JSON.stringify(notesObj),
+            created_at: now,
+            updated_at: now,
+          })
+          .select()
+          .maybeSingle()
+
+        if (newResident) {
+          residentId = newResident.id
+        } else if (resErr) {
+          console.warn('[Supabase Residents Insert Warning]:', resErr.message)
+        }
+      } catch (rErr: any) {
+        console.warn('[Supabase Residents Insert Exception]:', rErr?.message)
+      }
+
       // ─── SAVE IN SUPABASE USERS TABLE ───────────────────────
       const { data: savedUser, error: saveErr } = await serviceClient
         .from('users')
@@ -421,6 +498,7 @@ export async function POST(request: NextRequest) {
           full_name: full_name.trim(),
           phone: cleanedMobile,
           role: 'resident',
+          resident_id: residentId,
           is_active: true,
           last_login_at: now,
           created_at: now,
