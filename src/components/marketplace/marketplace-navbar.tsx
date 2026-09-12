@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
   Building2,
@@ -16,6 +16,7 @@ import {
   Heart,
   PhoneCall,
   Megaphone,
+  LogOut,
 } from 'lucide-react'
 import { useWebsiteContent } from '@/context/website-content-context'
 
@@ -35,8 +36,40 @@ export function MarketplaceNavbar({
   onScrollToSection,
 }: MarketplaceNavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [loadingUser, setLoadingUser] = useState(true)
   const { content } = useWebsiteContent()
   const announcement = content?.announcement
+
+  // Check login state on mount
+  useEffect(() => {
+    let isMounted = true
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/auth/session')
+        if (res.ok) {
+          const data = await res.json()
+          if (isMounted && data.user) {
+            setCurrentUser(data.user)
+          }
+        }
+      } catch {} finally {
+        if (isMounted) setLoadingUser(false)
+      }
+    }
+    checkAuth()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const handleSignOut = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+    } catch {}
+    setCurrentUser(null)
+    window.location.href = '/'
+  }
 
   const handleNavClick = (sectionId: string) => {
     setMobileMenuOpen(false)
@@ -150,45 +183,78 @@ export function MarketplaceNavbar({
             </button>
           )}
 
-          {/* Tenant Portal Link */}
-          <Link
-            href="/portal"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white px-3.5 py-2 text-xs font-semibold text-[#17211B] shadow-2xs hover:bg-[#F7FAF7] hover:border-gray-300 transition"
-          >
-            <KeyRound className="h-3.5 w-3.5 text-[#16A34A]" />
-            <span>Tenant Portal</span>
-          </Link>
+          {currentUser ? (
+            <div className="flex items-center gap-2">
+              {/* User Avatar and Name -> My Profile */}
+              <Link
+                href="/my-profile"
+                className="flex items-center gap-2 rounded-xl border border-gray-200/90 bg-[#F7FAF7] px-3 py-1.5 hover:border-[#16A34A] transition"
+              >
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#14532D] text-xs font-bold text-white ring-2 ring-[#DCFCE7]">
+                  {(currentUser.full_name || 'U')[0].toUpperCase()}
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-xs font-bold text-[#17211B] max-w-[110px] truncate">
+                    {currentUser.full_name || 'My Account'}
+                  </span>
+                  <span className="text-[10px] font-semibold text-[#16A34A] capitalize">
+                    {currentUser.role === 'owner' || currentUser.role === 'superadmin' ? 'Owner' : 'Verified Member'}
+                  </span>
+                </div>
+              </Link>
 
-          {/* Owner Login Link */}
-          <Link
-            href="/login"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-transparent px-3 py-2 text-xs font-semibold text-[#647067] hover:text-[#14532D] hover:bg-gray-100/70 transition"
-          >
-            <LogIn className="h-3.5 w-3.5" />
-            <span>Owner Login</span>
-          </Link>
+              {/* Direct Role Action Button */}
+              {currentUser.role === 'owner' || currentUser.role === 'superadmin' || currentUser.role === 'manager' ? (
+                <Link
+                  href="/dashboard"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-[#14532D] bg-[#14532D] px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#166534] transition"
+                >
+                  <Building2 className="h-3.5 w-3.5" />
+                  <span>Dashboard</span>
+                </Link>
+              ) : (
+                <Link
+                  href="/portal"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-[#16A34A] bg-[#DCFCE7] px-3.5 py-2 text-xs font-bold text-[#14532D] shadow-xs hover:bg-emerald-100 transition"
+                >
+                  <KeyRound className="h-3.5 w-3.5 text-[#16A34A]" />
+                  <span>My Stay</span>
+                </Link>
+              )}
 
-          {/* Create / My Profile CTA */}
-          <Link
-            href="/create-profile"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[#DCFCE7] bg-emerald-50 px-3.5 py-2 text-xs font-bold text-[#14532D] hover:bg-emerald-100 transition"
-          >
-            <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
-            <span>Create Profile</span>
-          </Link>
-          {/* List Your Property CTA Button */}
-          <button
-            onClick={onOpenListModal}
-            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:opacity-95 active:scale-98 transition"
-          >
-            <PlusCircle className="h-4 w-4" />
-            <span>List Your Property</span>
-            <span className="rounded-full bg-[#DCFCE7]/20 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-[#DCFCE7]">
-              Free
-            </span>
-          </button>
+              {/* Sign Out Button */}
+              <button
+                onClick={handleSignOut}
+                className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white p-2 text-gray-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition"
+                title="Sign Out"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              {/* Unified Mobile-First Sign In / Join CTA */}
+              <Link
+                href="/login"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-gray-300 bg-white px-4 py-2 text-xs font-bold text-[#17211B] shadow-2xs hover:bg-[#F7FAF7] hover:border-[#16A34A] transition"
+              >
+                <LogIn className="h-3.5 w-3.5 text-[#16A34A]" />
+                <span>Sign In / Join</span>
+              </Link>
+
+              {/* List Your Property CTA Button */}
+              <button
+                onClick={onOpenListModal}
+                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:opacity-95 active:scale-98 transition"
+              >
+                <PlusCircle className="h-4 w-4" />
+                <span>List Your Property</span>
+                <span className="rounded-full bg-[#DCFCE7]/20 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-[#DCFCE7]">
+                  Free
+                </span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Mobile Hamburger Button */}
@@ -262,55 +328,76 @@ export function MarketplaceNavbar({
 
             <div className="my-2 border-t border-gray-200" />
 
-            <button
-              onClick={() => {
-                setMobileMenuOpen(false)
-                onOpenListModal()
-              }}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] py-3 text-sm font-bold text-white shadow-sm"
-            >
-              <PlusCircle className="h-4 w-4" />
-              <span>List Your Property Free</span>
-            </button>
+            {currentUser ? (
+              <div className="flex flex-col gap-2">
+                <Link
+                  href="/my-profile"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2 rounded-xl bg-[#F7FAF7] p-3 border border-gray-200"
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#14532D] text-xs font-bold text-white">
+                    {(currentUser.full_name || 'U')[0].toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-gray-900">{currentUser.full_name || 'My Profile'}</div>
+                    <div className="text-[10px] text-[#16A34A] font-medium">Manage Profile & Stays →</div>
+                  </div>
+                </Link>
 
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              <Link
-                href="/create-profile"
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center justify-center gap-1.5 rounded-lg border border-[#DCFCE7] bg-emerald-50 py-2.5 text-xs font-bold text-[#14532D] hover:bg-emerald-100"
-              >
-                <Sparkles className="h-4 w-4 text-emerald-600" />
-                <span>Create Profile</span>
-              </Link>
-              <Link
-                href="/my-profile"
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 py-2.5 text-xs font-semibold text-[#17211B] hover:bg-gray-50"
-              >
-                <span>My Profile</span>
-              </Link>
-            </div>
+                {currentUser.role === 'owner' || currentUser.role === 'superadmin' || currentUser.role === 'manager' ? (
+                  <Link
+                    href="/dashboard"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#14532D] py-3 text-sm font-bold text-white shadow-sm"
+                  >
+                    <Building2 className="h-4 w-4" />
+                    <span>Go to Owner Dashboard</span>
+                  </Link>
+                ) : (
+                  <Link
+                    href="/portal"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#DCFCE7] py-3 text-sm font-bold text-[#14532D] shadow-sm"
+                  >
+                    <KeyRound className="h-4 w-4 text-[#16A34A]" />
+                    <span>Open Tenant Passbook</span>
+                  </Link>
+                )}
 
-            <div className="grid grid-cols-2 gap-2">
-              <Link
-                href="/portal"
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 py-2.5 text-xs font-semibold text-[#17211B] hover:bg-gray-50"
-              >
-                <KeyRound className="h-4 w-4 text-[#16A34A]" />
-                <span>Tenant Portal</span>
-              </Link>
-              <Link
-                href="/login"
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 py-2.5 text-xs font-semibold text-[#17211B] hover:bg-gray-50"
-              >
-                <LogIn className="h-4 w-4 text-[#647067]" />
-                <span>Owner Login</span>
-              </Link>
-            </div>
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false)
+                    handleSignOut()
+                  }}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-red-200 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <Link
+                  href="/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white py-3 text-sm font-bold text-[#17211B] shadow-2xs hover:bg-[#F7FAF7]"
+                >
+                  <LogIn className="h-4 w-4 text-[#16A34A]" />
+                  <span>Sign In / Join</span>
+                </Link>
+
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false)
+                    onOpenListModal()
+                  }}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] py-3 text-sm font-bold text-white shadow-sm"
+                >
+                  <PlusCircle className="h-4 w-4" />
+                  <span>List Your Property Free</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
