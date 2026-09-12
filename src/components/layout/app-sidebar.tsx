@@ -8,7 +8,9 @@ import {
   LayoutDashboard, Users, Building2, BedDouble, FileText,
   CreditCard, Zap, BarChart3, MessageSquare, Settings,
   DollarSign, BookOpen, PackageSearch, LogOut,
-  TrendingUp, ShieldAlert, Sparkles, Compass
+  TrendingUp, ShieldAlert, Sparkles, Compass,
+  Landmark, BookCheck, Fingerprint, Utensils, Wrench,
+  UploadCloud, UserCheck, Percent, Coins, Bot, Palette
 } from 'lucide-react'
 
 interface NavItem {
@@ -25,6 +27,16 @@ const navItems: NavItem[] = [
   { label: 'Rooms & Beds', href: '/dashboard/rooms', icon: BedDouble, roles: ['superadmin', 'owner', 'manager', 'staff'] },
   { label: 'Billing & Invoices', href: '/dashboard/billing', icon: FileText, roles: ['superadmin', 'owner', 'manager', 'accountant'] },
   { label: 'Payments Register', href: '/dashboard/payments', icon: CreditCard, roles: ['superadmin', 'owner', 'manager', 'accountant'] },
+  { label: 'Bank Reconcile (VAN)', href: '/dashboard/reconciliation', icon: Landmark, roles: ['superadmin', 'owner', 'accountant'], badge: 'VAN' },
+  { label: 'Tally Accounting', href: '/dashboard/accounting', icon: BookCheck, roles: ['superadmin', 'owner', 'accountant'] },
+  { label: 'Biometric Turnstile', href: '/dashboard/biometric', icon: Fingerprint, roles: ['superadmin', 'owner', 'manager', 'staff'] },
+  { label: 'Mess & Food Costing', href: '/dashboard/mess', icon: Utensils, roles: ['superadmin', 'owner', 'manager', 'staff'] },
+  { label: 'Preventive AMC', href: '/dashboard/maintenance', icon: Wrench, roles: ['superadmin', 'owner', 'manager', 'staff'] },
+  { label: 'Bulk CSV Import', href: '/dashboard/residents/bulk-import', icon: UploadCloud, roles: ['superadmin', 'owner', 'manager'] },
+  { label: 'Staff & Payroll', href: '/dashboard/staff', icon: UserCheck, roles: ['superadmin', 'owner', 'accountant'] },
+  { label: 'Dynamic Pricing Rules', href: '/dashboard/pricing-rules', icon: Percent, roles: ['superadmin', 'owner'] },
+  { label: 'Cashier Vault Closing', href: '/dashboard/vault', icon: Coins, roles: ['superadmin', 'owner', 'manager', 'accountant'] },
+  { label: 'AI WhatsApp Bot', href: '/dashboard/whatsapp-bot', icon: Bot, roles: ['superadmin', 'owner', 'manager'] },
   { label: 'Resident Ledger', href: '/dashboard/ledger', icon: BookOpen, roles: ['superadmin', 'owner', 'manager', 'accountant'] },
   { label: 'Electricity Sub-Meters', href: '/dashboard/electricity', icon: Zap, roles: ['superadmin', 'owner', 'manager', 'staff'] },
   { label: 'Expenses Tracking', href: '/dashboard/expenses', icon: DollarSign, roles: ['superadmin', 'owner', 'accountant', 'manager'] },
@@ -32,6 +44,7 @@ const navItems: NavItem[] = [
   { label: 'Financial Analytics', href: '/dashboard/analytics', icon: BarChart3, roles: ['superadmin', 'owner', 'manager', 'accountant'] },
   { label: 'Reports & Audits', href: '/dashboard/reports', icon: PackageSearch, roles: ['superadmin', 'owner', 'manager', 'accountant'] },
   { label: 'WhatsApp Automation', href: '/dashboard/communications', icon: MessageSquare, roles: ['superadmin', 'owner', 'manager', 'staff'] },
+  { label: 'White-Label Branding', href: '/dashboard/white-label', icon: Palette, roles: ['superadmin', 'owner'] },
   { label: 'PG Settings & GST', href: '/dashboard/settings', icon: Settings, roles: ['superadmin', 'owner'] },
 ]
 

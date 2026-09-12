@@ -7,7 +7,7 @@ import {
   AlertCircle, DollarSign, Zap, FileText, CreditCard,
   BookOpen, Sparkles, Loader2, LogOut, ArrowLeft,
   ExternalLink, Download, Printer, User, Shield, MessageSquare,
-  QrCode, X, Copy, Check
+  QrCode, X, Copy, Check, KeyRound, ShoppingBag, Plus, Share2
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/money'
 import { formatDate, formatDateTime, cn } from '@/lib/utils'
@@ -23,7 +23,24 @@ export default function ResidentPortalPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loadingData, setLoadingData] = useState(true)
   const [portalData, setPortalData] = useState<any>(null)
-  const [activeTab, setActiveTab] = useState<'invoices' | 'payments' | 'ledger' | 'electricity' | 'stay'>('invoices')
+  const [activeTab, setActiveTab] = useState<'invoices' | 'payments' | 'ledger' | 'electricity' | 'stay' | 'hra' | 'gatepass' | 'community'>('invoices')
+
+  // HRA Tax Kit State
+  const [selectedFy, setSelectedFy] = useState('2024-2025')
+  const [hraData, setHraData] = useState<any>(null)
+  const [loadingHra, setLoadingHra] = useState(false)
+
+  // Gate Pass State
+  const [gatePasses, setGatePasses] = useState<any[]>([])
+  const [loadingPasses, setLoadingPasses] = useState(false)
+  const [showNewPassModal, setShowNewPassModal] = useState(false)
+  const [newGuestName, setNewGuestName] = useState('')
+  const [newGuestPhone, setNewGuestPhone] = useState('')
+  const [newGuestCount, setNewGuestCount] = useState(1)
+  const [newPassPurpose, setNewPassPurpose] = useState('Friend Visiting')
+  const [newVehicleNumber, setNewVehicleNumber] = useState('')
+  const [creatingPass, setCreatingPass] = useState(false)
+  const [copiedPassId, setCopiedPassId] = useState<string | null>(null)
 
   // Receipt Modal State
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null)
@@ -122,6 +139,74 @@ export default function ResidentPortalPage() {
     setPortalData(null)
     setPhone('')
     setDob('')
+  }
+
+  // Fetch HRA Data
+  useEffect(() => {
+    async function fetchHra() {
+      if (activeTab !== 'hra') return
+      try {
+        setLoadingHra(true)
+        const residentId = portalData?.resident?.id
+        const res = await fetch(`/api/portal/hra-receipts?fy=${selectedFy}${residentId ? `&resident_id=${residentId}` : ''}`)
+        const data = await res.json()
+        if (res.ok) setHraData(data)
+      } catch {} finally {
+        setLoadingHra(false)
+      }
+    }
+    fetchHra()
+  }, [activeTab, selectedFy, portalData?.resident?.id])
+
+  // Fetch Gate Passes
+  useEffect(() => {
+    async function fetchGatePasses() {
+      if (activeTab !== 'gatepass') return
+      try {
+        setLoadingPasses(true)
+        const res = await fetch('/api/portal/gate-pass')
+        const data = await res.json()
+        if (res.ok) setGatePasses(data.passes || [])
+      } catch {} finally {
+        setLoadingPasses(false)
+      }
+    }
+    fetchGatePasses()
+  }, [activeTab])
+
+  // Handle Create Gate Pass
+  const handleCreatePass = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      setCreatingPass(true)
+      const res = await fetch('/api/portal/gate-pass', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create',
+          residentName: portalData?.resident?.full_name || 'Resident',
+          residentPhone: portalData?.resident?.phone || '',
+          roomNumber: portalData?.resident?.room_number || '',
+          guestName: newGuestName,
+          guestPhone: newGuestPhone,
+          guestCount: newGuestCount,
+          purpose: newPassPurpose,
+          vehicleNumber: newVehicleNumber,
+        }),
+      })
+      const data = await res.json()
+      if (res.ok && data.pass) {
+        setGatePasses((prev) => [data.pass, ...prev])
+        setShowNewPassModal(false)
+        setNewGuestName('')
+        setNewGuestPhone('')
+        setNewVehicleNumber('')
+      }
+    } catch {
+      alert('Failed to generate gate pass')
+    } finally {
+      setCreatingPass(false)
+    }
   }
 
   // Loading Screen
@@ -578,6 +663,39 @@ export default function ResidentPortalPage() {
             >
               Stay & Contact
             </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('hra')}
+              className={cn(
+                'px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap active:scale-95 flex items-center gap-1.5',
+                activeTab === 'hra' ? 'bg-white text-emerald-700 shadow-xs font-black' : 'text-emerald-700 hover:text-emerald-900'
+              )}
+            >
+              <Shield className="w-3.5 h-3.5 text-emerald-600" />
+              HRA Tax Kit
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('gatepass')}
+              className={cn(
+                'px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap active:scale-95 flex items-center gap-1.5',
+                activeTab === 'gatepass' ? 'bg-white text-blue-700 shadow-xs font-black' : 'text-gray-600 hover:text-gray-900'
+              )}
+            >
+              <KeyRound className="w-3.5 h-3.5 text-blue-600" />
+              Digital Gate Pass
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('community')}
+              className={cn(
+                'px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap active:scale-95 flex items-center gap-1.5',
+                activeTab === 'community' ? 'bg-white text-purple-700 shadow-xs font-black' : 'text-gray-600 hover:text-gray-900'
+              )}
+            >
+              <ShoppingBag className="w-3.5 h-3.5 text-purple-600" />
+              Campus Community
+            </button>
           </div>
         </div>
 
@@ -934,6 +1052,349 @@ export default function ResidentPortalPage() {
             )}
           </div>
         )}
+
+        {/* --------------------------------------------------------- */}
+        {/* TAB 6: AUTO-GENERATED HRA RENT RECEIPTS & FORM 16 TAX KIT */}
+        {/* --------------------------------------------------------- */}
+        {activeTab === 'hra' && (
+          <div className="space-y-4">
+            {/* Header & FY Selector */}
+            <div className="bg-white rounded-2xl p-5 border border-gray-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
+                    TAX COMPLIANT
+                  </span>
+                  <h3 className="text-sm font-black text-gray-900">Official HRA Rent Receipts & Tax Exemption Kit</h3>
+                </div>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Compliant with Section 10(13A) of the Income Tax Act, 1961 for corporate HRA claims & Form 16.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-bold text-gray-600">Financial Year:</label>
+                <select
+                  value={selectedFy}
+                  onChange={(e) => setSelectedFy(e.target.value)}
+                  className="text-xs font-bold bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="2025-2026">FY 2025-26</option>
+                  <option value="2024-2025">FY 2024-25</option>
+                  <option value="2023-2024">FY 2023-24</option>
+                </select>
+
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition"
+                >
+                  <Printer className="w-3.5 h-3.5" /> Print / Save PDF
+                </button>
+              </div>
+            </div>
+
+            {loadingHra ? (
+              <div className="bg-white rounded-2xl p-12 text-center border border-gray-200">
+                <Loader2 className="w-8 h-8 animate-spin text-emerald-600 mx-auto mb-2" />
+                <p className="text-xs text-gray-500">Compiling verified rent receipts for {selectedFy}...</p>
+              </div>
+            ) : hraData ? (
+              <>
+                {/* Landlord & Tax Compliance Banner */}
+                <div className="bg-gradient-to-br from-emerald-900 to-slate-900 text-white rounded-2xl p-5 shadow-sm space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                    <div>
+                      <span className="text-gray-400 text-[10px] uppercase font-bold block">Landlord / Property Legal Entity</span>
+                      <p className="font-bold text-white text-sm mt-0.5">{hraData.landlord?.name}</p>
+                      <p className="text-[11px] text-gray-300">{hraData.landlord?.address}</p>
+                    </div>
+
+                    <div>
+                      <span className="text-gray-400 text-[10px] uppercase font-bold block">Landlord PAN Number</span>
+                      <p className="font-mono font-black text-emerald-400 text-base mt-0.5">
+                        {hraData.landlord?.pan || 'AAACP9876K'}
+                      </p>
+                      <p className="text-[10px] text-emerald-300/80">
+                        {hraData.landlord?.panMandatory
+                          ? '✓ Mandatory PAN verified (Annual rent > ₹1,00,000)'
+                          : 'PAN verified for HRA claim'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <span className="text-gray-400 text-[10px] uppercase font-bold block">Total Annual Rent Paid</span>
+                      <p className="font-black text-white text-lg mt-0.5">
+                        ₹{hraData.summary?.totalAnnualRupees?.toLocaleString('en-IN')}
+                      </p>
+                      <p className="text-[10px] text-gray-300">
+                        12 Verified Monthly Payment Vouchers
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-white/10 rounded-xl border border-white/10 text-[11px] text-emerald-100 flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <span>
+                      <strong>Official Landlord Declaration:</strong> I hereby declare and certify that the tenant{' '}
+                      <strong>{hraData.resident?.name}</strong> has paid rent for residential accommodation at{' '}
+                      <strong>{hraData.landlord?.address}</strong> during Financial Year {hraData.financialYear}.
+                    </span>
+                  </div>
+                </div>
+
+                {/* 12 Months Receipts Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {hraData.receipts?.map((r: any) => (
+                    <div
+                      key={r.monthKey}
+                      className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-2xs space-y-2.5"
+                    >
+                      <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                        <span className="text-xs font-bold text-gray-900">{r.monthLabel}</span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 bg-gray-100 rounded text-gray-600 font-bold">
+                          {r.receiptNumber}
+                        </span>
+                      </div>
+
+                      <div className="space-y-1 text-[11px]">
+                        <div className="flex justify-between text-gray-500">
+                          <span>Amount Paid:</span>
+                          <strong className="text-emerald-700 font-black text-xs">
+                            ₹{r.amountRupees?.toLocaleString('en-IN')}
+                          </strong>
+                        </div>
+                        <div className="flex justify-between text-gray-500">
+                          <span>Payment Date:</span>
+                          <span className="font-semibold text-gray-800">{r.paymentDate}</span>
+                        </div>
+                        <div className="flex justify-between text-gray-500">
+                          <span>Mode / Ref:</span>
+                          <span className="font-mono text-[10px] text-gray-600 truncate max-w-[130px]">
+                            {r.transactionRef}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Validated
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => window.print()}
+                          className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-0.5"
+                        >
+                          <Download className="w-3 h-3" /> Receipt PDF
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : null}
+          </div>
+        )}
+
+        {/* --------------------------------------------------------- */}
+        {/* TAB 7: DIGITAL GATE PASS & GUEST PRE-APPROVAL */}
+        {/* --------------------------------------------------------- */}
+        {activeTab === 'gatepass' && (
+          <div className="space-y-4">
+            <div className="bg-white rounded-2xl p-5 border border-gray-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-blue-100 text-blue-800">
+                    ACCESS CONTROL
+                  </span>
+                  <h3 className="text-sm font-black text-gray-900">Digital Gate Pass & Guest Entry Pre-Approval</h3>
+                </div>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Generate instant 4-digit PIN passes and QR codes for friends, study partners, and delivery entries.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowNewPassModal(true)}
+                className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition"
+              >
+                <Plus className="w-4 h-4" /> Pre-Approve Visitor
+              </button>
+            </div>
+
+            {loadingPasses ? (
+              <div className="bg-white rounded-2xl p-12 text-center border border-gray-200">
+                <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-2" />
+                <p className="text-xs text-gray-500">Loading access passes...</p>
+              </div>
+            ) : gatePasses.length === 0 ? (
+              <div className="bg-white rounded-2xl p-10 text-center border border-gray-200">
+                <KeyRound className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                <h4 className="text-xs font-bold text-gray-800">No active visitor passes</h4>
+                <p className="text-[11px] text-gray-500 mt-0.5 mb-3">Pre-approve friends or family to ensure seamless gate entry.</p>
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassModal(true)}
+                  className="px-3.5 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold"
+                >
+                  Generate First Pass
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {gatePasses.map((pass) => (
+                  <div
+                    key={pass.id}
+                    className="bg-white rounded-2xl p-5 border border-gray-200/90 shadow-xs space-y-3"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <span className={`text-[10px] uppercase font-black px-2 py-0.5 rounded-md ${
+                          pass.status === 'checked_in'
+                            ? 'bg-blue-100 text-blue-800'
+                            : pass.status === 'approved'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {pass.status === 'checked_in' ? 'Entered PG' : 'Approved Entry'}
+                        </span>
+                        <h4 className="text-sm font-black text-gray-900 mt-1">{pass.guestName}</h4>
+                        <p className="text-[11px] text-gray-500">{pass.purpose}</p>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="text-[10px] text-gray-400 block font-bold">PIN CODE</span>
+                        <span className="text-xl font-black font-mono text-emerald-600 tracking-wider">
+                          {pass.pinCode}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 p-3 rounded-xl space-y-1 text-xs">
+                      <div className="flex justify-between text-gray-600 text-[11px]">
+                        <span>Pass Number:</span>
+                        <span className="font-mono font-bold text-gray-800">{pass.passNumber}</span>
+                      </div>
+                      {pass.guestPhone && (
+                        <div className="flex justify-between text-gray-600 text-[11px]">
+                          <span>Guest Phone:</span>
+                          <span className="font-mono font-bold text-gray-800">{pass.guestPhone}</span>
+                        </div>
+                      )}
+                      {pass.vehicleNumber && (
+                        <div className="flex justify-between text-gray-600 text-[11px]">
+                          <span>Vehicle No:</span>
+                          <span className="font-mono font-bold text-amber-700">{pass.vehicleNumber}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-gray-600 text-[11px]">
+                        <span>Valid Until:</span>
+                        <span className="font-semibold text-gray-700">
+                          {new Date(pass.validUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })},{' '}
+                          {new Date(pass.validUntil).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <Link
+                        href={`/gate-pass/${pass.id}`}
+                        target="_blank"
+                        className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" /> Security Guard View
+                      </Link>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const url = `${window.location.origin}/gate-pass/${pass.id}`
+                          navigator.clipboard.writeText(`Hi! Here is your PG-Setu Gate Pass. PIN: ${pass.pinCode}. Verification Link: ${url}`)
+                          setCopiedPassId(pass.id)
+                          setTimeout(() => setCopiedPassId(null), 2000)
+                        }}
+                        className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition flex items-center gap-1"
+                      >
+                        {copiedPassId === pass.id ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Share2 className="w-3.5 h-3.5" />}
+                        <span>{copiedPassId === pass.id ? 'Copied' : 'Share Pass'}</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* --------------------------------------------------------- */}
+        {/* TAB 8: CAMPUS COMMUNITY & BUY/SELL MARKETPLACE */}
+        {/* --------------------------------------------------------- */}
+        {activeTab === 'community' && (
+          <div className="space-y-4">
+            <div className="bg-gradient-to-r from-purple-900 to-indigo-900 text-white rounded-3xl p-6 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-purple-500/30 text-purple-200 border border-purple-400/20">
+                  CAMPUS CONNECT
+                </span>
+                <h3 className="text-xl font-black mt-1">PG-Setu Resident Community Hub</h3>
+                <p className="text-xs text-purple-200 mt-1 max-w-xl">
+                  Buy & sell used furniture, find compatible flatmates, organize box cricket tournaments, and broadcast campus updates.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/community"
+                  className="px-5 py-2.5 bg-white hover:bg-gray-100 text-purple-950 rounded-xl text-xs font-black transition shadow-sm"
+                >
+                  Explore Full Community Board →
+                </Link>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white rounded-2xl p-5 border border-gray-200 space-y-2">
+                <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
+                  <ShoppingBag className="w-5 h-5" />
+                </div>
+                <h4 className="text-xs font-black text-gray-900">Buy & Sell Student Items</h4>
+                <p className="text-[11px] text-gray-500">
+                  Moving out or need a monitor, cooler, or study table? Trade directly with peers without broker fees.
+                </p>
+                <Link href="/community?category=buy_sell" className="text-xs font-bold text-purple-600 block pt-1 hover:underline">
+                  Browse Marketplace →
+                </Link>
+              </div>
+
+              <div className="bg-white rounded-2xl p-5 border border-gray-200 space-y-2">
+                <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                  <User className="w-5 h-5" />
+                </div>
+                <h4 className="text-xs font-black text-gray-900">Roommate & Bed Matcher</h4>
+                <p className="text-[11px] text-gray-500">
+                  Looking for a roommate with similar study hours or food preferences? Post vacancies in your room.
+                </p>
+                <Link href="/community?category=roommate" className="text-xs font-bold text-blue-600 block pt-1 hover:underline">
+                  Find Roommates →
+                </Link>
+              </div>
+
+              <div className="bg-white rounded-2xl p-5 border border-gray-200 space-y-2">
+                <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <h4 className="text-xs font-black text-gray-900">Campus Events & Sports</h4>
+                <p className="text-[11px] text-gray-500">
+                  Join weekend badminton, trekking groups, or board game meetups organized by fellow residents.
+                </p>
+                <Link href="/community?category=event" className="text-xs font-bold text-emerald-600 block pt-1 hover:underline">
+                  View Events →
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* --------------------------------------------------------- */}
@@ -1184,6 +1645,114 @@ export default function ResidentPortalPage() {
             <p className="text-[10px] text-gray-400">
               After paying, share a payment screenshot with your PG manager on WhatsApp for immediate receipt confirmation.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* --------------------------------------------------------- */}
+      {/* MODAL 4: CREATE DIGITAL GATE PASS MODAL */}
+      {/* --------------------------------------------------------- */}
+      {showNewPassModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl relative border border-gray-100">
+            <button
+              type="button"
+              onClick={() => setShowNewPassModal(false)}
+              className="absolute top-4 right-4 p-1.5 text-gray-400 hover:text-gray-600 rounded-lg"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
+                <KeyRound className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-gray-900">Pre-Approve Visitor Gate Pass</h3>
+                <p className="text-[11px] text-gray-500">Security guard will verify PIN or scan QR code</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleCreatePass} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">Guest Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Rahul Sharma"
+                  value={newGuestName}
+                  onChange={(e) => setNewGuestName(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-xl"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">Guest Mobile</label>
+                  <input
+                    type="tel"
+                    placeholder="9876543210"
+                    value={newGuestPhone}
+                    onChange={(e) => setNewGuestPhone(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">Number of Guests</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="5"
+                    value={newGuestCount}
+                    onChange={(e) => setNewGuestCount(Number(e.target.value))}
+                    className="w-full px-3 py-2 border rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">Purpose of Visit</label>
+                <select
+                  value={newPassPurpose}
+                  onChange={(e) => setNewPassPurpose(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-xl"
+                >
+                  <option value="Friend Visiting / Study">Friend Visiting / Study</option>
+                  <option value="Parents / Family Visit">Parents / Family Visit</option>
+                  <option value="Delivery / Package Drop">Delivery / Package Drop</option>
+                  <option value="Late Check-in After Curfew">Late Check-in After Curfew</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">Vehicle Number (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. KA-01-AB-1234"
+                  value={newVehicleNumber}
+                  onChange={(e) => setNewVehicleNumber(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-xl font-mono uppercase"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassModal(false)}
+                  className="px-4 py-2 border rounded-xl font-bold text-gray-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingPass}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs transition disabled:opacity-50"
+                >
+                  {creatingPass ? 'Generating PIN...' : 'Generate 4-Digit Pass'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
