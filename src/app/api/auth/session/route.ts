@@ -173,6 +173,20 @@ export async function GET() {
       },
     ]
 
+    // ── 4. Resolve Profile Metadata ──
+    let profileData: any = null
+    try {
+      const col = user.role === 'owner' ? 'owner_profiles' : 'tenant_profiles'
+      const targetDocId = (user as any).registration_number || user.id
+      const fsProfile = await Promise.race([
+        (await import('@/lib/firebase/firestore')).getDocument(col, targetDocId),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 800)),
+      ]).catch(() => null)
+      if (fsProfile) {
+        profileData = fsProfile
+      }
+    } catch {}
+
     return NextResponse.json({
       user,
       organization: user.organizations,
@@ -180,6 +194,7 @@ export async function GET() {
       stays: userStays,
       passbookSummary,
       transactions,
+      profile: profileData,
     })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
