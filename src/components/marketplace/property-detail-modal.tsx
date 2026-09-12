@@ -105,10 +105,10 @@ export function PropertyDetailModal({
   )}`
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 p-2 sm:p-4 backdrop-blur-xs">
-      <div className="relative my-8 w-full max-w-5xl rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4 backdrop-blur-xs">
+      <div className="relative w-full max-w-5xl rounded-t-3xl sm:rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden max-h-[92dvh] sm:max-h-[92vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
         {/* Sticky Header with Title & Close */}
-        <div className="sticky top-0 z-30 flex items-center justify-between border-b border-gray-200 bg-white/95 px-5 py-3.5 backdrop-blur-md">
+        <div className="sticky top-0 z-30 flex items-center justify-between border-b border-gray-200 bg-white/95 px-4 sm:px-5 py-3 sm:py-3.5 backdrop-blur-md shrink-0">
           <div className="flex items-center gap-2">
             <span className="rounded-md bg-[#DCFCE7] px-2 py-0.5 text-xs font-bold text-[#14532D]">
               {property.propertyType.toUpperCase()}
@@ -116,7 +116,8 @@ export function PropertyDetailModal({
             {property.verified && (
               <span className="inline-flex items-center gap-1 rounded-md bg-[#16A34A] px-2 py-0.5 text-xs font-bold text-white">
                 <ShieldCheck className="h-3.5 w-3.5" />
-                <span>Physically Verified</span>
+                <span className="hidden sm:inline">Physically Verified</span>
+                <span className="sm:hidden">Verified</span>
               </span>
             )}
           </div>
@@ -124,7 +125,7 @@ export function PropertyDetailModal({
           <div className="flex items-center gap-2">
             <button
               onClick={handleShare}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-100"
+              className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-100"
               title="Share listing"
             >
               <Share2 className="h-4 w-4" />
@@ -132,7 +133,7 @@ export function PropertyDetailModal({
             {onToggleSave && (
               <button
                 onClick={() => onToggleSave(property.id)}
-                className={`flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 transition ${
+                className={`flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg border border-gray-200 transition ${
                   isSaved ? 'bg-rose-50 text-rose-600 border-rose-200' : 'text-gray-600 hover:bg-gray-100'
                 }`}
                 title="Save to favorites"
@@ -142,7 +143,7 @@ export function PropertyDetailModal({
             )}
             <button
               onClick={onClose}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-100 hover:text-black"
+              className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-100 hover:text-black"
             >
               <X className="h-5 w-5" />
             </button>
@@ -150,7 +151,7 @@ export function PropertyDetailModal({
         </div>
 
         {/* Modal Scrollable Body */}
-        <div className="max-h-[85vh] overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <div className="overflow-y-auto flex-1 p-3.5 sm:p-6 lg:p-8 overscroll-contain safe-bottom">
           {/* Main Photo Gallery */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
             {/* Primary Large Image */}

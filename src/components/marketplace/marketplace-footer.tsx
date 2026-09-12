@@ -148,11 +148,11 @@ export function MarketplaceFooter() {
         </div>
       </div>
 
-      {/* Bottom Copyright Bar */}
-      <div className="border-t border-gray-100 bg-[#F7FAF7] py-4">
-        <div className="mx-auto flex max-w-7xl flex-col sm:flex-row items-center justify-between px-4 sm:px-6 lg:px-8 gap-2 text-[11px]">
+      {/* Bottom Copyright Bar - Clears Mobile Bottom Navigation */}
+      <div className="border-t border-gray-100 bg-[#F7FAF7] py-4 pb-24 md:pb-4">
+        <div className="mx-auto flex max-w-7xl flex-col sm:flex-row items-center justify-between px-4 sm:px-6 lg:px-8 gap-2 text-[11px] text-center sm:text-left">
           <p>{footer?.copyrightText || '© 2026 PGSetu PropTech Technologies Pvt. Ltd. All rights reserved.'}</p>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
             <span className="hover:text-gray-900 cursor-pointer">Privacy Policy</span>
             <span className="hover:text-gray-900 cursor-pointer">Terms of Service</span>
             <span className="hover:text-gray-900 cursor-pointer">Safety Guidelines</span>

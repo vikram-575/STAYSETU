@@ -136,16 +136,16 @@ export function FeaturedListings({
   }
 
   return (
-    <section id="featured-properties" className="bg-[#F7FAF7] py-14 sm:py-20">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <section id="featured-properties" className="bg-[#F7FAF7] py-10 sm:py-20">
+      <div className="mx-auto max-w-7xl px-3.5 sm:px-6 lg:px-8">
         {/* Section Header */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="flex flex-col gap-3 sm:gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <div className="inline-flex items-center gap-1.5 rounded-full bg-[#DCFCE7] px-3 py-1 text-xs font-bold text-[#14532D]">
               <Sparkles className="h-3.5 w-3.5 text-[#16A34A]" />
               <span>Verified Market Feed</span>
             </div>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight text-[#14532D] sm:text-3xl lg:text-4xl">
+            <h2 className="mt-2 text-xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-[#14532D]">
               Featured PGs, Flats & Rooms for Rent
             </h2>
             <p className="mt-1 text-xs sm:text-sm text-[#647067]">
@@ -159,7 +159,7 @@ export function FeaturedListings({
             <div className="inline-flex rounded-xl border border-gray-200 bg-white p-1 shadow-2xs">
               <button
                 onClick={() => setViewMode('grid')}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                className={`flex items-center gap-1.5 rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-bold transition ${
                   viewMode === 'grid'
                     ? 'bg-[#14532D] text-white shadow-xs'
                     : 'text-[#647067] hover:text-[#17211B]'
@@ -170,7 +170,7 @@ export function FeaturedListings({
               </button>
               <button
                 onClick={() => setViewMode('map')}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                className={`flex items-center gap-1.5 rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-bold transition ${
                   viewMode === 'map'
                     ? 'bg-[#14532D] text-white shadow-xs'
                     : 'text-[#647067] hover:text-[#17211B]'
@@ -184,10 +184,10 @@ export function FeaturedListings({
         </div>
 
         {/* Filter Navigation Bar */}
-        <div className="mt-8 rounded-2xl border border-gray-200/90 bg-white p-3 sm:p-4 shadow-xs">
+        <div className="mt-6 sm:mt-8 rounded-2xl border border-gray-200/90 bg-white p-2.5 sm:p-4 shadow-xs">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            {/* Category Pills */}
-            <div className="flex flex-wrap items-center gap-1.5">
+            {/* Category Pills - Horizontal swipe on mobile, wrap on desktop */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 sm:pb-0 -mx-1 px-1 sm:mx-0 sm:px-0 sm:flex-wrap">
               {[
                 { id: 'all', label: 'All Spaces' },
                 { id: 'pg', label: 'Verified PGs' },
@@ -199,7 +199,7 @@ export function FeaturedListings({
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as TabCategory)}
-                  className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition ${
+                  className={`rounded-xl px-3 py-1.5 text-xs font-bold transition shrink-0 whitespace-nowrap active:scale-95 ${
                     activeTab === tab.id
                       ? 'bg-[#14532D] text-white shadow-xs'
                       : 'bg-gray-100/80 text-[#647067] hover:bg-gray-200/70 hover:text-[#17211B]'
@@ -210,17 +210,17 @@ export function FeaturedListings({
               ))}
             </div>
 
-            {/* Controls Right: Search + Sort Dropdown */}
-            <div className="flex flex-wrap items-center gap-2">
+            {/* Controls Right: Search + City & Sort */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
               {/* Search text */}
-              <div className="relative flex-1 sm:w-56">
+              <div className="relative w-full sm:w-56">
                 <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-gray-400" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Filter by metro, locality..."
-                  className="w-full rounded-xl border border-gray-200 bg-[#F7FAF7] py-1.5 pl-8 pr-3 text-xs font-medium focus:border-[#16A34A] focus:bg-white focus:outline-hidden"
+                  className="w-full rounded-xl border border-gray-200 bg-[#F7FAF7] py-1.5 pl-8 pr-7 text-xs font-medium focus:border-[#16A34A] focus:bg-white focus:outline-hidden"
                 />
                 {searchQuery && (
                   <button
@@ -232,31 +232,32 @@ export function FeaturedListings({
                 )}
               </div>
 
-              {/* City filter */}
-              <select
-                value={activeCity}
-                onChange={(e) => onCityChange(e.target.value)}
-                className="rounded-xl border border-gray-200 bg-[#F7FAF7] py-1.5 px-3 text-xs font-semibold text-[#17211B] focus:border-[#16A34A] focus:outline-hidden"
-              >
-                <option value="all">All Cities ({properties.length})</option>
-                {availableCities.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-
-              {/* Sort By */}
-              <div className="flex items-center gap-1 rounded-xl border border-gray-200 bg-[#F7FAF7] px-2 py-1">
-                <ArrowUpDown className="h-3 w-3 text-gray-400" />
+              {/* City filter & Sort By in a 2-col flex on mobile */}
+              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2">
                 <select
-                  value={sortBy}
-                  onChange={(e: any) => setSortBy(e.target.value)}
-                  className="bg-transparent text-xs font-semibold text-[#17211B] focus:outline-hidden"
+                  value={activeCity}
+                  onChange={(e) => onCityChange(e.target.value)}
+                  className="w-full sm:w-auto rounded-xl border border-gray-200 bg-[#F7FAF7] py-1.5 px-2.5 text-xs font-semibold text-[#17211B] focus:border-[#16A34A] focus:outline-hidden"
                 >
-                  <option value="recommended">Recommended</option>
-                  <option value="price_low">Price: Low to High</option>
-                  <option value="price_high">Price: High to Low</option>
-                  <option value="rating">Highest Rated</option>
+                  <option value="all">All Cities ({properties.length})</option>
+                  {availableCities.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
                 </select>
+
+                <div className="flex items-center gap-1 rounded-xl border border-gray-200 bg-[#F7FAF7] px-2 py-1">
+                  <ArrowUpDown className="h-3 w-3 text-gray-400 shrink-0" />
+                  <select
+                    value={sortBy}
+                    onChange={(e: any) => setSortBy(e.target.value)}
+                    className="w-full bg-transparent text-xs font-semibold text-[#17211B] focus:outline-hidden"
+                  >
+                    <option value="recommended">Recommended</option>
+                    <option value="price_low">Price: Low to High</option>
+                    <option value="price_high">Price: High to Low</option>
+                    <option value="rating">Highest Rated</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>

@@ -27,10 +27,10 @@ export function PopularCities({ onSelectCity, activeCity, properties = [] }: Pop
   }
 
   return (
-    <section id="popular-cities" className="bg-white py-14 sm:py-20 relative">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <section id="popular-cities" className="bg-white py-10 sm:py-20 relative">
+      <div className="mx-auto max-w-7xl px-3.5 sm:px-6 lg:px-8">
         {/* Section Header */}
-        <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
+        <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end">
           <div>
             <div className="flex items-center gap-2">
               <div className="inline-flex items-center gap-1.5 rounded-full bg-[#DCFCE7] px-3 py-1 text-xs font-bold text-[#14532D]">
@@ -38,10 +38,10 @@ export function PopularCities({ onSelectCity, activeCity, properties = [] }: Pop
                 <span>{citiesData?.badge || 'Top Rental Hubs'}</span>
               </div>
             </div>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight text-[#14532D] sm:text-3xl">
+            <h2 className="mt-2 text-xl sm:text-3xl font-bold tracking-tight text-[#14532D]">
               {citiesData?.title || 'Explore Popular Cities'}
             </h2>
-            <p className="mt-1 text-sm text-[#647067]">
+            <p className="mt-1 text-xs sm:text-sm text-[#647067]">
               {citiesData?.subtitle ||
                 'Find verified PGs, shared rooms, and independent flats across India’s major IT and educational centres.'}
             </p>
@@ -57,7 +57,7 @@ export function PopularCities({ onSelectCity, activeCity, properties = [] }: Pop
         </div>
 
         {/* Cities Grid */}
-        <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        <div className="mt-6 sm:mt-8 grid grid-cols-2 gap-2.5 sm:gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {citiesList.map((city) => {
             const isSelected = activeCity === city.name
 
@@ -79,14 +79,14 @@ export function PopularCities({ onSelectCity, activeCity, properties = [] }: Pop
               <div
                 key={city.name}
                 onClick={() => handleCityClick(city.name)}
-                className={`group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border transition-all hover:-translate-y-1 hover:shadow-lg ${
+                className={`group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border transition-all hover:-translate-y-1 hover:shadow-lg active:scale-98 ${
                   isSelected
                     ? 'border-[#16A34A] ring-2 ring-[#16A34A] shadow-md'
                     : 'border-gray-200/80 bg-white hover:border-gray-300'
                 }`}
               >
-                {/* City Image Container (4:3 aspect ratio) */}
-                <div className="relative aspect-4/3 w-full overflow-hidden bg-gray-100">
+                {/* City Image Container (responsive aspect ratio) */}
+                <div className="relative aspect-[16/11] sm:aspect-4/3 w-full overflow-hidden bg-gray-100">
                   <img
                     src={city.image}
                     alt={city.name}
@@ -97,31 +97,31 @@ export function PopularCities({ onSelectCity, activeCity, properties = [] }: Pop
                       target.src = 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=600&q=80'
                     }}
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
 
                   {/* Starting Price Pill */}
-                  <div className="absolute top-2 right-2 rounded-md bg-white/90 px-1.5 py-0.5 text-[10px] font-bold text-[#14532D] shadow-xs backdrop-blur-xs">
+                  <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 rounded-md bg-white/95 px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold text-[#14532D] shadow-xs backdrop-blur-xs">
                     From ₹{realMinPrice.toLocaleString('en-IN')}/mo
                   </div>
 
                   {/* City Name & State Overlay */}
-                  <div className="absolute bottom-2.5 left-2.5 text-white">
-                    <h3 className="text-sm sm:text-base font-bold tracking-tight">{city.name}</h3>
-                    <p className="text-[10px] text-gray-200 font-medium">{city.state}</p>
+                  <div className="absolute bottom-2 sm:bottom-2.5 left-2 sm:left-2.5 text-white pr-2">
+                    <h3 className="text-xs sm:text-base font-bold tracking-tight line-clamp-1">{city.name}</h3>
+                    <p className="text-[9px] sm:text-[10px] text-gray-200 font-medium">{city.state}</p>
                   </div>
                 </div>
 
                 {/* Card Details Bottom */}
-                <div className="p-3">
-                  <div className="flex items-center justify-between text-[11px] font-medium text-[#647067]">
+                <div className="p-2 sm:p-3">
+                  <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-medium text-[#647067]">
                     <span className="font-semibold text-gray-800">{displaySpaces}</span>
                     <span className="text-[#16A34A] font-semibold group-hover:underline">Explore →</span>
                   </div>
-                  <div className="mt-1.5 flex flex-wrap gap-1">
+                  <div className="mt-1 flex flex-wrap gap-1">
                     {city.popularLocalities.slice(0, 2).map((loc, i) => (
                       <span
                         key={i}
-                        className="rounded-sm bg-gray-100 px-1.5 py-0.5 text-[9px] text-[#17211B]"
+                        className="rounded-sm bg-gray-100 px-1 sm:px-1.5 py-0.5 text-[8.5px] sm:text-[9px] text-[#17211B] truncate max-w-[90px]"
                       >
                         {loc}
                       </span>

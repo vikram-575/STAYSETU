@@ -83,81 +83,81 @@ export function PropertyCard({
       onClick={() => onSelectDetails(property)}
       className="group relative flex flex-col overflow-hidden rounded-2xl border border-gray-200/90 bg-white shadow-xs transition-all duration-200 hover:-translate-y-1 hover:border-[#16A34A]/60 hover:shadow-xl cursor-pointer"
     >
-      {/* 4:3 Aspect Ratio Image Container */}
-      <div className="relative aspect-4/3 w-full overflow-hidden bg-gray-100">
+      {/* Aspect Ratio Image Container */}
+      <div className="relative aspect-[16/10] sm:aspect-4/3 w-full overflow-hidden bg-gray-100">
         <img
           src={property.images[currentImageIdx] || property.coverImage}
           alt={property.title}
           className="h-full w-full object-cover transition duration-300 group-hover:scale-103"
           loading="lazy"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/20 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/20 pointer-events-none" />
 
-        {/* Top Badges Left */}
-        <div className="absolute top-2.5 left-2.5 flex flex-wrap items-center gap-1.5 z-10">
+        {/* Top Badges Left - Constrained so it never collides with Heart button on mobile */}
+        <div className="absolute top-2 sm:top-2.5 left-2 sm:left-2.5 flex flex-wrap items-center gap-1 sm:gap-1.5 z-10 max-w-[calc(100%-44px)]">
           {property.verified && (
-            <span className="inline-flex items-center gap-1 rounded-md bg-[#16A34A] px-2 py-0.5 text-[10px] font-bold text-white shadow-xs">
+            <span className="inline-flex items-center gap-1 rounded-md bg-[#16A34A] px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-bold text-white shadow-xs">
               <ShieldCheck className="h-3 w-3" />
               <span>Verified</span>
             </span>
           )}
           {property.zeroBrokerage && (
-            <span className="rounded-md bg-[#DCFCE7] px-2 py-0.5 text-[10px] font-bold text-[#14532D] shadow-xs">
+            <span className="rounded-md bg-[#DCFCE7] px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-bold text-[#14532D] shadow-xs">
               Zero Brokerage
             </span>
           )}
           {property.superHost && (
-            <span className="rounded-md bg-[#FEF3C7] px-2 py-0.5 text-[10px] font-bold text-[#F59E0B] shadow-xs">
+            <span className="hidden sm:inline-block rounded-md bg-[#FEF3C7] px-2 py-0.5 text-[10px] font-bold text-[#F59E0B] shadow-xs">
               ★ Super Host
             </span>
           )}
         </div>
 
         {/* Top Actions Right: Wishlist Heart */}
-        <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 z-10">
+        <div className="absolute top-2 sm:top-2.5 right-2 sm:right-2.5 flex items-center gap-1.5 z-10">
           <button
             onClick={handleSaveClick}
-            className={`flex h-8 w-8 items-center justify-center rounded-full backdrop-blur-md transition ${
+            className={`flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full backdrop-blur-md transition shadow-xs ${
               isSaved
                 ? 'bg-rose-500 text-white shadow-md'
-                : 'bg-white/80 text-gray-700 hover:bg-white hover:text-rose-500'
+                : 'bg-white/85 text-gray-700 hover:bg-white hover:text-rose-500'
             }`}
             aria-label="Save to favorites"
           >
-            <Heart className={`h-4 w-4 ${isSaved ? 'fill-white' : ''}`} />
+            <Heart className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${isSaved ? 'fill-white' : ''}`} />
           </button>
         </div>
 
-        {/* Carousel Prev/Next Controls (visible on hover) */}
+        {/* Carousel Controls (Always touch accessible on mobile, hover on desktop) */}
         {property.images.length > 1 && (
-          <div className="absolute inset-y-0 inset-x-2 flex items-center justify-between opacity-0 transition-opacity duration-200 group-hover:opacity-100 z-10">
+          <div className="absolute inset-y-0 inset-x-1.5 sm:inset-x-2 flex items-center justify-between opacity-80 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 z-10">
             <button
               onClick={handlePrevImage}
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+              className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 active:scale-90 transition"
               aria-label="Previous image"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </button>
             <button
               onClick={handleNextImage}
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+              className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 active:scale-90 transition"
               aria-label="Next image"
             >
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </button>
           </div>
         )}
 
         {/* Bottom Image Overlay: Sharing & Rating */}
-        <div className="absolute bottom-2.5 inset-x-2.5 flex items-center justify-between text-white z-10">
-          <span className="rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-semibold backdrop-blur-xs">
+        <div className="absolute bottom-2 sm:bottom-2.5 inset-x-2 sm:inset-x-2.5 flex items-center justify-between text-white z-10">
+          <span className="rounded-md bg-black/60 px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold backdrop-blur-xs">
             {property.sharingType}
           </span>
 
-          <div className="flex items-center gap-1 rounded-md bg-white/95 px-2 py-0.5 text-[11px] font-bold text-[#17211B] shadow-xs">
+          <div className="flex items-center gap-1 rounded-md bg-white/95 px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-[#17211B] shadow-xs">
             <Star className="h-3 w-3 fill-[#F59E0B] text-[#F59E0B]" />
             <span>{property.rating.toFixed(1)}</span>
-            <span className="text-[10px] text-gray-500">({property.reviewCount})</span>
+            <span className="text-[9px] sm:text-[10px] text-gray-500">({property.reviewCount})</span>
           </div>
         </div>
 
@@ -177,42 +177,42 @@ export function PropertyCard({
       </div>
 
       {/* Card Body */}
-      <div className="flex flex-1 flex-col justify-between p-4">
+      <div className="flex flex-1 flex-col justify-between p-3 sm:p-4">
         <div>
           {/* Gender & Availability Pill */}
-          <div className="flex items-center justify-between text-[11px]">
-            <span className={`rounded-sm border px-2 py-0.5 font-bold ${gender.bg}`}>
+          <div className="flex items-center justify-between text-[10.5px] sm:text-[11px] gap-2">
+            <span className={`rounded-md border px-2 py-0.5 font-bold shrink-0 ${gender.bg}`}>
               {gender.label}
             </span>
-            <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-sm">
+            <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md truncate text-[10px] sm:text-[11px]">
               {property.availableBeds > 0
                 ? `${property.availableBeds} beds vacant`
-                : 'Limited Availability'}
+                : 'Limited Beds'}
             </span>
           </div>
 
           {/* Title */}
-          <h3 className="mt-2 text-base font-bold text-[#17211B] line-clamp-1 group-hover:text-[#16A34A] transition">
+          <h3 className="mt-1.5 sm:mt-2 text-sm sm:text-base font-bold text-[#17211B] line-clamp-1 group-hover:text-[#16A34A] transition leading-snug">
             {property.title}
           </h3>
 
           {/* Locality & Distance to Metro */}
           <div className="mt-1 flex items-center gap-1 text-xs text-[#647067]">
             <MapPin className="h-3.5 w-3.5 text-[#16A34A] shrink-0" />
-            <span className="line-clamp-1">
+            <span className="truncate">
               {property.locality}, {property.city}
             </span>
           </div>
 
           <div className="mt-0.5 flex items-center gap-1 text-[11px] text-gray-500">
             <Train className="h-3 w-3 text-gray-400 shrink-0" />
-            <span className="line-clamp-1">{property.distanceToMetro}</span>
+            <span className="truncate">{property.distanceToMetro}</span>
           </div>
 
           {/* Key Amenities Preview */}
-          <div className="mt-3 flex flex-wrap gap-1.5 border-t border-gray-100 pt-2.5">
+          <div className="mt-2 sm:mt-2.5 flex flex-wrap gap-1 sm:gap-1.5 border-t border-gray-100 pt-2">
             {property.foodIncluded && (
-              <span className="inline-flex items-center gap-1 rounded-md bg-[#DCFCE7]/70 px-2 py-0.5 text-[10px] font-semibold text-[#14532D]">
+              <span className="inline-flex items-center gap-1 rounded-md bg-[#DCFCE7]/70 px-1.5 sm:px-2 py-0.5 text-[9.5px] sm:text-[10px] font-semibold text-[#14532D]">
                 <Utensils className="h-2.5 w-2.5" />
                 <span>Meals Inc.</span>
               </span>
@@ -220,13 +220,13 @@ export function PropertyCard({
             {property.amenities.slice(0, 3).map((amenity, i) => (
               <span
                 key={i}
-                className="rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-700"
+                className="rounded-md bg-gray-100 px-1.5 sm:px-2 py-0.5 text-[9.5px] sm:text-[10px] font-medium text-gray-700"
               >
                 {amenity.replace(/\(.*?\)/g, '').trim()}
               </span>
             ))}
             {property.amenities.length > 3 && (
-              <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+              <span className="rounded-md bg-gray-100 px-1 sm:px-1.5 py-0.5 text-[9.5px] sm:text-[10px] font-medium text-gray-500">
                 +{property.amenities.length - 3}
               </span>
             )}
@@ -234,26 +234,26 @@ export function PropertyCard({
         </div>
 
         {/* Pricing & Bottom Action Row */}
-        <div className="mt-4 border-t border-gray-100 pt-3">
-          <div className="flex items-baseline justify-between">
-            <div>
+        <div className="mt-3 border-t border-gray-100 pt-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
               <div className="flex items-baseline gap-1">
-                <span className="text-lg sm:text-xl font-extrabold text-[#14532D]">
+                <span className="text-base sm:text-xl font-extrabold text-[#14532D]">
                   ₹{property.price.toLocaleString('en-IN')}
                 </span>
-                <span className="text-xs text-[#647067]">/month</span>
+                <span className="text-[10px] sm:text-xs text-[#647067]">/mo</span>
               </div>
-              <p className="text-[10px] text-gray-500">
+              <p className="text-[9.5px] sm:text-[10px] text-gray-500 truncate">
                 Deposit: ₹{property.deposit.toLocaleString('en-IN')}
               </p>
             </div>
 
             {/* Quick Action Buttons */}
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 shrink-0">
               {/* Compare Toggle */}
               <button
                 onClick={handleCompareClick}
-                className={`flex h-8 w-8 items-center justify-center rounded-lg border text-xs transition ${
+                className={`flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg border text-xs transition active:scale-95 ${
                   isCompared
                     ? 'border-[#16A34A] bg-[#DCFCE7] text-[#14532D]'
                     : 'border-gray-200 text-[#647067] hover:border-gray-300 hover:text-[#17211B]'
@@ -269,7 +269,7 @@ export function PropertyCard({
                   e.stopPropagation()
                   onSelectDetails(property)
                 }}
-                className="inline-flex items-center gap-1 rounded-xl bg-[#14532D] px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-[#16A34A] transition"
+                className="inline-flex items-center gap-1 rounded-xl bg-[#14532D] px-2.5 sm:px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-[#16A34A] transition active:scale-95"
               >
                 <span>View</span>
                 <Eye className="h-3.5 w-3.5" />

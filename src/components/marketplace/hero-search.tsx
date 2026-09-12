@@ -105,41 +105,41 @@ export function HeroSearch({ onSearch, selectedCity, onCityChange }: HeroSearchP
   }
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-b from-[#F7FAF7] via-white to-[#F7FAF7] pt-10 pb-16 lg:pt-16 lg:pb-24">
+    <section className="relative overflow-hidden bg-gradient-to-b from-[#F7FAF7] via-white to-[#F7FAF7] pt-6 pb-12 sm:pt-10 sm:pb-16 lg:pt-16 lg:pb-24">
       {/* Ambient background decoration */}
       <div className="pointer-events-none absolute inset-0 -z-10 flex justify-center">
-        <div className="h-[450px] w-full max-w-7xl bg-radial from-[#DCFCE7]/50 via-transparent to-transparent blur-2xl" />
+        <div className="h-[380px] sm:h-[450px] w-full max-w-7xl bg-radial from-[#DCFCE7]/50 via-transparent to-transparent blur-2xl" />
       </div>
 
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-3.5 sm:px-6 lg:px-8">
         {/* Top Tagline Pill */}
         <div className="flex items-center justify-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#16A34A]/25 bg-[#DCFCE7]/60 px-3.5 py-1.5 text-xs font-semibold text-[#14532D] shadow-2xs backdrop-blur-xs">
-            <ShieldCheck className="h-4 w-4 text-[#16A34A]" />
+          <div className="inline-flex items-center gap-1.5 sm:gap-2 rounded-full border border-[#16A34A]/25 bg-[#DCFCE7]/60 px-3 py-1 sm:px-3.5 sm:py-1.5 text-[11px] sm:text-xs font-semibold text-[#14532D] shadow-2xs backdrop-blur-xs">
+            <ShieldCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#16A34A]" />
             <span>{hero?.badge || '#1 PropTech & PG Rental Network'}</span>
           </div>
         </div>
 
         {/* Main Hero Typography */}
-        <div className="mx-auto mt-6 max-w-4xl text-center">
-          <h1 className="text-3xl font-extrabold tracking-tight text-[#14532D] sm:text-5xl lg:text-6xl">
+        <div className="mx-auto mt-4 sm:mt-6 max-w-4xl text-center">
+          <h1 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-[#14532D] leading-tight">
             {hero?.headline || 'Find Your Ideal PG or Flat'}{' '}
             <span className="bg-gradient-to-r from-[#16A34A] to-[#14532D] bg-clip-text text-transparent">
               {hero?.highlightText || 'Without Brokerage Hassle'}
             </span>
           </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-base sm:text-lg text-[#647067] leading-relaxed">
+          <p className="mx-auto mt-2.5 sm:mt-4 max-w-2xl text-xs sm:text-base text-[#647067] leading-relaxed">
             {hero?.subtitle ||
               'Discover verified PGs, rooms and flats with transparent digital rent passbooks, live electricity meter readings, and zero middleman commissions.'}
           </p>
 
-          {/* 4 Stats Counters */}
+          {/* 4 Stats Counters - Responsive 2x2 grid on mobile, inline flex on desktop */}
           {hero?.stats && hero.stats.length > 0 && (
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-6 sm:gap-10 text-center">
+            <div className="mt-4 sm:mt-6 grid grid-cols-2 sm:flex sm:flex-wrap items-center justify-center gap-2 sm:gap-8 text-center max-w-xs sm:max-w-none mx-auto">
               {hero.stats.map((st, i) => (
-                <div key={i} className="flex flex-col items-center">
-                  <span className="text-lg sm:text-xl font-black text-[#14532D]">{st.value}</span>
-                  <span className="text-xs text-[#647067] font-medium">{st.label}</span>
+                <div key={i} className="flex flex-col items-center bg-white/70 sm:bg-transparent rounded-xl p-2 sm:p-0 border border-emerald-100/70 sm:border-0 shadow-2xs sm:shadow-none">
+                  <span className="text-base sm:text-xl font-black text-[#14532D]">{st.value}</span>
+                  <span className="text-[10.5px] sm:text-xs text-[#647067] font-medium">{st.label}</span>
                 </div>
               ))}
             </div>
@@ -147,20 +147,20 @@ export function HeroSearch({ onSearch, selectedCity, onCityChange }: HeroSearchP
         </div>
 
         {/* Multi-Tab Search Box Card */}
-        <div className="mx-auto mt-10 max-w-5xl">
+        <div className="mx-auto mt-6 sm:mt-10 max-w-5xl">
           <div className="rounded-2xl border border-gray-200/90 bg-white p-3 sm:p-5 shadow-xl shadow-gray-200/60 ring-1 ring-black/5">
-            {/* Property Type Tabs */}
-            <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 pb-3">
+            {/* Property Type Tabs - Horizontal swipeable row on mobile, wrapped on desktop */}
+            <div className="flex items-center gap-1.5 sm:gap-2 border-b border-gray-100 pb-2.5 sm:pb-3 overflow-x-auto no-scrollbar -mx-1 px-1 sm:mx-0 sm:px-0">
               {SEARCH_TABS.map((tab) => {
                 const isActive = activeTab === tab.id
                 return (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs sm:text-sm font-semibold transition-all ${
+                    className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold transition-all shrink-0 whitespace-nowrap active:scale-95 ${
                       isActive
                         ? 'bg-[#14532D] text-white shadow-xs'
-                        : 'text-[#647067] hover:bg-gray-100/80 hover:text-[#17211B]'
+                        : 'text-[#647067] hover:bg-gray-100/80 hover:text-[#17211B] bg-gray-50/70 sm:bg-transparent'
                     }`}
                   >
                     <span>{tab.label}</span>
@@ -170,14 +170,14 @@ export function HeroSearch({ onSearch, selectedCity, onCityChange }: HeroSearchP
             </div>
 
             {/* Form Input Fields Grid */}
-            <form onSubmit={handleSearchSubmit} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12">
+            <form onSubmit={handleSearchSubmit} className="mt-3 sm:mt-4 grid grid-cols-1 gap-2.5 sm:gap-3 sm:grid-cols-2 lg:grid-cols-12">
               {/* 1. Location / City Input */}
               <div className="relative lg:col-span-4">
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-[#647067] mb-1">
+                <label className="block text-[10.5px] sm:text-[11px] font-bold uppercase tracking-wider text-[#647067] mb-1">
                   Location or City
                 </label>
                 <div className="relative flex items-center">
-                  <MapPin className="absolute left-3.5 h-4 w-4 text-[#16A34A]" />
+                  <MapPin className="absolute left-3 h-4 w-4 text-[#16A34A]" />
                   <input
                     type="text"
                     value={locationQuery}
@@ -187,7 +187,7 @@ export function HeroSearch({ onSearch, selectedCity, onCityChange }: HeroSearchP
                     }}
                     onFocus={() => setShowSuggestions(true)}
                     placeholder="e.g. Koramangala, Bangalore"
-                    className="w-full rounded-xl border border-gray-200 bg-[#F7FAF7] py-2.5 pl-10 pr-3 text-sm font-medium text-[#17211B] placeholder-gray-400 focus:border-[#16A34A] focus:bg-white focus:outline-hidden transition"
+                    className="w-full rounded-xl border border-gray-200 bg-[#F7FAF7] py-2 sm:py-2.5 pl-9 sm:pl-10 pr-3 text-xs sm:text-sm font-medium text-[#17211B] placeholder-gray-400 focus:border-[#16A34A] focus:bg-white focus:outline-hidden transition"
                   />
                 </div>
 
@@ -218,15 +218,15 @@ export function HeroSearch({ onSearch, selectedCity, onCityChange }: HeroSearchP
 
               {/* 2. Room / Sharing Dropdown */}
               <div className="lg:col-span-3">
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-[#647067] mb-1">
+                <label className="block text-[10.5px] sm:text-[11px] font-bold uppercase tracking-wider text-[#647067] mb-1">
                   Occupancy / BHK
                 </label>
                 <div className="relative flex items-center">
-                  <Home className="absolute left-3.5 h-4 w-4 text-[#16A34A]" />
+                  <Home className="absolute left-3 h-4 w-4 text-[#16A34A]" />
                   <select
                     value={sharingType}
                     onChange={(e) => setSharingType(e.target.value)}
-                    className="w-full appearance-none rounded-xl border border-gray-200 bg-[#F7FAF7] py-2.5 pl-10 pr-8 text-sm font-medium text-[#17211B] focus:border-[#16A34A] focus:bg-white focus:outline-hidden transition"
+                    className="w-full appearance-none rounded-xl border border-gray-200 bg-[#F7FAF7] py-2 sm:py-2.5 pl-9 sm:pl-10 pr-8 text-xs sm:text-sm font-medium text-[#17211B] focus:border-[#16A34A] focus:bg-white focus:outline-hidden transition"
                   >
                     <option value="all">Any Sharing / BHK</option>
                     <option value="Single Room">Private Single Room</option>
@@ -242,15 +242,15 @@ export function HeroSearch({ onSearch, selectedCity, onCityChange }: HeroSearchP
 
               {/* 3. Budget Dropdown */}
               <div className="lg:col-span-3">
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-[#647067] mb-1">
+                <label className="block text-[10.5px] sm:text-[11px] font-bold uppercase tracking-wider text-[#647067] mb-1">
                   Max Monthly Budget
                 </label>
                 <div className="relative flex items-center">
-                  <IndianRupee className="absolute left-3.5 h-4 w-4 text-[#16A34A]" />
+                  <IndianRupee className="absolute left-3 h-4 w-4 text-[#16A34A]" />
                   <select
                     value={budgetRange}
                     onChange={(e) => setBudgetRange(Number(e.target.value))}
-                    className="w-full appearance-none rounded-xl border border-gray-200 bg-[#F7FAF7] py-2.5 pl-10 pr-8 text-sm font-medium text-[#17211B] focus:border-[#16A34A] focus:bg-white focus:outline-hidden transition"
+                    className="w-full appearance-none rounded-xl border border-gray-200 bg-[#F7FAF7] py-2 sm:py-2.5 pl-9 sm:pl-10 pr-8 text-xs sm:text-sm font-medium text-[#17211B] focus:border-[#16A34A] focus:bg-white focus:outline-hidden transition"
                   >
                     <option value={0}>Any Budget</option>
                     <option value={8000}>Up to ₹8,000 / mo</option>
@@ -265,28 +265,28 @@ export function HeroSearch({ onSearch, selectedCity, onCityChange }: HeroSearchP
               </div>
 
               {/* 4. Search CTA Button */}
-              <div className="sm:col-span-2 lg:col-span-2 flex items-end">
+              <div className="sm:col-span-2 lg:col-span-2 flex items-end pt-1 sm:pt-0">
                 <button
                   type="submit"
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] py-2.5 px-4 text-sm font-bold text-white shadow-md hover:opacity-95 active:scale-98 transition"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] py-2.5 sm:py-2.5 px-4 text-xs sm:text-sm font-bold text-white shadow-md hover:opacity-95 active:scale-98 transition"
                 >
                   <Search className="h-4 w-4" />
-                  <span>Search</span>
+                  <span>Search Spaces</span>
                 </button>
               </div>
             </form>
           </div>
 
-          {/* Quick Search Chips */}
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-            <span className="text-xs font-semibold text-[#647067] mr-1 hidden sm:inline">Quick Filters:</span>
+          {/* Quick Search Chips - Horizontal swipeable on mobile */}
+          <div className="mt-4 flex items-center sm:flex-wrap sm:justify-center gap-1.5 overflow-x-auto no-scrollbar -mx-2 px-2 sm:mx-0 sm:px-0 py-1">
+            <span className="text-xs font-semibold text-[#647067] mr-1 shrink-0 hidden sm:inline">Quick Filters:</span>
             {(hero?.quickChips || []).map((chip) => {
               const isSelected = activeChip === chip.filterKey
               return (
                 <button
                   key={chip.filterKey}
                   onClick={() => handleChipClick(chip.filterKey)}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition ${
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition shrink-0 whitespace-nowrap active:scale-95 ${
                     isSelected
                       ? 'bg-[#16A34A] text-white shadow-xs'
                       : 'border border-gray-200/90 bg-white text-[#17211B] hover:border-[#16A34A] hover:bg-[#DCFCE7]/30'
