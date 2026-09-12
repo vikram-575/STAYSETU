@@ -80,37 +80,38 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      // C. Check in Firestore profiles (tenant_profiles / owner_profiles)
+      // C. Check in Firestore profiles (tenant_profiles / owner_profiles) with timeout safeguard
       try {
-        const { queryCollection } = await import('@/lib/firebase/firestore')
-        const tenantMatches = await queryCollection('tenant_profiles', [['mobile', '==', cleaned]])
-        if (tenantMatches && tenantMatches.length > 0) {
-          const t = tenantMatches[0]
-          return NextResponse.json({
-            exists: true,
-            userType: 'tenant',
-            name: t.full_name || 'Verified Tenant',
-            role: 'resident',
-            email: t.email,
-            tenantId: t.id,
-            mobile: cleaned,
-            devOtp: otpCode,
-            message: `Welcome back, ${t.full_name || 'Member'}! OTP sent to your registered mobile.`,
-          })
-        }
+        const firestoreCheck = (async () => {
+          const { queryCollection } = await import('@/lib/firebase/firestore')
+          const tenantMatches = await queryCollection('tenant_profiles', [['mobile', '==', cleaned]])
+          if (tenantMatches && tenantMatches.length > 0) {
+            return { matched: true, type: 'tenant', profile: tenantMatches[0] }
+          }
+          const ownerMatches = await queryCollection('owner_profiles', [['mobile', '==', cleaned]])
+          if (ownerMatches && ownerMatches.length > 0) {
+            return { matched: true, type: 'owner', profile: ownerMatches[0] }
+          }
+          return { matched: false }
+        })()
 
-        const ownerMatches = await queryCollection('owner_profiles', [['mobile', '==', cleaned]])
-        if (ownerMatches && ownerMatches.length > 0) {
-          const o = ownerMatches[0]
+        const timeoutCheck = new Promise<{ matched: boolean }>((resolve) =>
+          setTimeout(() => resolve({ matched: false }), 800)
+        )
+
+        const fRes = await Promise.race([firestoreCheck, timeoutCheck])
+        if (fRes.matched && (fRes as any).profile) {
+          const p = (fRes as any).profile
           return NextResponse.json({
             exists: true,
-            userType: 'owner',
-            name: o.full_name || 'Property Owner',
-            role: 'owner',
-            email: o.email,
+            userType: (fRes as any).type,
+            name: p.full_name || 'Verified Member',
+            role: (fRes as any).type === 'owner' ? 'owner' : 'resident',
+            email: p.email,
+            tenantId: p.id,
             mobile: cleaned,
             devOtp: otpCode,
-            message: `Welcome back, ${o.full_name || 'Owner'}! OTP sent to your registered mobile.`,
+            message: `Welcome back, ${p.full_name || 'Member'}! OTP sent to your registered mobile.`,
           })
         }
       } catch (err: any) {
@@ -232,17 +233,19 @@ export async function POST(request: NextRequest) {
         .limit(1)
         .maybeSingle()
 
-      // Look up in Firestore tenant_profiles / owner_profiles
+      // Look up in Firestore tenant_profiles / owner_profiles with timeout safeguard
       let firestoreProfile: any = null
       try {
-        const { queryCollection } = await import('@/lib/firebase/firestore')
-        const tMatches = await queryCollection('tenant_profiles', [['mobile', '==', cleaned]])
-        if (tMatches && tMatches.length > 0) {
-          firestoreProfile = tMatches[0]
-        } else {
+        const firestorePromise = (async () => {
+          const { queryCollection } = await import('@/lib/firebase/firestore')
+          const tMatches = await queryCollection('tenant_profiles', [['mobile', '==', cleaned]])
+          if (tMatches && tMatches.length > 0) return tMatches[0]
           const oMatches = await queryCollection('owner_profiles', [['mobile', '==', cleaned]])
-          if (oMatches && oMatches.length > 0) firestoreProfile = oMatches[0]
-        }
+          if (oMatches && oMatches.length > 0) return oMatches[0]
+          return null
+        })()
+        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 800))
+        firestoreProfile = await Promise.race([firestorePromise, timeoutPromise])
       } catch {}
 
       // Consolidate identity
