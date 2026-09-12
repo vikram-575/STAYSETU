@@ -9,6 +9,7 @@ export interface AuthSessionUser {
   role: 'superadmin' | 'owner' | 'manager' | 'accountant' | 'staff' | 'resident'
   organization_id: string | null
   phone?: string | null
+  registration_number?: string | null
   organizations?: {
     id: string
     name: string
@@ -116,7 +117,10 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
       // Fallback: check session cookies set by login route
       const authUserId = cookieStore.get('auth_user_id')?.value
       const authEmail = cookieStore.get('auth_email')?.value
-      if (authUserId || authEmail) {
+      const authMobile = cookieStore.get('auth_mobile')?.value
+      const residentId = cookieStore.get('resident_id')?.value
+
+      if (authUserId || authEmail || authMobile || residentId) {
         let fallbackProfile: any = null
 
         // Try lookup by ID first if present
@@ -188,8 +192,49 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
             full_name: fallbackProfile.full_name || fallbackProfile.email?.split('@')[0] || 'User',
             role: fallbackProfile.role || 'owner',
             organization_id: orgId,
-            phone: fallbackProfile.phone,
+            phone: fallbackProfile.phone || authMobile,
             organizations: orgObj,
+          }
+        }
+
+        // Check if this user is in 'residents' table (Tenant / Resident login)
+        const targetResidentId = residentId || authUserId
+        const cleanMob = authMobile ? authMobile.replace(/\D/g, '').slice(-10) : ''
+        
+        let residentQuery = serviceClient
+          .from('residents')
+          .select('id, full_name, email, phone, registration_number, organization_id, organizations(*)')
+        
+        if (targetResidentId) {
+          residentQuery = residentQuery.eq('id', targetResidentId)
+        } else if (cleanMob) {
+          residentQuery = residentQuery.or(`phone.ilike.%${cleanMob}%,alternate_phone.ilike.%${cleanMob}%`)
+        }
+
+        const { data: matchedResident } = await residentQuery.maybeSingle()
+        if (matchedResident) {
+          return {
+            id: matchedResident.id,
+            email: matchedResident.email || `${cleanMob || 'resident'}@resident.pgsetu.com`,
+            full_name: matchedResident.full_name || 'PG-Setu Resident',
+            role: 'resident',
+            organization_id: matchedResident.organization_id || null,
+            phone: matchedResident.phone || authMobile,
+            registration_number: (matchedResident as any).registration_number,
+            organizations: (matchedResident as any).organizations || null,
+          }
+        }
+
+        // Fallback for newly verified mobile profile without DB records yet
+        if (authMobile) {
+          return {
+            id: authUserId || `user_${cleanMob}`,
+            email: authEmail || `${cleanMob}@user.pgsetu.com`,
+            full_name: cookieStore.get('auth_name')?.value || 'PG-Setu Member',
+            role: (cookieStore.get('auth_role')?.value as any) || 'resident',
+            organization_id: null,
+            phone: authMobile,
+            organizations: null,
           }
         }
       }

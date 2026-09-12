@@ -163,8 +163,7 @@ export async function POST(request: NextRequest) {
           path: '/',
         })
 
-        const redirect =
-          user.role === 'owner' || user.role === 'superadmin' ? '/dashboard' : '/my-profile'
+        const redirect = '/my-profile'
 
         return NextResponse.json({
           success: true,
