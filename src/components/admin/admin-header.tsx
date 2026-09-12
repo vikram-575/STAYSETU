@@ -4,7 +4,7 @@ import React from 'react'
 import Link from 'next/link'
 import {
   ShieldCheck, Search, LayoutDashboard, ExternalLink,
-  Activity, Bell, Plus, Sparkles, Command, Building2, Store, Globe
+  Activity, Bell, Plus, Sparkles, Command, Building2, Store, Globe, Zap
 } from 'lucide-react'
 import AdminLogoutButton from '@/components/admin/admin-logout-button'
 import { cn } from '@/lib/utils'
@@ -120,6 +120,18 @@ export default function AdminHeader({
 
         {/* Action Controls */}
         <div className="flex items-center gap-2">
+          {/* Instant PG Requests Quick Link */}
+          <Link
+            href="/admin?mode=renting&tab=enquiries"
+            onClick={() => onSelectMode('renting')}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-black rounded-xl shadow-sm transition active:scale-95"
+            title="View Live Instant PG Leads from Floating Button"
+          >
+            <Zap className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+            <span className="hidden sm:inline">⚡ Instant PG Leads</span>
+            <span className="sm:hidden">⚡ Leads</span>
+          </Link>
+
           {/* Direct Connect to 7-Step Enterprise Onboarding Wizard */}
           <Link
             href="/onboarding?returnTo=/admin"

@@ -1,26 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { isSuperAdminFromRequest } from '@/lib/admin-auth'
-import { queryCollection, updateDocument } from '@/lib/firebase/firestore'
+import { requireSuperAdmin } from '@/lib/admin-auth'
+import { queryCollection, updateDocument, createDocument } from '@/lib/firebase/firestore'
 
-async function requireSuperAdmin(request: NextRequest) {
-  if (isSuperAdminFromRequest(request)) return { role: 'superadmin' }
-  try {
-    const { createServerClient } = await import('@supabase/ssr')
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { cookies: { getAll: () => request.cookies.getAll(), setAll: () => {} } }
-    )
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return null
-    const service = await createServiceClient()
-    const { data: profile } = await service.from('users').select('role').eq('id', user.id).single()
-    if (profile?.role !== 'superadmin') return null
-    return user
-  } catch {
-    return null
-  }
+declare global {
+  // eslint-disable-next-line no-var
+  var __pgsetu_instant_leads__: any[] | undefined
 }
 
 export async function GET(request: NextRequest) {
@@ -30,13 +15,14 @@ export async function GET(request: NextRequest) {
 
     const supabase = await createServiceClient()
     const url = new URL(request.url)
-    const view = url.searchParams.get('view') || 'listings'
+    const view = url.searchParams.get('view') || url.searchParams.get('section') || 'all'
     const status = url.searchParams.get('status')
     const city = url.searchParams.get('city')
     const search = url.searchParams.get('search')?.toLowerCase().trim()
 
-    if (view === 'listings') {
-      // Query properties and hierarchy for accurate counts
+    // 1. Fetch Listings
+    let listings: any[] = []
+    if (view === 'listings' || view === 'all') {
       const { data: properties, error: propErr } = await supabase
         .from('properties')
         .select(`
@@ -98,7 +84,7 @@ export async function GET(request: NextRequest) {
         bedsByRoom.set(b.room_id, arr)
       })
 
-      const listings = propList.map((prop: any) => {
+      listings = propList.map((prop: any) => {
         const propBldgs = bldgByProp.get(prop.id) || []
         const propFloors = propBldgs.flatMap((bId) => floorByBldg.get(bId) || [])
         const propRooms = propFloors.flatMap((fId) => roomsByFloor.get(fId) || [])
@@ -142,15 +128,14 @@ export async function GET(request: NextRequest) {
         }
       })
 
-      let filtered = listings
       if (status && status !== 'all') {
-        filtered = filtered.filter((l) => l.status === status)
+        listings = listings.filter((l) => l.status === status)
       }
       if (city && city !== 'all') {
-        filtered = filtered.filter((l) => l.city.toLowerCase() === city.toLowerCase())
+        listings = listings.filter((l) => l.city.toLowerCase() === city.toLowerCase())
       }
       if (search) {
-        filtered = filtered.filter(
+        listings = listings.filter(
           (l) =>
             l.title.toLowerCase().includes(search) ||
             l.owner_name.toLowerCase().includes(search) ||
@@ -159,79 +144,88 @@ export async function GET(request: NextRequest) {
         )
       }
 
-      return NextResponse.json({
-        success: true,
-        listings: filtered,
-      })
-    }
-
-    if (view === 'enquiries') {
-      const filters: Array<[string, any, any]> = []
-      if (status && status !== 'all') filters.push(['status', '==', status])
-      const rawLeads = await queryCollection('leads', filters, { field: 'created_at', direction: 'desc' }, 100)
-      const enquiries = (rawLeads || []).map((e: any) => ({
-        id: e.id,
-        user_name: e.tenant_name || e.user_name || 'Prospect',
-        tenant_name: e.tenant_name || e.user_name || 'Prospect',
-        user_phone: e.tenant_phone || e.user_phone || '',
-        tenant_phone: e.tenant_phone || e.user_phone || '',
-        tenant_email: e.tenant_email || '',
-        property_name: e.property_name || 'Property',
-        properties: { name: e.property_name || 'Property' },
-        owner_name: e.owner_name || 'Owner',
-        sharing_choice: e.sharing_choice || 'Single Room',
-        status: e.status || 'new',
-        created_at: e.created_at || new Date().toISOString(),
-        notes: e.notes || e.message || '',
-        message: e.notes || e.message || '',
-      }))
-
-      let filtered = enquiries
-      if (search) {
-        filtered = filtered.filter(
-          (item) =>
-            item.tenant_name.toLowerCase().includes(search) ||
-            item.tenant_phone.includes(search) ||
-            item.property_name.toLowerCase().includes(search)
-        )
+      if (view === 'listings') {
+        return NextResponse.json({ success: true, listings })
       }
-
-      return NextResponse.json({
-        success: true,
-        enquiries: filtered,
-      })
     }
 
+    // 2. Fetch Leads (Firestore + In-Memory)
+    const filters: Array<[string, any, any]> = []
+    if (status && status !== 'all') filters.push(['status', '==', status])
+    const rawLeads = await queryCollection('leads', filters, { field: 'created_at', direction: 'desc' }, 150)
+
+    const combinedMap = new Map<string, any>()
+    const memLeads = global.__pgsetu_instant_leads__ || []
+    for (const l of memLeads) {
+      if (status && status !== 'all' && l.status !== status) continue
+      combinedMap.set(l.id || l.reference_code, l)
+    }
+    for (const l of rawLeads) {
+      combinedMap.set(l.id || l.reference_code, l)
+    }
+
+    const allLeads = Array.from(combinedMap.values()).sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )
+
+    // A. Instant PG Leads
+    let instantPgLeads = allLeads.filter((l: any) => l.type === 'instant_pg' || l.reference_code?.startsWith('PG-INSTA'))
+    if (search) {
+      instantPgLeads = instantPgLeads.filter(
+        (l) =>
+          (l.tenant_name || l.user_name || '').toLowerCase().includes(search) ||
+          (l.tenant_phone || l.user_phone || '').includes(search) ||
+          (l.property_city || '').toLowerCase().includes(search) ||
+          (l.reference_code || '').toLowerCase().includes(search)
+      )
+    }
+
+    // B. General Enquiries
+    let enquiries = allLeads.filter((l: any) => l.type !== 'instant_pg' && l.type !== 'visit')
+    if (search) {
+      enquiries = enquiries.filter(
+        (l) =>
+          (l.tenant_name || l.user_name || '').toLowerCase().includes(search) ||
+          (l.tenant_phone || l.user_phone || '').includes(search) ||
+          (l.property_name || '').toLowerCase().includes(search)
+      )
+    }
+
+    // C. Visits
+    let visits = allLeads.filter((l: any) => l.type === 'visit' || l.status === 'visit_scheduled' || l.scheduled_date)
+    if (search) {
+      visits = visits.filter(
+        (l) =>
+          (l.tenant_name || l.user_name || '').toLowerCase().includes(search) ||
+          (l.tenant_phone || l.user_phone || '').includes(search)
+      )
+    }
+
+    if (view === 'instant_pg') {
+      return NextResponse.json({ success: true, instant_pg_leads: instantPgLeads })
+    }
+    if (view === 'enquiries') {
+      return NextResponse.json({ success: true, enquiries, instant_pg_leads: instantPgLeads })
+    }
     if (view === 'visits') {
-      const filters: Array<[string, any, any]> = []
-      if (status && status !== 'all') filters.push(['status', '==', status])
-      const rawLeads = await queryCollection('leads', filters, { field: 'created_at', direction: 'desc' }, 100)
-      const visits = (rawLeads || [])
-        .filter((l: any) => l.type === 'visit' || l.status === 'visit_scheduled' || l.scheduled_date)
-        .map((v: any) => ({
-          id: v.id,
-          user_name: v.tenant_name || v.user_name || 'Prospect',
-          tenant_name: v.tenant_name || v.user_name || 'Prospect',
-          user_phone: v.tenant_phone || v.user_phone || '',
-          tenant_phone: v.tenant_phone || v.user_phone || '',
-          property_name: v.property_name || 'Property',
-          properties: { name: v.property_name || 'Property' },
-          owner_name: v.owner_name || 'Owner',
-          scheduled_date: v.scheduled_date || v.visit_date || v.created_at?.split('T')[0] || '',
-          visit_date: v.scheduled_date || v.visit_date || v.created_at?.split('T')[0] || '',
-          scheduled_time: v.scheduled_time || v.time_slot || '11:00 AM',
-          time_slot: v.scheduled_time || v.time_slot || '11:00 AM',
-          status: v.status || 'scheduled',
-          created_at: v.created_at || new Date().toISOString(),
-        }))
-
-      return NextResponse.json({
-        success: true,
-        visits,
-      })
+      return NextResponse.json({ success: true, visits })
     }
 
-    return NextResponse.json({ error: 'Unknown view parameter' }, { status: 400 })
+    // View === 'all'
+    return NextResponse.json({
+      success: true,
+      listings,
+      enquiries,
+      visits,
+      instant_pg_leads: instantPgLeads,
+      stats: {
+        totalListings: listings.length,
+        totalEnquiries: enquiries.length,
+        totalVisits: visits.length,
+        totalInstantLeads: instantPgLeads.length,
+        newInstantLeads: instantPgLeads.filter((l) => l.status === 'new').length,
+      },
+    })
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Failed to fetch marketplace data' }, { status: 500 })
   }
@@ -243,11 +237,66 @@ export async function POST(request: NextRequest) {
     if (!adminUser) return NextResponse.json({ error: 'Super Admin access required.' }, { status: 403 })
 
     const body = await request.json()
-    const { action, enquiry_id, status } = body
+    const { action, enquiry_id, status, assigned_property_name, notes } = body
 
     if (action === 'update_enquiry_status' && enquiry_id) {
-      await updateDocument('leads', enquiry_id, { status })
-      return NextResponse.json({ success: true, message: 'Enquiry status updated' })
+      const updates: Record<string, any> = { updated_at: new Date().toISOString() }
+      if (status) updates.status = status
+      if (assigned_property_name) updates.assigned_property_name = assigned_property_name
+      if (notes !== undefined) updates.notes = notes
+
+      await updateDocument('leads', enquiry_id, updates)
+
+      // Update in memory as well
+      if (global.__pgsetu_instant_leads__) {
+        const found = global.__pgsetu_instant_leads__.find((l) => l.id === enquiry_id || l.reference_code === enquiry_id)
+        if (found) Object.assign(found, updates)
+      }
+
+      return NextResponse.json({ success: true, message: 'Enquiry / Lead status updated' })
+    }
+
+    if (action === 'create_instant_lead') {
+      const {
+        name,
+        phone,
+        city = 'Bengaluru',
+        gender = 'any',
+        sharing = '2-Sharing',
+        budget = '₹8,000 - ₹12,000',
+        move_in = 'Immediate / Today',
+        notes = '',
+      } = body
+
+      if (!name || !phone) {
+        return NextResponse.json({ error: 'Name and phone are required' }, { status: 400 })
+      }
+
+      const refCode = `PG-INSTA-${Math.floor(1000 + Math.random() * 9000)}`
+      const payload = {
+        reference_code: refCode,
+        tenant_name: name,
+        user_name: name,
+        tenant_phone: phone.replace(/\D/g, ''),
+        user_phone: phone.replace(/\D/g, ''),
+        property_city: city,
+        gender,
+        pg_type: gender,
+        sharing_choice: sharing,
+        budget_range: budget,
+        move_in_date: move_in,
+        notes,
+        type: 'instant_pg',
+        status: 'new',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+
+      const doc = await createDocument('leads', payload)
+      if (!global.__pgsetu_instant_leads__) global.__pgsetu_instant_leads__ = []
+      global.__pgsetu_instant_leads__.unshift(doc)
+
+      return NextResponse.json({ success: true, lead: doc, message: 'Instant lead created by admin' })
     }
 
     return handleListingModeration(adminUser, body)
@@ -279,7 +328,7 @@ async function handleListingModeration(adminUser: any, body: any) {
   // Fetch existing property settings
   const { data: prop, error: fetchError } = await supabase
     .from('properties')
-    .select('id, name, settings, organization_id')
+    .select('id, name, settings, is_active')
     .eq('id', property_id)
     .single()
 
@@ -287,60 +336,58 @@ async function handleListingModeration(adminUser: any, body: any) {
     return NextResponse.json({ error: 'Property not found' }, { status: 404 })
   }
 
-  const currentSettings = prop.settings || {}
-  let newStatus = currentSettings.listing_status || 'published'
-  let isActive = true
-  let isFeatured = currentSettings.is_featured || false
+  const currentSettings = (prop.settings as Record<string, any>) || {}
+  const updates: Record<string, any> = {}
 
   if (action === 'approve') {
-    newStatus = 'published'
-    isActive = true
+    updates.is_active = true
+    updates.settings = {
+      ...currentSettings,
+      listing_status: 'published',
+      flagged_reason: null,
+      approved_at: new Date().toISOString(),
+      approved_by: adminUser.email,
+    }
   } else if (action === 'reject') {
-    if (!reason) return NextResponse.json({ error: 'Rejection reason is mandatory.' }, { status: 400 })
-    newStatus = 'rejected'
-    isActive = false
-  } else if (action === 'suspend') {
-    if (!reason) return NextResponse.json({ error: 'Suspension reason is mandatory.' }, { status: 400 })
-    newStatus = 'suspended'
-    isActive = false
-  } else if (action === 'restore') {
-    newStatus = 'published'
-    isActive = true
+    updates.is_active = false
+    updates.settings = {
+      ...currentSettings,
+      listing_status: 'rejected',
+      flagged_reason: reason || 'Listing does not meet quality standards.',
+      rejected_at: new Date().toISOString(),
+      rejected_by: adminUser.email,
+    }
   } else if (action === 'feature') {
-    isFeatured = true
+    updates.settings = {
+      ...currentSettings,
+      is_featured: true,
+      featured_priority: Number(featured_priority) || 1,
+      featured_until: featured_until || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    }
   } else if (action === 'unfeature') {
-    isFeatured = false
-  }
-
-  const updatedSettings = {
-    ...currentSettings,
-    listing_status: newStatus,
-    is_featured: isFeatured,
-    featured_priority: featured_priority || currentSettings.featured_priority || 1,
-    featured_until: featured_until || currentSettings.featured_until || null,
-    moderated_at: new Date().toISOString(),
-    moderator_email: (adminUser as any).email || 'superadmin@pgsetu.com',
-    flagged_reason: action === 'reject' || action === 'suspend' ? reason : null,
+    updates.settings = {
+      ...currentSettings,
+      is_featured: false,
+      featured_priority: 0,
+      featured_until: null,
+    }
+  } else {
+    return NextResponse.json({ error: 'Unsupported moderation action' }, { status: 400 })
   }
 
   const { error: updateError } = await supabase
     .from('properties')
-    .update({
-      is_active: isActive,
-      settings: updatedSettings,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updates)
     .eq('id', property_id)
 
-  if (updateError) throw updateError
+  if (updateError) {
+    return NextResponse.json({ error: updateError.message }, { status: 500 })
+  }
 
   return NextResponse.json({
     success: true,
-    message: `Listing action '${action}' applied successfully.`,
-    listing: {
-      id: property_id,
-      status: newStatus,
-      is_featured: isFeatured,
-    },
+    action,
+    property_id,
+    message: `Property listing ${action}d successfully.`,
   })
 }

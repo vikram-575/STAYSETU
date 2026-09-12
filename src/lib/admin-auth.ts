@@ -165,3 +165,17 @@ export async function isSuperAdminFromRequestAsync(request: NextRequest): Promis
   const payload = await verifyAdminToken(token)
   return Boolean(payload)
 }
+
+/**
+ * Standard Super Admin authentication checker for API routes
+ */
+export async function requireSuperAdmin(request?: NextRequest): Promise<AdminTokenPayload | null> {
+  if (request) {
+    const token = request.cookies.get('superadmin_token')?.value
+    if (token) {
+      const payload = await verifyAdminToken(token)
+      if (payload) return payload
+    }
+  }
+  return await getAdminSessionFromCookies()
+}

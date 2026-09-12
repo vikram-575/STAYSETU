@@ -30,6 +30,8 @@ export const metadata: Metadata = {
   applicationName: 'PG-SETU',
 }
 
+import InstantPgFloatingWidget from '@/components/shared/instant-pg-floating-widget'
+
 export default function RootLayout({
   children,
 }: {
@@ -40,6 +42,7 @@ export default function RootLayout({
       <body className={`${inter.className} antialiased bg-gray-50 text-gray-900 selection:bg-blue-100 selection:text-blue-900`}>
         <Providers>
           {children}
+          <InstantPgFloatingWidget />
           <Toaster />
         </Providers>
       </body>

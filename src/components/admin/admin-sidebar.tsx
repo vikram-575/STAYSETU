@@ -5,7 +5,7 @@ import Link from 'next/link'
 import {
   LayoutDashboard, Store, MessageCircleQuestion, Network,
   Users2, Landmark, Building2, UserCog, ShieldAlert,
-  Radio, Cpu, ChevronRight, Sparkles, Calendar, Eye, Plus, Globe, UserCheck
+  Radio, Cpu, ChevronRight, Sparkles, Calendar, Eye, Plus, Globe, UserCheck, Zap
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AdminMode } from './admin-header'
@@ -96,6 +96,13 @@ export default function AdminSidebar({
           badge: 'Tenant+Owner',
           badgeVariant: 'slate',
         },
+        {
+          id: 'enquiries',
+          label: '⚡ Instant PG Leads',
+          icon: Zap,
+          badge: 'Fast-Track',
+          badgeVariant: 'amber',
+        },
       ],
     },
     {
@@ -150,10 +157,10 @@ export default function AdminSidebar({
         },
         {
           id: 'enquiries',
-          label: 'Leads & Enquiries Funnel',
-          icon: MessageCircleQuestion,
-          badge: badges.activeEnquiries ? badges.activeEnquiries : undefined,
-          badgeVariant: 'slate',
+          label: '⚡ Instant PG Leads',
+          icon: Zap,
+          badge: badges.activeEnquiries ? `${badges.activeEnquiries} new` : 'Live',
+          badgeVariant: 'amber',
         },
         { id: 'visits', label: 'Scheduled Visits', icon: Calendar },
       ],
