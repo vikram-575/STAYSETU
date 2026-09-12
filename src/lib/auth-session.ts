@@ -62,13 +62,32 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
           .single()
 
         if (adminProfile) {
+          let orgId = adminProfile.organization_id
+          let orgObj = adminProfile.organizations
+          if (!orgId) {
+            const { data: defaultOrg } = await serviceClient
+              .from('organizations')
+              .select('id, name, slug, gst_enabled')
+              .order('created_at', { ascending: true })
+              .limit(1)
+              .maybeSingle()
+            if (defaultOrg) {
+              orgId = defaultOrg.id
+              orgObj = defaultOrg
+              try {
+                await serviceClient.from('users').update({ organization_id: defaultOrg.id }).eq('id', adminProfile.id)
+              } catch {}
+            }
+          }
+
           return {
             id: adminProfile.id,
             email: SUPER_ADMIN_EMAIL,
-            full_name: adminProfile.full_name || 'Vikram Tomar (Super Admin)',
-            role: 'superadmin',
-            organization_id: adminProfile.organization_id || null,
-            organizations: adminProfile.organizations || null,
+            full_name: adminProfile.full_name || 'Vikram Tomar (Owner)',
+            role: (adminProfile.role as any) || 'owner',
+            organization_id: orgId,
+            organizations: orgObj,
+            phone: adminProfile.phone,
           }
         }
       } catch {}
@@ -98,13 +117,41 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
       const authUserId = cookieStore.get('auth_user_id')?.value
       const authEmail = cookieStore.get('auth_email')?.value
       if (authUserId || authEmail) {
-        let query = serviceClient.from('users').select('*, organizations(*)')
+        let fallbackProfile: any = null
+
+        // Try lookup by ID first if present
         if (authUserId) {
-          query = query.eq('id', authUserId)
-        } else if (authEmail) {
-          query = query.ilike('email', authEmail)
+          const { data } = await serviceClient
+            .from('users')
+            .select('*, organizations(*)')
+            .eq('id', authUserId)
+            .maybeSingle()
+          fallbackProfile = data
         }
-        const { data: fallbackProfile } = await query.maybeSingle()
+
+        // If not found by ID, always look up by email (heals stale ID cookies after database wipes)
+        if (!fallbackProfile && authEmail) {
+          const { data } = await serviceClient
+            .from('users')
+            .select('*, organizations(*)')
+            .ilike('email', authEmail)
+            .maybeSingle()
+          fallbackProfile = data
+
+          // If found by email, update cookie so next request uses valid ID
+          if (fallbackProfile?.id) {
+            try {
+              cookieStore.set('auth_user_id', fallbackProfile.id, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 60 * 60 * 24 * 30,
+                path: '/',
+              })
+            } catch {}
+          }
+        }
+
         if (fallbackProfile) {
           let orgId = fallbackProfile.organization_id
           let orgObj = fallbackProfile.organizations
@@ -260,6 +307,7 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
     if (err?.digest === 'DYNAMIC_SERVER_USAGE' || err?.message?.includes('DYNAMIC_SERVER_USAGE')) {
       throw err
     }
+    console.error('[getAuthenticatedUser Exception]:', err?.message || err)
     return null
   }
 }

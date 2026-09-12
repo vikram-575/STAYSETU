@@ -41,6 +41,12 @@ export async function POST(request: NextRequest) {
       } catch {}
     }
 
+    const referer = request.headers.get('referer') || ''
+    const isFromSuperAdminPortal =
+      referer.includes('/superman') ||
+      referer.includes('/admin') ||
+      referer.includes('/superadmin')
+
     // ── 1. MASTER COMPANY SUPER ADMIN AUTHENTICATION ───────────────────────
     if (
       cleanEmail === SUPER_ADMIN_EMAIL &&
@@ -63,7 +69,39 @@ export async function POST(request: NextRequest) {
         maxAge: 60 * 60 * 24 * 30,
         path: '/',
       })
-      cookieStore.set('auth_role', 'superadmin', {
+
+      // Establish Supabase Auth session so client and server SSR cookies exist
+      let supabaseUserId: string | null = null
+      try {
+        const supabase = await createClient()
+        const { data: authData } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password,
+        })
+        if (authData?.user) {
+          supabaseUserId = authData.user.id
+        }
+      } catch {}
+
+      // Look up existing user record in SQL DB to preserve organization_id and profile
+      const serviceClient = await createServiceClient()
+      const { data: existingUser } = await serviceClient
+        .from('users')
+        .select('id, role, organization_id, full_name, phone')
+        .ilike('email', cleanEmail)
+        .maybeSingle()
+
+      const resolvedUserId = existingUser?.id || supabaseUserId || '7d66235b-290c-4c73-9f43-abb9711339db'
+      const resolvedRole = isFromSuperAdminPortal ? 'superadmin' : (existingUser?.role || 'owner')
+
+      cookieStore.set('auth_role', resolvedRole, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 30,
+        path: '/',
+      })
+      cookieStore.set('auth_user_id', resolvedUserId, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
@@ -73,22 +111,22 @@ export async function POST(request: NextRequest) {
       // Clear temporary password flag for superadmin
       cookieStore.set('must_change_password', '', { maxAge: 0, path: '/' })
 
-      // Ensure profile exists in SQL DB (best effort)
-      try {
-        const serviceClient = await createServiceClient()
-        await serviceClient.from('users').upsert({
-          email: cleanEmail,
-          full_name: 'Vikram Tomar (Super Admin)',
-          role: 'superadmin',
-          is_active: true,
-        }, { onConflict: 'email' })
-      } catch {}
+      // Update last_login_at
+      if (existingUser?.id) {
+        serviceClient
+          .from('users')
+          .update({ last_login_at: new Date().toISOString() })
+          .eq('id', existingUser.id)
+          .then(() => {})
+      }
+
+      const destination = isFromSuperAdminPortal ? '/superman' : '/dashboard'
 
       return NextResponse.json({
         success: true,
-        role: 'superadmin',
+        role: resolvedRole,
         requiresPasswordChange: false,
-        redirect: '/superman',
+        redirect: destination,
       })
     }
 
@@ -196,12 +234,10 @@ export async function POST(request: NextRequest) {
         }
 
         let destination: string
-        if (isSuperAdmin) {
+        if (isSuperAdmin && isFromSuperAdminPortal) {
           destination = '/superman'
         } else if (mustChangePassword) {
           destination = '/set-password'
-        } else if (profile?.organization_id) {
-          destination = '/dashboard'
         } else {
           destination = '/dashboard'
         }
@@ -297,7 +333,7 @@ export async function POST(request: NextRequest) {
             cookieStore.set('superadmin_token', '', { maxAge: 0, path: '/' })
           }
 
-          const destination = isSuperAdmin
+          const destination = (isSuperAdmin && isFromSuperAdminPortal)
             ? '/superman'
             : mustChangePassword
             ? '/set-password'

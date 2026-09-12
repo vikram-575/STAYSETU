@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
-import { isSuperAdminFromRequest } from '@/lib/admin-auth'
+import { isSuperAdminFromRequestAsync } from '@/lib/admin-auth'
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
@@ -20,8 +20,8 @@ export async function middleware(request: NextRequest) {
     return response
   }
 
-  // 1. Check SuperAdmin token
-  const isSuperAdmin = isSuperAdminFromRequest(request)
+  // 1. Check SuperAdmin token with cryptographic HMAC verification
+  const isSuperAdmin = await isSuperAdminFromRequestAsync(request)
 
   // 2. Check Supabase session
   let sbUser: any = null
@@ -56,17 +56,32 @@ export async function middleware(request: NextRequest) {
 
   const mustChangePassword = request.cookies.get('must_change_password')?.value === 'true'
 
-  // If already logged in and visiting login pages, redirect to home
+  // Anti-loop protection: if request has redirectTo or error, do NOT bounce back to protected pages
+  const hasRedirectTo = request.nextUrl.searchParams.has('redirectTo')
+  const hasError = request.nextUrl.searchParams.has('error')
+  const shouldBypassLoginRedirect = hasRedirectTo || hasError
+
+  // If already logged in and visiting login pages, redirect to home (unless recovering or errored)
   if (
     isAuthenticated &&
+    !shouldBypassLoginRedirect &&
     (pathname === '/login' ||
       pathname === '/register' ||
       pathname === '/superman/login' ||
       pathname === '/admin/login' ||
       pathname === '/superadmin/login')
   ) {
+    const isSuperAdminLoginPage =
+      pathname === '/superman/login' ||
+      pathname === '/admin/login' ||
+      pathname === '/superadmin/login'
+
     const targetUrl = request.nextUrl.clone()
-    targetUrl.pathname = mustChangePassword ? '/set-password' : isSuperAdmin ? '/superman' : '/dashboard'
+    targetUrl.pathname = mustChangePassword
+      ? '/set-password'
+      : isSuperAdmin && isSuperAdminLoginPage
+      ? '/superman'
+      : '/dashboard'
     return NextResponse.redirect(targetUrl)
   }
 
@@ -80,12 +95,12 @@ export async function middleware(request: NextRequest) {
   // If user visits /set-password but does not have a temporary password
   if (isAuthenticated && !mustChangePassword && pathname === '/set-password') {
     const targetUrl = request.nextUrl.clone()
-    targetUrl.pathname = isSuperAdmin ? '/superman' : '/dashboard'
+    targetUrl.pathname = '/dashboard'
     return NextResponse.redirect(targetUrl)
   }
 
   // Redirect authenticated non-superadmin users away from the root landing page
-  if (pathname === '/' && sbUser && !isSuperAdmin) {
+  if (pathname === '/' && (sbUser || (authUserId && authEmail)) && !isSuperAdmin) {
     const targetUrl = request.nextUrl.clone()
     targetUrl.pathname = mustChangePassword ? '/set-password' : '/dashboard'
     return NextResponse.redirect(targetUrl)

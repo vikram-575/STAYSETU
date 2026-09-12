@@ -155,3 +155,13 @@ export function isSuperAdminFromRequest(request: NextRequest): boolean {
   const payload = extractAdminTokenPayload(token)
   return Boolean(payload)
 }
+
+/**
+ * Async cryptographic verification of super admin from NextRequest
+ */
+export async function isSuperAdminFromRequestAsync(request: NextRequest): Promise<boolean> {
+  const token = request.cookies.get('superadmin_token')?.value
+  if (!token) return false
+  const payload = await verifyAdminToken(token)
+  return Boolean(payload)
+}

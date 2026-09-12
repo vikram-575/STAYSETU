@@ -10,8 +10,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 })
     }
 
-    if (password.length < 8) {
-      return NextResponse.json({ error: 'Password must be at least 8 characters long.' }, { status: 400 })
+    if (password.length < 6) {
+      return NextResponse.json({ error: 'Password must be at least 6 characters long.' }, { status: 400 })
     }
 
     const cleanEmail = email.trim().toLowerCase()
@@ -40,6 +40,15 @@ export async function POST(request: NextRequest) {
       supabaseUserId = signUpData.user?.id || null
     }
 
+    // Sign in to establish client-side SSR session cookies
+    try {
+      const supabase = await createClient()
+      await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password,
+      })
+    } catch {}
+
     // 2. Set Session Cookies
     cookieStore.set('auth_email', cleanEmail, {
       httpOnly: true,
@@ -55,6 +64,15 @@ export async function POST(request: NextRequest) {
       maxAge: 60 * 60 * 24 * 30,
       path: '/',
     })
+    if (supabaseUserId) {
+      cookieStore.set('auth_user_id', supabaseUserId, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 30,
+        path: '/',
+      })
+    }
     cookieStore.set('auth_token', supabaseUserId ? `user_${supabaseUserId}` : 'session_active', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -65,11 +83,18 @@ export async function POST(request: NextRequest) {
 
     // 3. Create or upsert user profile in SQL DB
     if (supabaseUserId) {
+      const { data: matchedOrg } = await serviceClient
+        .from('organizations')
+        .select('id')
+        .ilike('email', cleanEmail)
+        .maybeSingle()
+
       await serviceClient.from('users').upsert({
         id: supabaseUserId,
         email: cleanEmail,
         full_name: full_name || cleanEmail.split('@')[0],
         role: 'owner',
+        organization_id: matchedOrg?.id || null,
         is_active: true,
       }, { onConflict: 'id' })
     }

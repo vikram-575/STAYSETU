@@ -17,7 +17,7 @@ export const metadata = { title: 'Executive Dashboard — PG-SETU' }
 
 export default async function DashboardPage() {
   const user = await getAuthenticatedUser()
-  if (!user) redirect('/login')
+  if (!user) redirect('/login?error=session_expired')
 
   const supabase = await createServiceClient()
   const orgId = await resolveEffectiveOrgId(user)

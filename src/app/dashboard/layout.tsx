@@ -14,7 +14,7 @@ export default async function DashboardLayout({
   const user = await getAuthenticatedUser()
 
   if (!user) {
-    redirect('/login')
+    redirect('/login?error=session_expired')
   }
 
   // Ensure robust effective organization context is provided

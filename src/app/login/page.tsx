@@ -50,8 +50,6 @@ function LoginFormContent() {
       let destination: string
       if (data.requiresPasswordChange || data.redirect === '/set-password') {
         destination = '/set-password'
-      } else if (data.role === 'superadmin') {
-        destination = data.redirect || '/superman'
       } else {
         const safeRedirect =
           redirectTo &&
@@ -61,7 +59,7 @@ function LoginFormContent() {
           !redirectTo.startsWith('/onboarding')
             ? redirectTo
             : '/dashboard'
-        destination = safeRedirect !== '/dashboard' ? safeRedirect : data.redirect || '/dashboard'
+        destination = safeRedirect !== '/dashboard' ? safeRedirect : (data.redirect && !data.redirect.startsWith('/superman') ? data.redirect : '/dashboard')
         if (
           destination.startsWith('/superman') ||
           destination.startsWith('/superadmin') ||
@@ -72,8 +70,7 @@ function LoginFormContent() {
         }
       }
 
-      router.push(destination)
-      router.refresh()
+      window.location.href = destination
     } catch (err: any) {
       setError(err.message || 'Login failed. Please check your credentials.')
       setLoading(false)
