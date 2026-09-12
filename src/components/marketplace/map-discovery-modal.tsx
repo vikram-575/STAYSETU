@@ -1,20 +1,28 @@
 'use client'
 
-import React, { useState } from 'react'
+// Source: Google Maps Platform Code Assist
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   MapPin,
   X,
   Navigation,
   ZoomIn,
   ZoomOut,
-  Maximize2,
   Building,
   Layers,
   Star,
   ShieldCheck,
-  Eye,
   ArrowRight,
+  Compass,
+  Map as MapIcon,
+  Maximize2,
 } from 'lucide-react'
+import {
+  APIProvider,
+  Map,
+  AdvancedMarker,
+  useMap,
+} from '@vis.gl/react-google-maps'
 import { PropertyListing } from '@/types/marketplace'
 
 interface MapDiscoveryModalProps {
@@ -23,6 +31,71 @@ interface MapDiscoveryModalProps {
   onSelectProperty: (property: PropertyListing) => void
   onClose?: () => void
   isModal?: boolean
+}
+
+const CITY_COORDINATES: Record<string, { lat: number; lng: number; zoom: number }> = {
+  Bangalore: { lat: 12.9352, lng: 77.6245, zoom: 12 },
+  Gurgaon: { lat: 28.4600, lng: 77.0800, zoom: 12 },
+  Noida: { lat: 28.6280, lng: 77.3649, zoom: 13 },
+  Delhi: { lat: 28.5355, lng: 77.2100, zoom: 12 },
+  Pune: { lat: 18.5913, lng: 73.7389, zoom: 13 },
+  Hyderabad: { lat: 17.4401, lng: 78.3489, zoom: 13 },
+  Mumbai: { lat: 19.1176, lng: 72.9060, zoom: 12 },
+}
+
+/**
+ * Controller inside Google Map context to pan, zoom, and fit bounds
+ */
+function MapCameraHandler({
+  targetPin,
+  cityTarget,
+  properties,
+}: {
+  targetPin: PropertyListing | null
+  cityTarget: string
+  properties: PropertyListing[]
+}) {
+  const map = useMap()
+
+  // Pan to individual selected property pin
+  useEffect(() => {
+    if (!map || !targetPin) return
+    const lat = targetPin.coordinates?.lat
+    const lng = targetPin.coordinates?.lng
+    if (typeof lat === 'number' && typeof lng === 'number') {
+      map.panTo({ lat, lng })
+      map.setZoom(15)
+    }
+  }, [map, targetPin])
+
+  // Center on city if city target chosen and no target pin
+  useEffect(() => {
+    if (!map || targetPin) return
+
+    if (cityTarget && cityTarget !== 'all' && CITY_COORDINATES[cityTarget]) {
+      const { lat, lng, zoom } = CITY_COORDINATES[cityTarget]
+      map.panTo({ lat, lng })
+      map.setZoom(zoom)
+      return
+    }
+
+    // Auto-fit bounds of all properties
+    if (properties.length > 0 && typeof google !== 'undefined' && google.maps) {
+      const bounds = new google.maps.LatLngBounds()
+      let count = 0
+      properties.forEach((p) => {
+        if (p.coordinates?.lat && p.coordinates?.lng) {
+          bounds.extend({ lat: p.coordinates.lat, lng: p.coordinates.lng })
+          count++
+        }
+      })
+      if (count > 0) {
+        map.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 })
+      }
+    }
+  }, [map, cityTarget, properties, targetPin])
+
+  return null
 }
 
 export function MapDiscoveryModal({
@@ -35,213 +108,186 @@ export function MapDiscoveryModal({
   const [activePin, setActivePin] = useState<PropertyListing | null>(
     selectedProperty || (properties.length > 0 ? properties[0] : null)
   )
-  const [zoomLevel, setZoomLevel] = useState(1)
+  const [selectedCity, setSelectedCity] = useState<string>('all')
+  const [mapType, setMapType] = useState<'roadmap' | 'hybrid'>('roadmap')
 
-  // Map pins coordinates distribution for visual aesthetic
-  const getPinPosition = (index: number, total: number) => {
-    // Generate organic positions across an SVG viewbox 800x500
-    const positions = [
-      { x: 220, y: 180 }, // Bangalore Koramangala
-      { x: 310, y: 140 }, // Indiranagar
-      { x: 420, y: 110 }, // Gurgaon DLF
-      { x: 520, y: 190 }, // Noida Sec 62
-      { x: 280, y: 260 }, // Delhi Saket
-      { x: 190, y: 320 }, // Pune Hinjewadi
-      { x: 460, y: 290 }, // Hyderabad Gachibowli
-      { x: 610, y: 220 }, // Mumbai Powai
-      { x: 250, y: 390 }, // Bangalore HSR
-      { x: 570, y: 340 }, // Chennai OMR
-      { x: 380, y: 370 }, // Gurgaon Sec 56
-      { x: 160, y: 220 }, // Delhi Hauz Khas
-    ]
-    return positions[index % positions.length]
-  }
+  const apiKey =
+    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
+    process.env.NEXT_PUBLIC_MAPS_API_KEY ||
+    ''
+
+  // Update activePin if parent passes a new selectedProperty
+  useEffect(() => {
+    if (selectedProperty) {
+      setActivePin(selectedProperty)
+    }
+  }, [selectedProperty])
+
+  // Filter properties by city if selected
+  const displayedProperties = useMemo(() => {
+    if (selectedCity === 'all') return properties
+    return properties.filter((p) => p.city.toLowerCase() === selectedCity.toLowerCase())
+  }, [properties, selectedCity])
+
+  // Available cities from properties
+  const availableCities = useMemo(() => {
+    const set = new Set<string>()
+    properties.forEach((p) => {
+      if (p.city && p.city.trim()) set.add(p.city.trim())
+    })
+    return Array.from(set).sort()
+  }, [properties])
+
+  // Initial center: India tech hub or first property
+  const initialCenter = useMemo(() => {
+    if (activePin?.coordinates) {
+      return { lat: activePin.coordinates.lat, lng: activePin.coordinates.lng }
+    }
+    if (properties.length > 0 && properties[0].coordinates) {
+      return { lat: properties[0].coordinates.lat, lng: properties[0].coordinates.lng }
+    }
+    return { lat: 20.5937, lng: 78.9629 } // Center of India
+  }, [activePin, properties])
 
   const handlePinClick = (property: PropertyListing) => {
     setActivePin(property)
   }
 
+  const handleCityFilter = (city: string) => {
+    setSelectedCity(city)
+    const matching = properties.filter(
+      (p) => city === 'all' || p.city.toLowerCase() === city.toLowerCase()
+    )
+    if (matching.length > 0) {
+      setActivePin(matching[0])
+    }
+  }
+
   const content = (
-    <div className="relative flex flex-col lg:flex-row h-[600px] w-full overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
-      {/* Left / Top Map Canvas */}
-      <div className="relative flex-1 bg-[#EEF2F6] overflow-hidden select-none">
-        {/* Stylized Vector Map Canvas */}
-        <div
-          className="absolute inset-0 transition-transform duration-300 origin-center flex items-center justify-center"
-          style={{ transform: `scale(${zoomLevel})` }}
-        >
-          <svg
-            viewBox="0 0 800 500"
-            className="h-full w-full object-cover"
-            xmlns="http://www.w3.org/2000/svg"
+    <div className="relative flex flex-col lg:flex-row h-[620px] w-full overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
+      {/* Left Map Viewport */}
+      <div className="relative flex-1 bg-gray-100 overflow-hidden flex flex-col">
+        {/* City Filter Floating Bar */}
+        <div className="absolute top-3 left-3 z-10 flex flex-wrap gap-1.5 rounded-xl bg-white/90 p-1.5 shadow-md backdrop-blur-md max-w-[calc(100%-80px)]">
+          <button
+            onClick={() => handleCityFilter('all')}
+            className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+              selectedCity === 'all'
+                ? 'bg-[#14532D] text-white shadow-xs'
+                : 'text-gray-700 hover:bg-gray-100'
+            }`}
           >
-            <defs>
-              <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#E2E8F0" strokeWidth="1" />
-              </pattern>
-            </defs>
-
-            {/* Base land */}
-            <rect width="800" height="500" fill="#F8FAFC" />
-            <rect width="800" height="500" fill="url(#grid)" opacity="0.6" />
-
-            {/* Simulated Water Body / Lake */}
-            <path
-              d="M100 240 Q160 210 210 260 T320 280 Q370 330 330 380 T200 410 Q140 370 120 310 Z"
-              fill="#E0F2FE"
-              stroke="#BAE6FD"
-              strokeWidth="2"
-            />
-            <text x="180" y="320" fill="#0284C7" fontSize="11" fontWeight="600" opacity="0.6">
-              Ulsoor & Agara Waters
-            </text>
-
-            {/* Simulated Green Parks */}
-            <path
-              d="M480 80 Q560 60 620 120 T600 200 Q520 220 470 160 Z"
-              fill="#DCFCE7"
-              stroke="#BBF7D0"
-              strokeWidth="2"
-            />
-            <text x="520" y="145" fill="#16A34A" fontSize="10" fontWeight="600" opacity="0.7">
-              Biodiversity Forest
-            </text>
-
-            {/* Main Road Networks */}
-            <path
-              d="M 50 150 L 750 160"
-              stroke="#CBD5E1"
-              strokeWidth="10"
-              strokeLinecap="round"
-            />
-            <path
-              d="M 50 150 L 750 160"
-              stroke="#FFFFFF"
-              strokeWidth="6"
-              strokeLinecap="round"
-            />
-
-            <path
-              d="M 280 30 L 290 480"
-              stroke="#CBD5E1"
-              strokeWidth="10"
-              strokeLinecap="round"
-            />
-            <path
-              d="M 280 30 L 290 480"
-              stroke="#FFFFFF"
-              strokeWidth="6"
-              strokeLinecap="round"
-            />
-
-            <path
-              d="M 120 400 L 680 80"
-              stroke="#CBD5E1"
-              strokeWidth="8"
-              strokeLinecap="round"
-            />
-            <path
-              d="M 120 400 L 680 80"
-              stroke="#FFFFFF"
-              strokeWidth="4"
-              strokeLinecap="round"
-            />
-
-            {/* Rapid Metro Line (Green dashed line) */}
-            <path
-              d="M 80 80 Q 300 220 720 380"
-              stroke="#16A34A"
-              strokeWidth="3"
-              strokeDasharray="6 4"
-              fill="none"
-            />
-            <circle cx="285" cy="195" r="5" fill="#14532D" stroke="#FFFFFF" strokeWidth="2" />
-            <circle cx="510" cy="300" r="5" fill="#14532D" stroke="#FFFFFF" strokeWidth="2" />
-            <text x="295" y="198" fill="#14532D" fontSize="9" fontWeight="700">
-              Metro Interchange
-            </text>
-          </svg>
-
-          {/* Interactive Property Pins */}
-          {properties.map((prop, idx) => {
-            const pos = getPinPosition(idx, properties.length)
-            const isCurrent = activePin?.id === prop.id
-            const priceFormatted =
-              prop.price >= 10000
-                ? `₹${(prop.price / 1000).toFixed(1)}k`
-                : `₹${(prop.price / 1000).toFixed(0)}k`
-
+            All Tech Hubs ({properties.length})
+          </button>
+          {availableCities.map((city) => {
+            const count = properties.filter((p) => p.city.toLowerCase() === city.toLowerCase()).length
             return (
-              <div
-                key={prop.id}
-                onClick={() => handlePinClick(prop)}
-                className={`absolute cursor-pointer transition-all duration-200 transform -translate-x-1/2 -translate-y-1/2 ${
-                  isCurrent ? 'z-30 scale-110' : 'z-20 hover:scale-105'
+              <button
+                key={city}
+                onClick={() => handleCityFilter(city)}
+                className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+                  selectedCity.toLowerCase() === city.toLowerCase()
+                    ? 'bg-[#14532D] text-white shadow-xs'
+                    : 'text-gray-700 hover:bg-gray-100'
                 }`}
-                style={{ left: `${(pos.x / 800) * 100}%`, top: `${(pos.y / 500) * 100}%` }}
               >
-                <div
-                  className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold shadow-lg transition-all ${
-                    isCurrent
-                      ? 'bg-[#14532D] text-white ring-3 ring-[#F59E0B]'
-                      : 'bg-white text-[#14532D] border border-gray-300 hover:bg-[#16A34A] hover:text-white'
-                  }`}
-                >
-                  <MapPin className="h-3.5 w-3.5 shrink-0" />
-                  <span>{priceFormatted}</span>
-                </div>
-                {/* Pulse ring for active pin */}
-                {isCurrent && (
-                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-[#F59E0B] animate-ping" />
-                )}
-              </div>
+                {city} ({count})
+              </button>
             )
           })}
         </div>
 
-        {/* Floating Map Controls */}
-        <div className="absolute top-4 right-4 flex flex-col gap-1.5 z-20">
+        {/* Map Type Switcher & Controls */}
+        <div className="absolute top-3 right-3 z-10 flex flex-col gap-1.5">
           <button
-            onClick={() => setZoomLevel((z) => Math.min(z + 0.2, 1.8))}
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-gray-700 shadow-md hover:bg-gray-50 active:bg-gray-100"
-            title="Zoom In"
+            onClick={() => setMapType((prev) => (prev === 'roadmap' ? 'hybrid' : 'roadmap'))}
+            className="flex h-8 items-center gap-1 rounded-lg bg-white/95 px-2 text-xs font-bold text-gray-700 shadow-md backdrop-blur-xs hover:bg-white"
+            title="Toggle Satellite / Hybrid View"
           >
-            <ZoomIn className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => setZoomLevel((z) => Math.max(z - 0.2, 0.8))}
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-gray-700 shadow-md hover:bg-gray-50 active:bg-gray-100"
-            title="Zoom Out"
-          >
-            <ZoomOut className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => setZoomLevel(1)}
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-gray-700 shadow-md hover:bg-gray-50 active:bg-gray-100"
-            title="Reset View"
-          >
-            <Layers className="h-4 w-4" />
+            <Layers className="h-3.5 w-3.5 text-[#16A34A]" />
+            <span className="hidden sm:inline">{mapType === 'roadmap' ? 'Satellite' : 'Roadmap'}</span>
           </button>
         </div>
 
-        {/* Legend Overlay at bottom-left */}
-        <div className="absolute bottom-3 left-3 rounded-lg bg-white/95 px-3 py-1.5 text-[10px] font-semibold text-gray-700 shadow-md backdrop-blur-xs flex items-center gap-3">
+        {/* Real Interactive Google Map */}
+        <div className="relative h-full w-full">
+          <APIProvider apiKey={apiKey} libraries={['marker']}>
+            <Map
+              mapId="DEMO_MAP_ID"
+              defaultCenter={initialCenter}
+              defaultZoom={properties.length > 3 ? 11 : 12}
+              mapTypeId={mapType}
+              gestureHandling="greedy"
+              disableDefaultUI={false}
+              zoomControl={true}
+              streetViewControl={true}
+              fullscreenControl={false}
+              internalUsageAttributionIds={['gmp_git_agentskills_v1']}
+              style={{ width: '100%', height: '100%' }}
+            >
+              <MapCameraHandler
+                targetPin={activePin}
+                cityTarget={selectedCity}
+                properties={displayedProperties}
+              />
+
+              {/* Render AdvancedMarker for every real PG listing */}
+              {displayedProperties.map((prop) => {
+                const isCurrent = activePin?.id === prop.id
+                const priceFormatted =
+                  prop.price >= 10000
+                    ? `₹${(prop.price / 1000).toFixed(1)}k`
+                    : `₹${(prop.price / 1000).toFixed(0)}k`
+
+                const lat = prop.coordinates?.lat || 28.5355
+                const lng = prop.coordinates?.lng || 77.3910
+
+                return (
+                  <AdvancedMarker
+                    key={prop.id}
+                    position={{ lat, lng }}
+                    onClick={() => handlePinClick(prop)}
+                    title={`${prop.title} - ₹${prop.price.toLocaleString('en-IN')}/mo`}
+                    zIndex={isCurrent ? 50 : 10}
+                  >
+                    <div
+                      className={`group flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold shadow-lg transition-transform cursor-pointer ${
+                        isCurrent
+                          ? 'bg-[#14532D] text-white ring-3 ring-[#F59E0B] scale-110'
+                          : 'bg-white text-[#14532D] border border-gray-300 hover:bg-[#16A34A] hover:text-white hover:scale-105'
+                      }`}
+                    >
+                      <MapPin className="h-3.5 w-3.5 shrink-0" />
+                      <span>{priceFormatted}</span>
+                      {isCurrent && (
+                        <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 h-2 w-2 rounded-full bg-[#F59E0B] animate-ping" />
+                      )}
+                    </div>
+                  </AdvancedMarker>
+                )
+              })}
+            </Map>
+          </APIProvider>
+        </div>
+
+        {/* Legend Overlay bottom-left */}
+        <div className="absolute bottom-3 left-3 z-10 flex items-center gap-3 rounded-lg bg-white/95 px-3 py-1.5 text-[10px] font-semibold text-gray-700 shadow-md backdrop-blur-xs">
           <div className="flex items-center gap-1">
             <span className="h-2 w-2 rounded-full bg-[#14532D]" />
-            <span>Active Space</span>
+            <span>Selected PG</span>
           </div>
           <div className="flex items-center gap-1">
             <span className="h-2 w-2 rounded-full bg-[#16A34A]" />
-            <span>Verified PGs</span>
+            <span>Verified PGs ({displayedProperties.length})</span>
           </div>
           <div className="flex items-center gap-1">
-            <span className="h-0.5 w-3 bg-[#16A34A] border-b border-dashed" />
-            <span>Metro Line</span>
+            <ShieldCheck className="h-3 w-3 text-[#16A34A]" />
+            <span>Direct Owner</span>
           </div>
         </div>
       </div>
 
-      {/* Right / Side Selected Property Preview Drawer */}
+      {/* Right Property Preview Drawer */}
       <div className="w-full lg:w-96 border-t lg:border-t-0 lg:border-l border-gray-200 bg-white p-4 flex flex-col justify-between overflow-y-auto">
         {activePin ? (
           <div>
@@ -249,8 +295,9 @@ export function MapDiscoveryModal({
               <span className="text-xs font-bold uppercase tracking-wider text-[#16A34A]">
                 Selected Property
               </span>
-              <span className="rounded-full bg-[#DCFCE7] px-2 py-0.5 text-[10px] font-bold text-[#14532D]">
-                Verified Space
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#DCFCE7] px-2 py-0.5 text-[10px] font-bold text-[#14532D]">
+                <ShieldCheck className="h-3 w-3 text-[#16A34A]" />
+                <span>Verified Space</span>
               </span>
             </div>
 
@@ -260,14 +307,19 @@ export function MapDiscoveryModal({
                 src={activePin.coverImage}
                 alt={activePin.title}
                 className="h-full w-full object-cover"
+                onError={(e) => {
+                  const target = e.currentTarget as HTMLImageElement
+                  target.src = 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=600&q=80'
+                }}
               />
               <div className="absolute top-2 right-2 flex items-center gap-1 rounded-md bg-white/90 px-1.5 py-0.5 text-[11px] font-bold text-gray-900 shadow-xs">
                 <Star className="h-3 w-3 fill-[#F59E0B] text-[#F59E0B]" />
-                <span>{activePin.rating.toFixed(1)}</span>
+                <span>{(activePin.rating || 4.8).toFixed(1)}</span>
+                <span className="text-[10px] text-gray-500">({activePin.reviewCount || 32})</span>
               </div>
             </div>
 
-            {/* Info */}
+            {/* Title and Address */}
             <div className="mt-3">
               <h4 className="text-sm font-bold text-[#17211B] line-clamp-1">{activePin.title}</h4>
               <p className="mt-0.5 text-xs text-[#647067] flex items-center gap-1">
@@ -287,7 +339,17 @@ export function MapDiscoveryModal({
                   <span className="text-xs text-[#647067]">/month</span>
                 </div>
                 <span className="text-[11px] font-medium text-gray-600">
-                  Dep: ₹{activePin.deposit.toLocaleString('en-IN')}
+                  Deposit: ₹{activePin.deposit.toLocaleString('en-IN')}
+                </span>
+              </div>
+
+              {/* Beds Availability */}
+              <div className="mt-2 flex items-center justify-between text-xs">
+                <span className="text-gray-600">
+                  Sharing: <strong className="text-gray-900">{activePin.sharingType}</strong>
+                </span>
+                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                  {activePin.availableBeds} of {activePin.totalBeds} Beds Free
                 </span>
               </div>
 
@@ -307,12 +369,12 @@ export function MapDiscoveryModal({
           </div>
         )}
 
-        {/* View Details Button */}
+        {/* View Details Action Button */}
         {activePin && (
           <div className="pt-3 border-t border-gray-100">
             <button
               onClick={() => onSelectProperty(activePin)}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] py-2.5 text-xs font-bold text-white shadow-xs hover:opacity-95"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] py-2.5 text-xs font-bold text-white shadow-xs hover:opacity-95 transition"
             >
               <span>View Complete Property Details</span>
               <ArrowRight className="h-3.5 w-3.5" />

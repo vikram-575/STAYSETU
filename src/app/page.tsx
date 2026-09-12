@@ -195,7 +195,11 @@ export default function MarketplaceHomePage() {
         <TrustSection />
 
         {/* 4. Popular Cities Grid */}
-        <PopularCities onSelectCity={setActiveCity} activeCity={activeCity} />
+        <PopularCities
+          properties={properties}
+          onSelectCity={setActiveCity}
+          activeCity={activeCity}
+        />
 
         {/* 5. Featured Properties Feed & Split Map */}
         <FeaturedListings

@@ -5,12 +5,15 @@ import Image from 'next/image'
 import { MapPin, ArrowRight, Building, Sparkles } from 'lucide-react'
 import { useWebsiteContent } from '@/context/website-content-context'
 
+import { PropertyListing } from '@/types/marketplace'
+
 interface PopularCitiesProps {
   onSelectCity: (cityName: string) => void
   activeCity?: string
+  properties?: PropertyListing[]
 }
 
-export function PopularCities({ onSelectCity, activeCity }: PopularCitiesProps) {
+export function PopularCities({ onSelectCity, activeCity, properties = [] }: PopularCitiesProps) {
   const { content } = useWebsiteContent()
   const citiesData = content?.cities
   const citiesList = citiesData?.cities || []
@@ -57,6 +60,21 @@ export function PopularCities({ onSelectCity, activeCity }: PopularCitiesProps) 
         <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {citiesList.map((city) => {
             const isSelected = activeCity === city.name
+
+            // Real dynamic data from database listings
+            const matchedProps = properties.filter(
+              (p) => p.city.toLowerCase() === city.name.toLowerCase()
+            )
+            const realListingCount = matchedProps.length > 0 ? matchedProps.length : city.listingCount
+            const realTotalBeds = matchedProps.reduce((sum, p) => sum + (p.totalBeds || 0), 0)
+            const realMinPrice = matchedProps.length > 0
+              ? Math.min(...matchedProps.map((p) => p.price))
+              : city.startingPrice
+
+            const displaySpaces = realTotalBeds > 0
+              ? `${realTotalBeds} Spaces`
+              : `${realListingCount} ${realListingCount === 1 ? 'PG' : 'PGs'}`
+
             return (
               <div
                 key={city.name}
@@ -74,12 +92,16 @@ export function PopularCities({ onSelectCity, activeCity }: PopularCitiesProps) 
                     alt={city.name}
                     className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                     loading="lazy"
+                    onError={(e) => {
+                      const target = e.currentTarget as HTMLImageElement
+                      target.src = 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=600&q=80'
+                    }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
 
                   {/* Starting Price Pill */}
                   <div className="absolute top-2 right-2 rounded-md bg-white/90 px-1.5 py-0.5 text-[10px] font-bold text-[#14532D] shadow-xs backdrop-blur-xs">
-                    From ₹{city.startingPrice.toLocaleString('en-IN')}/mo
+                    From ₹{realMinPrice.toLocaleString('en-IN')}/mo
                   </div>
 
                   {/* City Name & State Overlay */}
@@ -92,7 +114,7 @@ export function PopularCities({ onSelectCity, activeCity }: PopularCitiesProps) 
                 {/* Card Details Bottom */}
                 <div className="p-3">
                   <div className="flex items-center justify-between text-[11px] font-medium text-[#647067]">
-                    <span>{city.listingCount.toLocaleString('en-IN')} Spaces</span>
+                    <span className="font-semibold text-gray-800">{displaySpaces}</span>
                     <span className="text-[#16A34A] font-semibold group-hover:underline">Explore →</span>
                   </div>
                   <div className="mt-1.5 flex flex-wrap gap-1">
@@ -114,3 +136,4 @@ export function PopularCities({ onSelectCity, activeCity }: PopularCitiesProps) 
     </section>
   )
 }
+
