@@ -1,63 +1,75 @@
 import { NextResponse, type NextRequest } from 'next/server'
+import { processWhatsAppMessage } from '@/lib/whatsapp/bot-engine'
+import { sendWhatsAppMessage } from '@/lib/whatsapp/sender'
 
 interface BotRule {
   id: string
   triggerWords: string[]
   responseTemplate: string
-  category: 'Billing' | 'Wi-Fi' | 'Food' | 'Support'
+  category: 'Billing' | 'Wi-Fi' | 'Food' | 'Support' | 'Gate Pass' | 'Owner Insights'
   isActive: boolean
 }
 
-declare global {
-  // eslint-disable-next-line no-var
-  var __pgsetu_whatsapp_bot_rules__: BotRule[] | undefined
-}
-
-if (!global.__pgsetu_whatsapp_bot_rules__) {
-  global.__pgsetu_whatsapp_bot_rules__ = [
-    {
-      id: 'rule_01',
-      triggerWords: ['balance', 'rent', 'due', 'pending', 'fees', 'invoice'],
-      responseTemplate:
-        'Hi {{name}}! 👋 Your current outstanding rent balance is *₹{{balance}}* for Room {{room}}. You can pay instantly using our UPI handle: `pgsetu@icici` or via the tenant passbook portal: https://pgsetu.com/portal',
-      category: 'Billing',
-      isActive: true,
-    },
-    {
-      id: 'rule_02',
-      triggerWords: ['wifi', 'wi-fi', 'internet', 'password', 'speed'],
-      responseTemplate:
-        '📶 *PG-Setu High-Speed Fiber*\nSSID: `PG-SETU-5G-ZONE`\nPassword: `SecureStay@2025`\nFor router resets or low speeds, please reply with "Complaint".',
-      category: 'Wi-Fi',
-      isActive: true,
-    },
-    {
-      id: 'rule_03',
-      triggerWords: ['food', 'menu', 'dinner', 'lunch', 'breakfast', 'khana'],
-      responseTemplate:
-        '🍲 *Today\'s Mess Menu*\n• Breakfast: Poha with Peanuts & Mint Chutney\n• Lunch: Phulka Rotis, Dal Tadka, Aloo Gobhi & Steamed Jeera Rice\n• Dinner: Chapati, Paneer Butter Masala & Kheer Dessert\nEnjoy your meal! 🍽️',
-      category: 'Food',
-      isActive: true,
-    },
-    {
-      id: 'rule_04',
-      triggerWords: ['complaint', 'repair', 'plumber', 'ac', 'water', 'leak'],
-      responseTemplate:
-        '🛠️ Ticket Registered: #TKT-{{randomTicket}}\nOur maintenance team has been alerted for your room. A technician will visit within 2 hours. Track status on your portal: https://pgsetu.com/portal',
-      category: 'Support',
-      isActive: true,
-    },
-  ]
-}
+const DEFAULT_RULES: BotRule[] = [
+  {
+    id: 'rule_01',
+    triggerWords: ['balance', 'rent', 'due', 'pending', 'fees', 'invoice', 'bill'],
+    responseTemplate:
+      'Hi {{name}}! 👋 Your current outstanding rent balance is *₹{{balance}}* for Room {{room}}. You can pay instantly using our UPI handle: `pgsetu@icici` or via the tenant passbook portal: https://pgsetu.com/portal',
+    category: 'Billing',
+    isActive: true,
+  },
+  {
+    id: 'rule_02',
+    triggerWords: ['wifi', 'wi-fi', 'internet', 'password', 'speed'],
+    responseTemplate:
+      '📶 *PG-Setu High-Speed Fiber*\nSSID: `PG-SETU-HIGH-SPEED-5G`\nPassword: `SecureStay@2026`\nFor router resets or low speeds, please reply with "Complaint: Wi-Fi slow".',
+    category: 'Wi-Fi',
+    isActive: true,
+  },
+  {
+    id: 'rule_03',
+    triggerWords: ['food', 'menu', 'dinner', 'lunch', 'breakfast', 'khana'],
+    responseTemplate:
+      '🍲 *Today\'s Mess Menu*\n• Breakfast: Poha with Peanuts & Mint Chutney\n• Lunch: Phulka Rotis, Dal Tadka, Aloo Gobhi & Steamed Jeera Rice\n• Dinner: Chapati, Paneer Butter Masala & Gulab Jamun\nEnjoy your meal! 🍽️',
+    category: 'Food',
+    isActive: true,
+  },
+  {
+    id: 'rule_04',
+    triggerWords: ['complaint', 'repair', 'plumber', 'ac', 'water', 'leak', 'geyser'],
+    responseTemplate:
+      '🛠️ Ticket Registered: #TKT-{{randomTicket}}\nOur maintenance team has been alerted for your room. A technician will visit within 2 hours. Track status on your portal: https://pgsetu.com/portal',
+    category: 'Support',
+    isActive: true,
+  },
+  {
+    id: 'rule_05',
+    triggerWords: ['gate', 'pass', 'leave', 'night out', 'late', 'entry'],
+    responseTemplate:
+      '🎫 Digital Gate Pass Generated for {{name}} (Room {{room}}). Security Pass Code: 8492. Show this to the security guard upon entry.',
+    category: 'Gate Pass',
+    isActive: true,
+  },
+  {
+    id: 'rule_06',
+    triggerWords: ['occupancy', 'collections', 'defaulters', 'revenue'],
+    responseTemplate:
+      '📊 PG-Setu Owner Analytics: Live Bed Capacity, MTD Rent Collections, and Top Overdue Defaulters Summary.',
+    category: 'Owner Insights',
+    isActive: true,
+  },
+]
 
 export async function GET(request: NextRequest) {
   try {
-    const rules = global.__pgsetu_whatsapp_bot_rules__ || []
     return NextResponse.json({
       success: true,
-      rules,
-      webhookUrl: 'https://pgsetu.com/api/erp/whatsapp-bot',
+      rules: DEFAULT_RULES,
+      webhookUrl: 'https://pgsetu.com/api/whatsapp/webhook',
+      verifyToken: process.env.WHATSAPP_VERIFY_TOKEN || 'pgsetu_secure_webhook_token_2026',
       status: 'active',
+      cloudApiConfigured: Boolean(process.env.WHATSAPP_API_TOKEN && process.env.WHATSAPP_PHONE_ID),
     })
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || 'Failed to fetch bot rules' }, { status: 500 })
@@ -67,36 +79,42 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { message = '', residentName = 'Arjun Verma', roomNumber = '204-B' } = body
-    const rules = global.__pgsetu_whatsapp_bot_rules__ || []
+    const {
+      message = '',
+      phone = '9876543210',
+      residentName = 'Arjun Verma',
+      residentId = undefined,
+    } = body
 
-    const cleanMsg = message.toLowerCase().trim()
-    let matchedReply = ''
+    // Route through the real Bot Engine with Supabase connection & intent classification
+    const result = await processWhatsAppMessage({
+      phone,
+      message,
+      senderName: residentName,
+      residentId,
+    })
 
-    for (const rule of rules) {
-      if (!rule.isActive) continue
-      const hasMatch = rule.triggerWords.some((word) => cleanMsg.includes(word))
-      if (hasMatch) {
-        matchedReply = rule.responseTemplate
-          .replace('{{name}}', residentName)
-          .replace('{{room}}', roomNumber)
-          .replace('{{balance}}', '12,000')
-          .replace('{{randomTicket}}', Math.floor(1000 + Math.random() * 9000).toString())
-        break
-      }
-    }
-
-    if (!matchedReply) {
-      matchedReply = `Hello ${residentName}! I am your automated PG-Setu Assistant. 🤖\nYou can ask me:\n• *"What is my rent balance?"*\n• *"Send Wi-Fi password"*\n• *"Today's food menu"*\n• *"Register a maintenance complaint"*`
-    }
+    // Log outbound reply
+    await sendWhatsAppMessage({
+      to: phone,
+      text: result.replyText,
+      organizationId: result.residentData?.organizationId,
+      residentId: result.residentData?.id,
+    })
 
     return NextResponse.json({
       success: true,
+      senderPhone: result.senderPhone,
+      senderRole: result.senderRole,
+      intent: result.intent,
+      residentData: result.residentData,
       query: message,
-      reply: matchedReply,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      reply: result.replyText,
+      ticketCreated: result.ticketCreated,
+      timestamp: result.timestamp,
     })
   } catch (error: any) {
+    console.error('Bot processing failed in erp route:', error)
     return NextResponse.json({ error: error?.message || 'Bot processing failed' }, { status: 500 })
   }
 }
