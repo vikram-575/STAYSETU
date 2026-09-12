@@ -31,7 +31,10 @@ export default function InstantPgFloatingWidget() {
     pathname?.startsWith('/dashboard') ||
     pathname?.startsWith('/admin') ||
     pathname?.startsWith('/superman') ||
-    pathname?.startsWith('/superadmin')
+    pathname?.startsWith('/superadmin') ||
+    pathname?.startsWith('/login') ||
+    pathname?.startsWith('/register') ||
+    pathname?.startsWith('/set-password')
   ) {
     return null
   }
@@ -106,27 +109,28 @@ export default function InstantPgFloatingWidget() {
 
   return (
     <>
-      {/* FLOATING ACTION BUTTON (TRIGGER) */}
-      <div className="fixed bottom-5 right-5 z-40 select-none">
+      {/* FLOATING ACTION BUTTON (TRIGGER) - Sits cleanly above mobile bottom nav bar & safe area */}
+      <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-6 right-3 sm:right-6 z-40 select-none">
         <button
           onClick={() => setIsOpen(true)}
-          className="group relative flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:via-teal-500 hover:to-emerald-600 text-white font-black text-xs sm:text-sm rounded-full shadow-2xl shadow-emerald-700/40 hover:shadow-emerald-600/60 active:scale-95 transition-all duration-300 border-2 border-white/20 backdrop-blur-sm"
+          className="group relative flex items-center gap-2 sm:gap-3 px-3 py-2 sm:px-4 sm:py-3 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:via-teal-500 hover:to-emerald-600 text-white font-black text-xs sm:text-sm rounded-full shadow-2xl shadow-emerald-950/30 hover:shadow-emerald-600/50 active:scale-95 transition-all duration-300 border-2 border-white/25 backdrop-blur-sm cursor-pointer"
           title="Book Instant Verified PG"
+          aria-label="Get Instant PG"
         >
           {/* Beacon Pulse Ring */}
-          <span className="absolute -top-1 -right-1 flex h-4 w-4">
+          <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 sm:h-4 sm:w-4">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-4 w-4 bg-amber-500 border-2 border-white shadow-xs"></span>
+            <span className="relative inline-flex rounded-full h-3.5 w-3.5 sm:h-4 sm:w-4 bg-amber-500 border-2 border-white shadow-xs"></span>
           </span>
 
-          <div className="w-7 h-7 rounded-full bg-amber-400 text-emerald-950 flex items-center justify-center shadow-inner group-hover:rotate-12 transition-transform">
-            <Zap className="w-4 h-4 fill-emerald-950" />
+          <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-amber-400 text-emerald-950 flex items-center justify-center shadow-inner group-hover:rotate-12 transition-transform shrink-0">
+            <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-emerald-950" />
           </div>
 
-          <div className="text-left leading-tight pr-1">
+          <div className="text-left leading-tight pr-0.5 sm:pr-1">
             <div className="flex items-center gap-1.5">
-              <span>⚡ Get Instant PG</span>
-              <span className="hidden sm:inline-block px-1.5 py-0.2 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-300/25 text-amber-200 border border-amber-300/30">
+              <span className="font-extrabold tracking-tight">⚡ Instant PG</span>
+              <span className="hidden sm:inline-block px-1.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-300/25 text-amber-200 border border-amber-300/30">
                 15 MIN ALLOTMENT
               </span>
             </div>
@@ -139,16 +143,17 @@ export default function InstantPgFloatingWidget() {
 
       {/* POPUP MODAL DRAWER */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200 overscroll-contain">
           <div
-            className="relative w-full max-w-lg bg-white rounded-3xl border border-gray-200 shadow-2xl overflow-hidden max-h-[92vh] flex flex-col"
+            className="relative w-full max-w-lg bg-white rounded-3xl border border-gray-200 shadow-2xl overflow-hidden max-h-[90dvh] sm:max-h-[92vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-800 text-white p-5 sm:p-6 shrink-0 relative">
+            <div className="bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-800 text-white p-4 sm:p-6 shrink-0 relative">
               <button
                 onClick={handleReset}
-                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition"
+                className="absolute top-3.5 right-3.5 sm:top-4 sm:right-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition"
+                aria-label="Close dialog"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -163,16 +168,16 @@ export default function InstantPgFloatingWidget() {
                 </span>
               </div>
 
-              <h3 className="text-lg sm:text-xl font-black tracking-tight text-white">
+              <h3 className="text-base sm:text-xl font-black tracking-tight text-white">
                 ⚡ Get Instant Verified PG Allotment
               </h3>
-              <p className="text-xs text-emerald-100 mt-0.5">
+              <p className="text-[11px] sm:text-xs text-emerald-100 mt-0.5 leading-snug">
                 Fill your requirements & our centralized Super Admin team will match you with ready-to-move beds immediately.
               </p>
             </div>
 
             {/* Modal Body */}
-            <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4">
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-3.5 sm:space-y-4">
               {submittedData ? (
                 /* SUCCESS VIEW */
                 <div className="text-center py-6 space-y-4 animate-in zoom-in-95 duration-200">
