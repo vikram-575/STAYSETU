@@ -16,7 +16,7 @@ services:
       - key: NEXT_PUBLIC_SUPABASE_URL
         value: https://ouefslqwkxviijqtvgtv.supabase.co
       - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
-        sync: false
+        value: sb_publishable_Jvgcn9tD7UVUzxKoPN4UVw_7HZEePeG
       - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
         value: sb_publishable_Jvgcn9tD7UVUzxKoPN4UVw_7HZEePeG
       - key: SUPABASE_SERVICE_ROLE_KEY
