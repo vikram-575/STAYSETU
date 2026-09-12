@@ -105,6 +105,21 @@ export default function RegisterPage() {
             </Link>
           </div>
 
+          {/* Mobile OTP Fast-Track Banner */}
+          <Link
+            href="/login"
+            className="flex items-center justify-between p-3 rounded-2xl bg-gradient-to-r from-[#DCFCE7] to-[#DCFCE7]/40 border border-[#16A34A]/30 text-xs text-[#14532D] hover:bg-[#DCFCE7]/70 transition group"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-base">📱</span>
+              <div>
+                <span className="font-bold block">Sign In or Register with Mobile OTP</span>
+                <span className="text-[10px] text-[#166534]">Instant login if number exists, otherwise creates profile</span>
+              </div>
+            </div>
+            <ArrowRight className="h-4 w-4 text-[#16A34A] group-hover:translate-x-0.5 transition" />
+          </Link>
+
           <div className="border-b border-[#E5E7EB] pb-3.5">
             <span className="text-xs font-bold uppercase tracking-wider text-[#16A34A] block">PG Owner & Manager Sign Up</span>
             <p className="text-[11px] text-[#647067] mt-0.5">

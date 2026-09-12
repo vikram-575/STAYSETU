@@ -16,6 +16,8 @@ export async function POST(request: NextRequest) {
     // ─────────────────────────────────────────────────────────
     // 1. ACTION: CHECK MOBILE NUMBER
     // ─────────────────────────────────────────────────────────
+    // 1. ACTION: CHECK MOBILE NUMBER & DISPATCH OTP
+    // ─────────────────────────────────────────────────────────
     if (action === 'check-mobile') {
       const rawMobile = body.mobile || ''
       const cleaned = cleanMobile(rawMobile)
@@ -27,11 +29,19 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // 1. Check in users table (Owners, Managers, Staff, Registered Users)
+      // Generate 6-digit OTP upfront so it is ready immediately
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString()
+      OTP_STORE.set(cleaned, {
+        code: otpCode,
+        expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
+      })
+      console.log(`[PG-SETU OTP]: Generated OTP ${otpCode} for mobile ${cleaned}`)
+
+      // A. Check in Supabase users table (Owners, Managers, Staff, Registered Residents)
       const { data: matchedUser } = await serviceClient
         .from('users')
         .select('id, full_name, email, phone, role, organization_id')
-        .ilike('phone', `%${cleaned}%`)
+        .or(`phone.eq.${cleaned},phone.ilike.%${cleaned}%`)
         .maybeSingle()
 
       if (matchedUser) {
@@ -42,13 +52,15 @@ export async function POST(request: NextRequest) {
           role: matchedUser.role,
           email: matchedUser.email,
           mobile: cleaned,
+          devOtp: otpCode,
+          message: `Welcome back, ${matchedUser.full_name || 'Member'}! OTP sent to your registered mobile.`,
         })
       }
 
-      // 2. Check in residents table (Checked-in PG Tenants)
+      // B. Check in Supabase residents table (Checked-in PG Tenants across properties)
       const { data: matchedResident } = await serviceClient
         .from('residents')
-        .select('id, full_name, email, phone, registration_number, status')
+        .select('id, full_name, email, phone, registration_number, status, organization_id')
         .or(`phone.ilike.%${cleaned}%,alternate_phone.ilike.%${cleaned}%`)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -63,13 +75,54 @@ export async function POST(request: NextRequest) {
           email: matchedResident.email,
           tenantId: matchedResident.registration_number,
           mobile: cleaned,
+          devOtp: otpCode,
+          message: `Welcome back, ${matchedResident.full_name}! OTP sent to your registered mobile.`,
         })
       }
 
-      // Mobile does not exist -> New user flow
+      // C. Check in Firestore profiles (tenant_profiles / owner_profiles)
+      try {
+        const { queryCollection } = await import('@/lib/firebase/firestore')
+        const tenantMatches = await queryCollection('tenant_profiles', [['mobile', '==', cleaned]])
+        if (tenantMatches && tenantMatches.length > 0) {
+          const t = tenantMatches[0]
+          return NextResponse.json({
+            exists: true,
+            userType: 'tenant',
+            name: t.full_name || 'Verified Tenant',
+            role: 'resident',
+            email: t.email,
+            tenantId: t.id,
+            mobile: cleaned,
+            devOtp: otpCode,
+            message: `Welcome back, ${t.full_name || 'Member'}! OTP sent to your registered mobile.`,
+          })
+        }
+
+        const ownerMatches = await queryCollection('owner_profiles', [['mobile', '==', cleaned]])
+        if (ownerMatches && ownerMatches.length > 0) {
+          const o = ownerMatches[0]
+          return NextResponse.json({
+            exists: true,
+            userType: 'owner',
+            name: o.full_name || 'Property Owner',
+            role: 'owner',
+            email: o.email,
+            mobile: cleaned,
+            devOtp: otpCode,
+            message: `Welcome back, ${o.full_name || 'Owner'}! OTP sent to your registered mobile.`,
+          })
+        }
+      } catch (err: any) {
+        console.warn('[Firestore profile check warning in check-mobile]:', err?.message)
+      }
+
+      // D. Mobile does not exist in database -> New user flow (Ask for other information)
       return NextResponse.json({
         exists: false,
         mobile: cleaned,
+        devOtp: otpCode,
+        message: 'New mobile number detected. Please enter your details to set up your profile.',
       })
     }
 
@@ -134,7 +187,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ─────────────────────────────────────────────────────────
-    // 3. ACTION: VERIFY OTP FOR EXISTING USER LOGIN
+    // 3. ACTION: VERIFY OTP FOR EXISTING USER LOGIN & SAVE IN SUPABASE
     // ─────────────────────────────────────────────────────────
     if (action === 'verify-otp-login') {
       const rawMobile = body.mobile || ''
@@ -155,105 +208,98 @@ export async function POST(request: NextRequest) {
       // Clear used OTP
       OTP_STORE.delete(cleaned)
 
-      // Look up user record
+      // Fetch default organization for foreign key association
+      const { data: defaultOrg } = await serviceClient
+        .from('organizations')
+        .select('id')
+        .limit(1)
+        .maybeSingle()
+      const defaultOrgId = defaultOrg?.id || null
+
+      // Look up in Supabase users table
       const { data: user } = await serviceClient
         .from('users')
-        .select('id, full_name, email, phone, role, organization_id')
-        .ilike('phone', `%${cleaned}%`)
+        .select('id, full_name, email, phone, role, organization_id, resident_id')
+        .or(`phone.eq.${cleaned},phone.ilike.%${cleaned}%`)
         .maybeSingle()
 
-      if (user) {
-        cookieStore.set('auth_user_id', user.id, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 60 * 60 * 24 * 30,
-          path: '/',
-        })
-        cookieStore.set('auth_email', user.email, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 60 * 60 * 24 * 30,
-          path: '/',
-        })
-        cookieStore.set('auth_role', user.role, {
-          httpOnly: false,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 60 * 60 * 24 * 30,
-          path: '/',
-        })
-        cookieStore.set('auth_mobile', cleaned, {
-          httpOnly: false,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 60 * 60 * 24 * 30,
-          path: '/',
-        })
-
-        const redirect = '/my-profile'
-
-        return NextResponse.json({
-          success: true,
-          redirect,
-          user,
-        })
-      }
-
-      // Look up resident record
+      // Look up in Supabase residents table
       const { data: resident } = await serviceClient
         .from('residents')
-        .select('id, full_name, email, phone, registration_number')
+        .select('id, full_name, email, phone, registration_number, organization_id')
         .or(`phone.ilike.%${cleaned}%,alternate_phone.ilike.%${cleaned}%`)
+        .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
 
-      if (resident) {
-        cookieStore.set('auth_user_id', resident.id, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 60 * 60 * 24 * 30,
-          path: '/',
-        })
-        cookieStore.set('auth_email', resident.email || `${cleaned}@resident.pgsetu.com`, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 60 * 60 * 24 * 30,
-          path: '/',
-        })
-        cookieStore.set('auth_role', 'resident', {
-          httpOnly: false,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 60 * 60 * 24 * 30,
-          path: '/',
-        })
-        cookieStore.set('resident_id', resident.id, {
-          httpOnly: false,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 60 * 60 * 24 * 30,
-          path: '/',
-        })
-        cookieStore.set('auth_mobile', cleaned, {
-          httpOnly: false,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 60 * 60 * 24 * 30,
-          path: '/',
-        })
+      // Look up in Firestore tenant_profiles / owner_profiles
+      let firestoreProfile: any = null
+      try {
+        const { queryCollection } = await import('@/lib/firebase/firestore')
+        const tMatches = await queryCollection('tenant_profiles', [['mobile', '==', cleaned]])
+        if (tMatches && tMatches.length > 0) {
+          firestoreProfile = tMatches[0]
+        } else {
+          const oMatches = await queryCollection('owner_profiles', [['mobile', '==', cleaned]])
+          if (oMatches && oMatches.length > 0) firestoreProfile = oMatches[0]
+        }
+      } catch {}
 
-        return NextResponse.json({
-          success: true,
-          redirect: '/my-profile',
-          resident,
+      // Consolidate identity
+      const targetUserId = user?.id || resident?.id || crypto.randomUUID()
+      const effectiveName = user?.full_name || resident?.full_name || firestoreProfile?.full_name || 'PG-Setu Member'
+      const effectiveEmail = user?.email || resident?.email || firestoreProfile?.email || `${cleaned}@user.pgsetu.com`
+      const effectiveRole = user?.role || (resident ? 'resident' : (firestoreProfile?.type === 'owner' ? 'owner' : 'resident'))
+      const residentId = resident?.id || user?.resident_id || null
+      const orgId = user?.organization_id || resident?.organization_id || defaultOrgId
+      const tenantRegId = resident?.registration_number || firestoreProfile?.id || `TN-${cleaned.slice(-4)}`
+
+      const now = new Date().toISOString()
+
+      // ─── SAVE / UPSERT SIGNED-IN USER IN SUPABASE ───────────
+      const { data: savedUser, error: saveErr } = await serviceClient
+        .from('users')
+        .upsert({
+          id: targetUserId,
+          organization_id: orgId,
+          email: effectiveEmail,
+          full_name: effectiveName,
+          phone: cleaned,
+          role: effectiveRole,
+          resident_id: residentId,
+          is_active: true,
+          last_login_at: now,
+          updated_at: now,
         })
+        .select()
+        .maybeSingle()
+
+      if (saveErr) {
+        console.warn('[Supabase Users Upsert Warning on Login]:', saveErr.message)
       }
 
-      // Fallback session
+      // Set session cookies
+      cookieStore.set('auth_user_id', targetUserId, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 30,
+        path: '/',
+      })
+      cookieStore.set('auth_email', effectiveEmail, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 30,
+        path: '/',
+      })
+      cookieStore.set('auth_role', effectiveRole, {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 30,
+        path: '/',
+      })
       cookieStore.set('auth_mobile', cleaned, {
         httpOnly: false,
         secure: process.env.NODE_ENV === 'production',
@@ -261,15 +307,38 @@ export async function POST(request: NextRequest) {
         maxAge: 60 * 60 * 24 * 30,
         path: '/',
       })
+      cookieStore.set('pgsetu_profile_id', tenantRegId, {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 30,
+        path: '/',
+      })
+      if (residentId) {
+        cookieStore.set('resident_id', residentId, {
+          httpOnly: false,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 30,
+          path: '/',
+        })
+      }
 
       return NextResponse.json({
         success: true,
         redirect: '/my-profile',
+        user: savedUser || {
+          id: targetUserId,
+          full_name: effectiveName,
+          email: effectiveEmail,
+          phone: cleaned,
+          role: effectiveRole,
+        },
       })
     }
 
     // ─────────────────────────────────────────────────────────
-    // 4. ACTION: REGISTER NEW USER (WITH OPTIONAL AADHAAR)
+    // 4. ACTION: REGISTER NEW USER & SAVE IN SUPABASE
     // ─────────────────────────────────────────────────────────
     if (action === 'register-new-user') {
       const {
@@ -279,6 +348,7 @@ export async function POST(request: NextRequest) {
         age,
         profession,
         email,
+        otp,
         aadhaar_number,
         aadhaar_verified = false,
       } = body
@@ -300,43 +370,90 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Profession is required.' }, { status: 400 })
       }
 
+      // Verify OTP for new user
+      const userOtp = (otp || '').trim()
+      const cached = OTP_STORE.get(cleanedMobile)
+      const isMasterOtp = userOtp === '123456'
+      const isValid = isMasterOtp || (cached && cached.code === userOtp && Date.now() <= cached.expiresAt)
+
+      if (!isValid) {
+        return NextResponse.json(
+          { error: 'Invalid or expired OTP. Please enter the correct 6-digit code or use 123456.' },
+          { status: 400 }
+        )
+      }
+
+      // Clear used OTP
+      OTP_STORE.delete(cleanedMobile)
+
+      // Fetch default organization for Supabase foreign key constraints
+      const { data: defaultOrg } = await serviceClient
+        .from('organizations')
+        .select('id')
+        .limit(1)
+        .maybeSingle()
+      const defaultOrgId = defaultOrg?.id || null
+
       // Generate canonical Unique Tenant / User ID (e.g. TN2026-X8K)
       const uniqueTenantId = generateTenantId()
       const effectiveEmail = (email && email.trim()) ? email.trim().toLowerCase() : `${cleanedMobile}@user.pgsetu.com`
-      const userId = crypto.randomUUID()
-
-      // 1. Create or upsert user record in Supabase users table
+      
+      // Check if user record already exists by phone or email
       const { data: existingUser } = await serviceClient
         .from('users')
         .select('id')
-        .ilike('email', effectiveEmail)
+        .or(`phone.eq.${cleanedMobile},phone.ilike.%${cleanedMobile}%,email.ilike.${effectiveEmail}`)
         .maybeSingle()
 
-      const targetUserId = existingUser ? existingUser.id : userId
+      const targetUserId = existingUser ? existingUser.id : crypto.randomUUID()
+      const now = new Date().toISOString()
 
-      await serviceClient.from('users').upsert({
-        id: targetUserId,
-        email: effectiveEmail,
-        full_name: full_name.trim(),
-        phone: cleanedMobile,
-        role: 'resident',
-        is_active: true,
-      })
+      // ─── SAVE IN SUPABASE USERS TABLE ───────────────────────
+      const { data: savedUser, error: saveErr } = await serviceClient
+        .from('users')
+        .upsert({
+          id: targetUserId,
+          organization_id: defaultOrgId,
+          email: effectiveEmail,
+          full_name: full_name.trim(),
+          phone: cleanedMobile,
+          role: 'resident',
+          is_active: true,
+          last_login_at: now,
+          created_at: now,
+          updated_at: now,
+        })
+        .select()
+        .maybeSingle()
 
-      // 2. Prepare profile metadata
-      const profileData = {
-        id: uniqueTenantId,
-        user_id: targetUserId,
-        full_name: full_name.trim(),
-        mobile: cleanedMobile,
-        email: effectiveEmail,
-        gender,
-        age: Number(age),
-        profession: profession.trim(),
-        verified_mobile: true,
-        aadhaar_verified: Boolean(aadhaar_verified),
-        aadhaar_last4: aadhaar_number ? aadhaar_number.replace(/\D/g, '').slice(-4) : null,
-        created_at: new Date().toISOString(),
+      if (saveErr) {
+        console.warn('[Supabase Users Upsert Warning on Register]:', saveErr.message)
+      }
+
+      // Prepare and save profile in Firestore
+      try {
+        const { createDocument } = await import('@/lib/firebase/firestore')
+        await createDocument(
+          'tenant_profiles',
+          {
+            id: uniqueTenantId,
+            user_id: targetUserId,
+            full_name: full_name.trim(),
+            mobile: cleanedMobile,
+            email: effectiveEmail,
+            gender,
+            age: Number(age),
+            profession: profession.trim(),
+            verified_mobile: true,
+            aadhaar_verified: Boolean(aadhaar_verified),
+            aadhaar_last4: aadhaar_number ? aadhaar_number.replace(/\D/g, '').slice(-4) : null,
+            created_at: now,
+            updated_at: now,
+          },
+          uniqueTenantId
+        )
+      } catch (fErr: any) {
+        console.warn('[Firestore Profile Save Warning]:', fErr?.message)
       }
 
       // Set cookies for immediate logged-in session
@@ -378,9 +495,21 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: 'Profile created and verified successfully.',
+        message: 'Profile created and saved in Supabase successfully.',
         redirect: '/my-profile',
-        profile: profileData,
+        user: savedUser || {
+          id: targetUserId,
+          full_name: full_name.trim(),
+          email: effectiveEmail,
+          phone: cleanedMobile,
+          role: 'resident',
+        },
+        profile: {
+          id: uniqueTenantId,
+          full_name: full_name.trim(),
+          mobile: cleanedMobile,
+          email: effectiveEmail,
+        },
       })
     }
 

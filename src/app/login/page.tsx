@@ -73,7 +73,7 @@ function UnifiedLoginForm() {
 
     setLoading(true)
     try {
-      // Step A: Check if mobile exists
+      // Check if mobile exists in database & trigger OTP dispatch in single call
       const checkRes = await fetch('/api/auth/mobile-flow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -85,25 +85,18 @@ function UnifiedLoginForm() {
         throw new Error(checkData.error || 'Failed to verify mobile number.')
       }
 
-      // Send OTP
-      const otpRes = await fetch('/api/auth/mobile-flow', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'send-otp', mobile: cleaned }),
-      })
-      const otpData = await otpRes.json()
-      if (otpData.devOtp) {
-        setDevOtp(otpData.devOtp)
+      if (checkData.devOtp) {
+        setDevOtp(checkData.devOtp)
       }
 
       if (checkData.exists) {
-        // Existing user -> OTP login
+        // Existing user -> Directly ask for OTP!
         setExistingUserInfo(checkData)
-        setInfoMessage(`Welcome back! An OTP has been sent to +91 ${cleaned}`)
+        setInfoMessage(checkData.message || `Welcome back, ${checkData.name || 'Member'}! Enter the 6-digit OTP sent to +91 ${cleaned}`)
         setStep('existing_otp')
       } else {
-        // New user -> Details & Verification
-        setInfoMessage(`Verification code sent to +91 ${cleaned}`)
+        // New user -> Ask for other information!
+        setInfoMessage(checkData.message || `New member! Enter the OTP sent to +91 ${cleaned} and fill in your details to create your profile.`)
         setStep('new_details')
       }
     } catch (err: any) {
@@ -185,6 +178,7 @@ function UnifiedLoginForm() {
         body: JSON.stringify({
           action: 'register-new-user',
           mobile: cleaned,
+          otp: otp.trim(),
           full_name: fullName,
           gender,
           age: Number(age),
@@ -524,14 +518,32 @@ function UnifiedLoginForm() {
             </select>
           </div>
 
-          <button
-            type="submit"
-            disabled={!fullName.trim() || !gender || !age || !profession || otp.length < 6}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] py-3 text-sm font-bold text-white shadow-md hover:opacity-95 disabled:opacity-50 transition"
-          >
-            <span>Next: Identity Verification</span>
-            <ArrowRight className="h-4 w-4" />
-          </button>
+          <div className="space-y-2 pt-1">
+            <button
+              type="button"
+              onClick={() => handleFinalizeRegistration(true)}
+              disabled={loading || !fullName.trim() || !gender || !age || !profession || otp.length < 6}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] py-3 text-sm font-bold text-white shadow-md hover:opacity-95 disabled:opacity-50 transition"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <span>Complete & Create Profile</span>
+                  <Check className="h-4 w-4" />
+                </>
+              )}
+            </button>
+
+            <button
+              type="submit"
+              disabled={loading || !fullName.trim() || !gender || !age || !profession || otp.length < 6}
+              className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-gray-300 bg-white py-2.5 text-xs font-bold text-[#14532D] hover:bg-gray-50 transition"
+            >
+              <span>Optional: Verify Aadhaar ID (Instant Badge)</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
 
           <div className="text-center pt-1">
             <button
