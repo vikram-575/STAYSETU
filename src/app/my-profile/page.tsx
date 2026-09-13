@@ -120,10 +120,10 @@ function MyProfileContent() {
 
   const totalRentFormatted = passbookSummary
     ? `₹${(passbookSummary.total_rent_paid_paise / 100).toLocaleString('en-IN')}`
-    : '₹1,16,500'
+    : '₹0'
   const activeDepositFormatted = passbookSummary
     ? `₹${(passbookSummary.active_deposits_paise / 100).toLocaleString('en-IN')}`
-    : '₹19,000'
+    : '₹0'
   const outstandingDueFormatted = passbookSummary
     ? `₹${(passbookSummary.total_due_paise / 100).toLocaleString('en-IN')}`
     : '₹0'
@@ -137,7 +137,10 @@ function MyProfileContent() {
   }
 
   const handleShareIdCard = async () => {
-    const shareText = `PG-Setu Digital Tenant Pass\nName: ${currentUser?.full_name || 'Tenant'}\nUniversal ID: ${uniqueId}\nStay: ${activeStay?.property_name || 'PG-Setu Co-Living'}\nRoom: ${activeStay?.room_number || 'Room 304'}\nStatus: Verified Resident`
+    const roomInfo = activeStay?.room_number
+      ? `${activeStay.room_number}${activeStay.bed_label ? ` (${activeStay.bed_label})` : ''}`
+      : 'Pending Room Allotment'
+    const shareText = `PG-Setu Digital Tenant Pass\nName: ${currentUser?.full_name || 'Tenant'}\nUniversal ID: ${uniqueId}\nStay: ${activeStay?.property_name || 'PG-Setu Network'}\nRoom: ${roomInfo}\nStatus: Verified Resident`
     if (navigator.share) {
       try {
         await navigator.share({
@@ -483,11 +486,13 @@ function MyProfileContent() {
             <div className="flex items-center gap-1.5 text-emerald-200 text-[11px]">
               <Home className="h-3.5 w-3.5 text-emerald-300 shrink-0" />
               <span className="font-semibold text-white">
-                {activeStay?.property_name || 'PG-Setu Co-Living'}
+                {activeStay?.property_name || 'PG-Setu Member'}
               </span>
               <span className="text-white/40">•</span>
               <span className="font-bold text-emerald-300">
-                {activeStay?.room_number || 'Room 304'} ({activeStay?.bed_label || 'Bed A'})
+                {activeStay?.room_number
+                  ? `${activeStay.room_number} (${activeStay.bed_label || 'Bed A'})`
+                  : 'Pending Room Assignment'}
               </span>
             </div>
 
@@ -760,27 +765,56 @@ function MyProfileContent() {
                   <div className="rounded-xl bg-white/80 p-2 border border-emerald-100">
                     <span className="text-[10px] text-gray-400 uppercase font-bold block">Room & Bed</span>
                     <span className="font-bold text-gray-800 text-xs mt-0.5 block">
-                      {activeStay.room_number} • {activeStay.bed_label}
+                      {activeStay.room_number ? `${activeStay.room_number} • ${activeStay.bed_label || 'Bed A'}` : 'Pending Allotment'}
                     </span>
                   </div>
                   <div className="rounded-xl bg-white/80 p-2 border border-emerald-100">
                     <span className="text-[10px] text-gray-400 uppercase font-bold block">Monthly Rent</span>
                     <span className="font-bold text-gray-800 text-xs mt-0.5 block">
-                      ₹{((activeStay.monthly_rent_paise || 950000) / 100).toLocaleString('en-IN')}
+                      {activeStay.monthly_rent_paise ? `₹${((activeStay.monthly_rent_paise) / 100).toLocaleString('en-IN')}` : '₹0'}
                     </span>
                   </div>
                   <div className="rounded-xl bg-white/80 p-2 border border-emerald-100">
                     <span className="text-[10px] text-gray-400 uppercase font-bold block">Check-In</span>
                     <span className="font-bold text-gray-800 text-xs mt-0.5 block">
-                      {activeStay.check_in_date || '10 Jan 2025'}
+                      {activeStay.check_in_date || 'Pending'}
                     </span>
                   </div>
                   <div className="rounded-xl bg-white/80 p-2 border border-emerald-100">
                     <span className="text-[10px] text-gray-400 uppercase font-bold block">Escrow Deposit</span>
                     <span className="font-bold text-[#14532D] text-xs mt-0.5 block">
-                      ₹{((activeStay.deposit_held_paise || 1900000) / 100).toLocaleString('en-IN')}
+                      {activeStay.deposit_held_paise ? `₹${((activeStay.deposit_held_paise) / 100).toLocaleString('en-IN')}` : '₹0'}
                     </span>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Empty State when no stays registered */}
+            {stays.length === 0 && (
+              <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50/60 p-6 text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+                  <Building2 className="h-6 w-6" />
+                </div>
+                <h3 className="mt-3 text-sm font-bold text-gray-900">No Active Stay Allotted</h3>
+                <p className="mt-1 text-xs text-gray-500 max-w-sm mx-auto">
+                  You are registered as a verified PG-Setu Member. Once your PG manager assigns your room and bed, your stay pass and rent ledger will appear here.
+                </p>
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                  <Link
+                    href="/"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#166534] transition"
+                  >
+                    <span>Explore Verified PGs</span>
+                  </Link>
+                  <a
+                    href="https://wa.me/919453522757?text=Hi%20PG-Setu,%20please%20help%20me%20with%20my%20stay%20allotment"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50 transition"
+                  >
+                    <span>Contact Support</span>
+                  </a>
                 </div>
               </div>
             )}
@@ -850,66 +884,78 @@ function MyProfileContent() {
 
             {/* Mobile Native Transaction Cards */}
             <div className="space-y-2.5">
-              {filteredTransactions.map((txn: any) => {
-                const isRefund = txn.amount_paise < 0
-                return (
-                  <div
-                    key={txn.id}
-                    className="rounded-2xl border border-gray-200/80 bg-white p-3.5 shadow-xs hover:border-gray-300 transition space-y-2.5"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-start gap-2.5">
-                        <div
-                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-                            isRefund
-                              ? 'bg-blue-50 text-blue-700'
-                              : 'bg-emerald-50 text-emerald-700'
-                          }`}
-                        >
-                          <Receipt className="h-4 w-4" />
+              {filteredTransactions.length === 0 ? (
+                <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50/60 p-6 text-center">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+                    <Receipt className="h-6 w-6" />
+                  </div>
+                  <h3 className="mt-3 text-sm font-bold text-gray-900">No Transactions Found</h3>
+                  <p className="mt-1 text-xs text-gray-500 max-w-sm mx-auto">
+                    Rent receipts, utility adjustments, and deposit clearances will appear here once recorded.
+                  </p>
+                </div>
+              ) : (
+                filteredTransactions.map((txn: any) => {
+                  const isRefund = txn.amount_paise < 0
+                  return (
+                    <div
+                      key={txn.id}
+                      className="rounded-2xl border border-gray-200/80 bg-white p-3.5 shadow-xs hover:border-gray-300 transition space-y-2.5"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-2.5">
+                          <div
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                              isRefund
+                                ? 'bg-blue-50 text-blue-700'
+                                : 'bg-emerald-50 text-emerald-700'
+                            }`}
+                          >
+                            <Receipt className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-bold text-gray-900 leading-snug">
+                              {txn.description}
+                            </h4>
+                            <span className="text-[10px] text-gray-400 block mt-0.5">
+                              {txn.property} • {txn.date}
+                            </span>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="text-xs font-bold text-gray-900 leading-snug">
-                            {txn.description}
-                          </h4>
-                          <span className="text-[10px] text-gray-400 block mt-0.5">
-                            {txn.property} • {txn.date}
+
+                        <div className="text-right shrink-0">
+                          <span
+                            className={`text-sm font-black block ${
+                              isRefund ? 'text-blue-700' : 'text-gray-900'
+                            }`}
+                          >
+                            {isRefund ? '-' : ''}₹{Math.abs(txn.amount_paise / 100).toLocaleString('en-IN')}
+                          </span>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-800 px-2 py-0.2 text-[9px] font-bold">
+                            <Check className="h-2.5 w-2.5" />
+                            {txn.status}
                           </span>
                         </div>
                       </div>
 
-                      <div className="text-right shrink-0">
-                        <span
-                          className={`text-sm font-black block ${
-                            isRefund ? 'text-blue-700' : 'text-gray-900'
-                          }`}
+                      <div className="flex items-center justify-between pt-2 border-t border-gray-100 text-xs">
+                        <span className="inline-flex items-center gap-1 text-[11px] text-gray-500 font-medium">
+                          <CreditCard className="h-3 w-3 text-gray-400" />
+                          <span>{txn.payment_mode}</span>
+                        </span>
+
+                        <button
+                          onClick={() => handleDownloadReceipt(txn.receipt_id)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1 text-[11px] font-bold text-gray-700 hover:bg-gray-100 active:scale-95 transition"
                         >
-                          {isRefund ? '-' : ''}₹{Math.abs(txn.amount_paise / 100).toLocaleString('en-IN')}
-                        </span>
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-800 px-2 py-0.2 text-[9px] font-bold">
-                          <Check className="h-2.5 w-2.5" />
-                          {txn.status}
-                        </span>
+                          <Download className="h-3 w-3 text-gray-500" />
+                          <span>{receiptDownloaded === txn.receipt_id ? 'Downloaded!' : 'Receipt'}</span>
+                        </button>
                       </div>
                     </div>
-
-                    <div className="flex items-center justify-between pt-2 border-t border-gray-100 text-xs">
-                      <span className="inline-flex items-center gap-1 text-[11px] text-gray-500 font-medium">
-                        <CreditCard className="h-3 w-3 text-gray-400" />
-                        <span>{txn.payment_mode}</span>
-                      </span>
-
-                      <button
-                        onClick={() => handleDownloadReceipt(txn.receipt_id)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1 text-[11px] font-bold text-gray-700 hover:bg-gray-100 active:scale-95 transition"
-                      >
-                        <Download className="h-3 w-3 text-gray-500" />
-                        <span>{receiptDownloaded === txn.receipt_id ? 'Downloaded!' : 'Receipt'}</span>
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
+                  )
+                })
+              )}
             </div>
           </div>
         )}
@@ -919,64 +965,83 @@ function MyProfileContent() {
         {/* ────────────────────────────────────────────────────────── */}
         {activeTab === 'stays' && (
           <div className="space-y-3">
-            {stays.map((stay: any, idx: number) => {
-              const isActive = stay.status === 'active'
-              return (
-                <div
-                  key={stay.id || idx}
-                  className={`rounded-3xl border bg-white p-4 sm:p-6 shadow-xs space-y-3 transition ${
-                    isActive ? 'border-emerald-300 ring-1 ring-emerald-100' : 'border-gray-200/80'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                        isActive
-                          ? 'bg-[#DCFCE7] text-[#14532D]'
-                          : 'bg-gray-100 text-gray-600'
-                      }`}
-                    >
-                      {isActive ? '● Currently Active Stay' : 'Completed Stay'}
-                    </span>
-                    <span className="text-[11px] font-mono text-gray-400">
-                      Ref: {stay.registration_number || `TN-STAY-${idx + 1}`}
-                    </span>
-                  </div>
+            {stays.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50/60 p-6 text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+                  <Building2 className="h-6 w-6" />
+                </div>
+                <h3 className="mt-3 text-sm font-bold text-gray-900">No Stays Found</h3>
+                <p className="mt-1 text-xs text-gray-500 max-w-sm mx-auto">
+                  You haven't been assigned to a PG room yet. Once checked in by your property manager, your stay history and agreement details will appear here.
+                </p>
+                <div className="mt-4">
+                  <Link
+                    href="/"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#166534] transition"
+                  >
+                    <span>Browse PG Listings</span>
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              stays.map((stay: any, idx: number) => {
+                const isActive = stay.status === 'active'
+                return (
+                  <div
+                    key={stay.id || idx}
+                    className={`rounded-3xl border bg-white p-4 sm:p-6 shadow-xs space-y-3 transition ${
+                      isActive ? 'border-emerald-300 ring-1 ring-emerald-100' : 'border-gray-200/80'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                          isActive
+                            ? 'bg-[#DCFCE7] text-[#14532D]'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}
+                      >
+                        {isActive ? '● Currently Active Stay' : 'Completed Stay'}
+                      </span>
+                      <span className="text-[11px] font-mono text-gray-400">
+                        Ref: {stay.registration_number || `TN-STAY-${idx + 1}`}
+                      </span>
+                    </div>
 
-                  <div>
-                    <h3 className="text-base font-black text-gray-900">{stay.property_name}</h3>
-                    <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                      <MapPin className="h-3 w-3 text-gray-400 shrink-0" />
-                      <span>{stay.address || stay.city}</span>
-                    </p>
-                  </div>
+                    <div>
+                      <h3 className="text-base font-black text-gray-900">{stay.property_name}</h3>
+                      <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                        <MapPin className="h-3 w-3 text-gray-400 shrink-0" />
+                        <span>{stay.address || stay.city}</span>
+                      </p>
+                    </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                    <div className="rounded-xl bg-gray-50 p-2">
-                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Room & Bed</span>
-                      <span className="font-bold text-gray-800 text-xs block mt-0.5">
-                        {stay.room_number} • {stay.bed_label}
-                      </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                      <div className="rounded-xl bg-gray-50 p-2">
+                        <span className="text-[10px] text-gray-400 uppercase font-bold block">Room & Bed</span>
+                        <span className="font-bold text-gray-800 text-xs block mt-0.5">
+                          {stay.room_number ? `${stay.room_number} • ${stay.bed_label || 'Bed A'}` : 'Pending Allotment'}
+                        </span>
+                      </div>
+                      <div className="rounded-xl bg-gray-50 p-2">
+                        <span className="text-[10px] text-gray-400 uppercase font-bold block">Check-In</span>
+                        <span className="font-bold text-gray-800 text-xs block mt-0.5">
+                          {stay.check_in_date || 'Pending'}
+                        </span>
+                      </div>
+                      <div className="rounded-xl bg-gray-50 p-2">
+                        <span className="text-[10px] text-gray-400 uppercase font-bold block">Monthly Rent</span>
+                        <span className="font-bold text-gray-800 text-xs block mt-0.5">
+                          {stay.monthly_rent_paise ? `₹${((stay.monthly_rent_paise) / 100).toLocaleString('en-IN')}/mo` : '₹0/mo'}
+                        </span>
+                      </div>
+                      <div className="rounded-xl bg-gray-50 p-2">
+                        <span className="text-[10px] text-gray-400 uppercase font-bold block">Escrow Deposit</span>
+                        <span className="font-bold text-[#14532D] text-xs block mt-0.5">
+                          {stay.deposit_held_paise ? `₹${((stay.deposit_held_paise) / 100).toLocaleString('en-IN')}` : '₹0'}
+                        </span>
+                      </div>
                     </div>
-                    <div className="rounded-xl bg-gray-50 p-2">
-                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Check-In</span>
-                      <span className="font-bold text-gray-800 text-xs block mt-0.5">
-                        {stay.check_in_date || '15 Jan 2025'}
-                      </span>
-                    </div>
-                    <div className="rounded-xl bg-gray-50 p-2">
-                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Monthly Rent</span>
-                      <span className="font-bold text-gray-800 text-xs block mt-0.5">
-                        ₹{((stay.monthly_rent_paise || 850000) / 100).toLocaleString('en-IN')}/mo
-                      </span>
-                    </div>
-                    <div className="rounded-xl bg-gray-50 p-2">
-                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Escrow Deposit</span>
-                      <span className="font-bold text-[#14532D] text-xs block mt-0.5">
-                        ₹{((stay.deposit_held_paise || 1700000) / 100).toLocaleString('en-IN')}
-                      </span>
-                    </div>
-                  </div>
 
                   <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-gray-100">
                     <Link
@@ -1002,7 +1067,7 @@ function MyProfileContent() {
                   </div>
                 </div>
               )
-            })}
+            }))}
           </div>
         )}
 
@@ -1524,16 +1589,16 @@ function MyProfileContent() {
             <div className="rounded-2xl bg-gray-50 p-4 border border-gray-200 text-center my-3">
               <span className="text-[10px] text-gray-400 uppercase font-bold block">Current Monthly Rent Due</span>
               <span className="text-2xl font-black text-gray-900 block mt-0.5">
-                ₹{((activeStay?.monthly_rent_paise || 950000) / 100).toLocaleString('en-IN')}
+                ₹{((activeStay?.monthly_rent_paise || 0) / 100).toLocaleString('en-IN')}
               </span>
               <span className="text-[11px] text-emerald-700 font-semibold block mt-0.5">
-                For {activeStay?.property_name || 'PG-Setu Co-Living'} ({activeStay?.room_number || 'Room 304'})
+                For {activeStay?.property_name || 'PG-Setu Member'} ({activeStay?.room_number || 'Room Pending'})
               </span>
             </div>
 
             <div className="space-y-2">
               <a
-                href={`upi://pay?pa=pgsetu@icici&pn=PGSetu%20Residency&am=${(activeStay?.monthly_rent_paise || 950000) / 100}&cu=INR&tn=Rent%20Settlement`}
+                href={`upi://pay?pa=pgsetu@icici&pn=PGSetu%20Residency&am=${(activeStay?.monthly_rent_paise || 0) / 100}&cu=INR&tn=Rent%20Settlement`}
                 className="w-full py-3 rounded-2xl bg-gradient-to-r from-[#14532D] to-[#16A34A] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-xs active:scale-95 transition"
               >
                 <Smartphone className="h-4 w-4" />
@@ -1591,7 +1656,7 @@ function MyProfileContent() {
                   #{generatedPassCode}
                 </span>
                 <p className="text-xs text-emerald-700">
-                  Visitor <strong>{visitorName || 'Guest'}</strong> can show this code at the security gate for instant access to {activeStay?.room_number || 'Room 304'}.
+                  Visitor <strong>{visitorName || 'Guest'}</strong> can show this code at the security gate for instant access to {activeStay?.room_number || 'your room'}.
                 </p>
                 <button
                   onClick={() => {
