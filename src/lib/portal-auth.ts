@@ -1,6 +1,8 @@
 import crypto from 'crypto'
 import { cookies } from 'next/headers'
 
+import { SUPABASE_SECRET_KEY, SUPABASE_PUBLISHABLE_KEY } from './supabase/config'
+
 export interface PortalTokenPayload {
   residentId: string
   orgId: string
@@ -9,8 +11,10 @@ export interface PortalTokenPayload {
 }
 
 const PORTAL_SECRET =
+  process.env.SUPABASE_SECRET_KEY ||
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  SUPABASE_SECRET_KEY ||
+  SUPABASE_PUBLISHABLE_KEY ||
   'pgsetu-resident-portal-secret-token-key-2026'
 
 /**

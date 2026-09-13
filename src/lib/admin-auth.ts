@@ -1,6 +1,8 @@
 import { cookies } from 'next/headers'
 import type { NextRequest } from 'next/server'
 
+import { SUPABASE_SECRET_KEY, SUPABASE_PUBLISHABLE_KEY } from './supabase/config'
+
 export interface AdminTokenPayload {
   email: string
   role: 'superadmin'
@@ -9,8 +11,10 @@ export interface AdminTokenPayload {
 
 const ADMIN_SECRET =
   process.env.ADMIN_SESSION_SECRET ||
+  process.env.SUPABASE_SECRET_KEY ||
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  SUPABASE_SECRET_KEY ||
+  SUPABASE_PUBLISHABLE_KEY ||
   'pgsetu-master-superadmin-secret-key-2026'
 
 export const SUPER_ADMIN_EMAIL = (process.env.SUPER_ADMIN_EMAIL || 'vikramtomar0505@gmail.com').toLowerCase().trim()

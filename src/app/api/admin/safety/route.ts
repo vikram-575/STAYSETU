@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/supabase/config'
 import { isSuperAdminFromRequest } from '@/lib/admin-auth'
 
 async function requireSuperAdmin(request: NextRequest) {
@@ -7,8 +8,8 @@ async function requireSuperAdmin(request: NextRequest) {
   try {
     const { createServerClient } = await import('@supabase/ssr')
     const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      SUPABASE_URL,
+      SUPABASE_ANON_KEY,
       { cookies: { getAll: () => request.cookies.getAll(), setAll: () => {} } }
     )
     const { data: { user } } = await supabase.auth.getUser()

@@ -13,6 +13,14 @@ services:
         value: PG-SETU
       - key: NEXT_PUBLIC_APP_URL
         value: https://pgsetu.onrender.com
+      - key: SUPABASE_URL
+        value: https://ouefslqwkxviijqtvgtv.supabase.co
+      - key: SUPABASE_PUBLISHABLE_KEY
+        value: sb_publishable_Jvgcn9tD7UVUzxKoPN4UVw_7HZEePeG
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: SUPABASE_JWKS_URL
+        value: https://ouefslqwkxviijqtvgtv.supabase.co/auth/v1/.well-known/jwks.json
       - key: NEXT_PUBLIC_SUPABASE_URL
         value: https://ouefslqwkxviijqtvgtv.supabase.co
       - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
