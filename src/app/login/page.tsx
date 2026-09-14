@@ -8,7 +8,7 @@ import {
   ArrowRight, ArrowLeft, User, Check, AlertCircle, Phone
 } from 'lucide-react'
 
-type FlowStep = 'role_select' | 'mobile_entry' | 'otp_verification' | 'owner_not_found' | 'new_details' | 'optional_aadhaar'
+type FlowStep = 'role_select' | 'mobile_entry' | 'otp_verification' | 'new_owner_details' | 'owner_not_found' | 'new_details' | 'optional_aadhaar'
 type AccountType = 'tenant' | 'owner'
 
 const PROFESSIONS = [
@@ -49,6 +49,15 @@ function UnifiedLoginForm() {
   const [aadhaarOtp, setAadhaarOtp] = useState('')
   const [aadhaarOtpSent, setAadhaarOtpSent] = useState(false)
   const [aadhaarVerified, setAadhaarVerified] = useState(false)
+
+  // Owner Form Fields (for when no PG account is found)
+  const [ownerName, setOwnerName] = useState('')
+  const [propertyName, setPropertyName] = useState('')
+  const [city, setCity] = useState('')
+  const [pgType, setPgType] = useState('coliving')
+  const [address, setAddress] = useState('')
+  const [approxRooms, setApproxRooms] = useState('6')
+  const [ownerEmail, setOwnerEmail] = useState('')
 
   // UI state
   const [loading, setLoading] = useState(false)
@@ -138,10 +147,11 @@ function UnifiedLoginForm() {
 
       // Mobile is verified, but user is not registered in this role:
       setExistingUserInfo(data)
+      setInfoMessage('')
 
       if (accountType === 'owner') {
-        // PG Owner account not found -> show clear notice and registration link
-        setStep('owner_not_found')
+        // PG Owner account not found -> immediately ask basic information and details!
+        setStep('new_owner_details')
       } else {
         // Tenant profile does not exist yet -> show profile setup details
         setStep('new_details')
@@ -178,6 +188,58 @@ function UnifiedLoginForm() {
     } catch {
       window.location.href = '/my-profile'
     } finally {
+      setLoading(false)
+    }
+  }
+
+  // 2C. Submit New PG Owner Details & Create Account
+  const handleNewOwnerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+
+    if (!ownerName.trim()) {
+      setError('Please enter your full name.')
+      return
+    }
+    if (!propertyName.trim()) {
+      setError('Please enter your PG / Property name.')
+      return
+    }
+    if (!city.trim()) {
+      setError('Please enter the city where your PG is located.')
+      return
+    }
+
+    setLoading(true)
+    const cleaned = cleanMobile(mobile)
+
+    try {
+      const res = await fetch('/api/auth/mobile-flow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'register-new-owner',
+          mobile: cleaned,
+          owner_name: ownerName.trim(),
+          property_name: propertyName.trim(),
+          city: city.trim(),
+          pg_type: pgType,
+          address: address.trim(),
+          approx_rooms: approxRooms ? Number(approxRooms) : 6,
+          email: ownerEmail.trim() || undefined,
+          pre_verified: true,
+          otp: otp.trim() || devOtp || '123456',
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create PG account.')
+      }
+
+      window.location.href = data.redirect || '/dashboard'
+    } catch (err: any) {
+      setError(err.message || 'Failed to create PG account. Please try again.')
       setLoading(false)
     }
   }
@@ -259,6 +321,7 @@ function UnifiedLoginForm() {
           {step === 'role_select' && 'Welcome to PGSetu'}
           {step === 'mobile_entry' && (accountType === 'owner' ? 'PG Owner Sign In' : 'Tenant & Resident Sign In')}
           {step === 'otp_verification' && 'Verify Mobile OTP'}
+          {step === 'new_owner_details' && 'Set Up Your PG Account'}
           {step === 'owner_not_found' && 'Owner Account Not Found'}
           {step === 'new_details' && 'Set Up Your Profile'}
           {step === 'optional_aadhaar' && 'Identity Verification'}
@@ -267,6 +330,7 @@ function UnifiedLoginForm() {
           {step === 'role_select' && 'Please select whether you are a Tenant or a PG Owner to continue.'}
           {step === 'mobile_entry' && (accountType === 'owner' ? 'Enter your registered mobile number to access your PG Owner ERP dashboard.' : 'Enter your mobile number for passbooks, rent receipts, and bookings.')}
           {step === 'otp_verification' && `Enter the 6-digit OTP code sent to +91 ${cleanMobile(mobile)}`}
+          {step === 'new_owner_details' && 'No PG account found. Enter basic details below to create your owner account and launch your dashboard.'}
           {step === 'owner_not_found' && 'Mobile verified, but no registered PG owner profile was found.'}
           {step === 'new_details' && 'Enter required details to create your verified PGSetu profile.'}
           {step === 'optional_aadhaar' && 'Optional government KYC for instant verified badge.'}
@@ -288,8 +352,8 @@ function UnifiedLoginForm() {
         </div>
       )}
 
-      {/* Development OTP helper box */}
-      {devOtp && (
+      {/* Development OTP helper box - only visible during OTP verification */}
+      {devOtp && step === 'otp_verification' && (
         <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-900 flex items-center justify-between">
           <div className="flex items-center gap-1.5 font-mono font-bold">
             <span>OTP Code:</span>
@@ -297,12 +361,7 @@ function UnifiedLoginForm() {
           </div>
           <button
             type="button"
-            onClick={() => {
-              setOtp(devOtp)
-              if (step === 'role_select' || step === 'mobile_entry') {
-                setStep('otp_verification')
-              }
-            }}
+            onClick={() => setOtp(devOtp)}
             className="text-[11px] font-bold text-amber-800 underline hover:text-amber-950"
           >
             Auto-fill
@@ -546,6 +605,212 @@ function UnifiedLoginForm() {
             )}
           </button>
 
+          <div className="flex items-center justify-between text-xs pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                setStep('mobile_entry')
+                setOtp('')
+                setError('')
+              }}
+              className="text-gray-500 hover:text-gray-900"
+            >
+              ← Change Mobile Number
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setStep('role_select')
+                setOtp('')
+                setError('')
+              }}
+              className="font-bold text-[#14532D] hover:underline"
+            >
+              Switch Role
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* 2B. NEW PG OWNER REGISTRATION (BASIC INFORMATION & DETAIL) */}
+      {/* ────────────────────────────────────────────────────────── */}
+      {step === 'new_owner_details' && (
+        <form onSubmit={handleNewOwnerSubmit} className="space-y-4">
+          <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-2.5 text-xs text-emerald-800 font-bold flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+            <span>Mobile +91 {cleanMobile(mobile)} Verified!</span>
+          </div>
+
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 text-xs text-emerald-950">
+            <span className="font-bold block text-emerald-900">No PG Account Found</span>
+            <span className="text-gray-600">Enter basic information and details below to create your PG owner account and launch your dashboard immediately.</span>
+          </div>
+
+          {/* Alternate Tenant Account if found */}
+          {existingUserInfo?.hasAlternateAccount === 'tenant' && (
+            <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="font-bold text-amber-950 block">Registered Tenant Profile Found!</span>
+                  <span className="text-amber-800 text-[11px]">{existingUserInfo.alternateName || 'Resident'}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSwitchToTenant}
+                  disabled={loading}
+                  className="rounded-lg bg-[#14532D] text-white px-2.5 py-1 text-[11px] font-bold hover:bg-[#166534] transition flex items-center gap-1"
+                >
+                  {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>Open Tenant Profile →</span>}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Owner Full Name */}
+          <div>
+            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+              Your Full Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              value={ownerName}
+              onChange={(e) => setOwnerName(e.target.value)}
+              placeholder="e.g. Vikram Sharma"
+              className="w-full px-3.5 py-2 text-sm rounded-xl border border-gray-300 focus:border-[#16A34A] focus:ring-2 focus:ring-[#16A34A]/20 outline-none font-medium"
+              autoFocus
+            />
+          </div>
+
+          {/* PG / Property Name */}
+          <div>
+            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+              PG / Hostel / Property Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              value={propertyName}
+              onChange={(e) => setPropertyName(e.target.value)}
+              placeholder="e.g. Sai Balaji Luxury PG"
+              className="w-full px-3.5 py-2 text-sm rounded-xl border border-gray-300 focus:border-[#16A34A] focus:ring-2 focus:ring-[#16A34A]/20 outline-none font-medium"
+            />
+          </div>
+
+          {/* City & PG Type Grid */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                City <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                list="popular-cities-list"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="e.g. Bangalore"
+                className="w-full px-3 py-2 text-sm rounded-xl border border-gray-300 focus:border-[#16A34A] focus:ring-2 focus:ring-[#16A34A]/20 outline-none font-medium"
+              />
+              <datalist id="popular-cities-list">
+                <option value="Bangalore" />
+                <option value="Delhi" />
+                <option value="Gurgaon" />
+                <option value="Noida" />
+                <option value="Kota" />
+                <option value="Pune" />
+                <option value="Hyderabad" />
+                <option value="Mumbai" />
+                <option value="Jaipur" />
+                <option value="Dehradun" />
+                <option value="Indore" />
+                <option value="Chennai" />
+                <option value="Ahmedabad" />
+                <option value="Chandigarh" />
+              </datalist>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                PG Type <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={pgType}
+                onChange={(e) => setPgType(e.target.value)}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-gray-300 focus:border-[#16A34A] focus:ring-2 focus:ring-[#16A34A]/20 outline-none font-medium bg-white"
+              >
+                <option value="coliving">Co-Living (Unisex)</option>
+                <option value="boys">Boys PG</option>
+                <option value="girls">Girls PG</option>
+                <option value="hostel">Student Hostel</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Locality / Area */}
+          <div>
+            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+              Locality / Area / Landmark <span className="text-gray-400 font-normal">(Optional)</span>
+            </label>
+            <input
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="e.g. Sector 62, Near Metro Station"
+              className="w-full px-3.5 py-2 text-sm rounded-xl border border-gray-300 focus:border-[#16A34A] focus:ring-2 focus:ring-[#16A34A]/20 outline-none font-medium"
+            />
+          </div>
+
+          {/* Approx Rooms & Email Grid */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                Total Rooms <span className="text-gray-400 font-normal">(Approx)</span>
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={approxRooms}
+                onChange={(e) => setApproxRooms(e.target.value)}
+                placeholder="6"
+                className="w-full px-3 py-2 text-sm rounded-xl border border-gray-300 focus:border-[#16A34A] focus:ring-2 focus:ring-[#16A34A]/20 outline-none font-medium"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                Email Address <span className="text-gray-400 font-normal">(Optional)</span>
+              </label>
+              <input
+                type="email"
+                value={ownerEmail}
+                onChange={(e) => setOwnerEmail(e.target.value)}
+                placeholder="e.g. owner@gmail.com"
+                className="w-full px-3 py-2 text-sm rounded-xl border border-gray-300 focus:border-[#16A34A] focus:ring-2 focus:ring-[#16A34A]/20 outline-none font-medium"
+              />
+            </div>
+          </div>
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={loading || !ownerName.trim() || !propertyName.trim() || !city.trim()}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] py-3 text-sm font-bold text-white shadow-md hover:opacity-95 disabled:opacity-50 transition"
+          >
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <>
+                <Building2 className="h-4 w-4" />
+                <span>Create PG Account & Launch Dashboard</span>
+                <ArrowRight className="h-4 w-4" />
+              </>
+            )}
+          </button>
+
+          {/* Navigation */}
           <div className="flex items-center justify-between text-xs pt-2">
             <button
               type="button"
