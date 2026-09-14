@@ -478,8 +478,8 @@ function SearchPGContent() {
       </div>
 
       {/* Main Filter & Results Container */}
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="mx-auto max-w-7xl px-2 sm:px-6 lg:px-8 py-4 sm:py-6 flex-1 w-full">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
           {/* Desktop Filter Sidebar (4 cols) */}
           <aside className="hidden lg:block lg:col-span-3 space-y-5 sticky top-24 self-start max-h-[calc(100vh-7rem)] overflow-y-auto pr-1 no-scrollbar">
             <div className="rounded-2xl border border-gray-200/90 bg-white p-4 shadow-xs space-y-5">
@@ -743,7 +743,7 @@ function SearchPGContent() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-2 sm:gap-4 xl:grid-cols-3">
                 {filteredProperties.map((prop) => (
                   <PropertyCard
                     key={prop.id}

@@ -143,8 +143,8 @@ export function FeaturedListings({
   }
 
   return (
-    <section id="featured-properties" className="bg-[#F7FAF7] py-10 sm:py-20">
-      <div className="mx-auto max-w-7xl px-3.5 sm:px-6 lg:px-8">
+    <section id="featured-properties" className="bg-[#F7FAF7] py-8 sm:py-20">
+      <div className="mx-auto max-w-7xl px-2 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="flex flex-col gap-3 sm:gap-4 md:flex-row md:items-end md:justify-between">
           <div>
@@ -307,7 +307,7 @@ export function FeaturedListings({
         ) : (
           <div className="mt-8">
             {filteredProperties.length > 0 ? (
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-2 gap-2 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {filteredProperties.map((property) => (
                   <PropertyCard
                     key={property.id}

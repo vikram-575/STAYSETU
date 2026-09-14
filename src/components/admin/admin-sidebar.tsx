@@ -88,12 +88,18 @@ export default function AdminSidebar({
           badge: badges.pendingKyc ? `${badges.pendingKyc} kyc` : undefined,
           badgeVariant: 'amber',
         },
-        { id: 'users', label: 'Staff & Role Privileges', icon: UserCog },
+        {
+          id: 'users',
+          label: 'All Users & Profiles',
+          icon: Users2,
+          badge: 'Owners+Tenants',
+          badgeVariant: 'emerald',
+        },
         {
           id: 'profiles',
-          label: 'Marketplace Profiles',
+          label: 'Marketplace Leads',
           icon: UserCheck,
-          badge: 'Tenant+Owner',
+          badge: 'Registry',
           badgeVariant: 'slate',
         },
         {
@@ -198,8 +204,15 @@ export default function AdminSidebar({
       ],
     },
     {
-      title: 'Marketplace Profiles',
+      title: 'User Profiles & Identity',
       items: [
+        {
+          id: 'users',
+          label: 'All Users & Profiles',
+          icon: Users2,
+          badge: 'Owners+Tenants',
+          badgeVariant: 'emerald',
+        },
         {
           id: 'profiles',
           label: 'Tenant & Owner Profiles',

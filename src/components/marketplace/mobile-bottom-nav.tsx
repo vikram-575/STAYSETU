@@ -2,7 +2,7 @@
 
 import React from 'react'
 import Link from 'next/link'
-import { Home, Search, Map, Heart, KeyRound, GitCompare } from 'lucide-react'
+import { Home, Search, Heart, KeyRound, User } from 'lucide-react'
 
 interface MobileBottomNavProps {
   savedCount?: number
@@ -21,17 +21,13 @@ export function MobileBottomNav({
   onOpenCompare,
   onOpenListModal,
 }: MobileBottomNavProps) {
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
   return (
     <div className="fixed bottom-0 inset-x-0 z-30 border-t border-gray-200 bg-white/95 py-2 px-3 backdrop-blur-md md:hidden safe-bottom shadow-lg">
       <div className="flex items-center justify-around">
         {/* Home */}
         <Link
           href="/"
-          className="flex flex-col items-center gap-1 text-[#647067] hover:text-[#16A34A]"
+          className="flex flex-col items-center gap-1 text-[#647067] hover:text-[#16A34A] transition-colors"
         >
           <Home className="h-5 w-5" />
           <span className="text-[10px] font-medium">Home</span>
@@ -40,29 +36,27 @@ export function MobileBottomNav({
         {/* Search PG */}
         <Link
           href="/search"
-          className="flex flex-col items-center gap-1 text-[#647067] hover:text-[#16A34A]"
+          className="flex flex-col items-center gap-1 text-[#647067] hover:text-[#16A34A] transition-colors"
         >
           <Search className="h-5 w-5" />
           <span className="text-[10px] font-medium">Search PG</span>
         </Link>
 
-        {/* Map View */}
-        {onToggleMap && (
-          <button
-            onClick={onToggleMap}
-            className="flex flex-col items-center gap-1 text-[#16A34A] font-semibold"
-          >
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#DCFCE7] text-[#14532D]">
-              <Map className="h-4 w-4" />
-            </div>
-            <span className="text-[10px]">Map</span>
-          </button>
-        )}
+        {/* Tenant Portal in Center Slot */}
+        <Link
+          href="/portal"
+          className="flex flex-col items-center gap-1 text-[#14532D] font-semibold"
+        >
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#DCFCE7] text-[#14532D] shadow-xs">
+            <KeyRound className="h-4 w-4" />
+          </div>
+          <span className="text-[10px] font-bold">Portal</span>
+        </Link>
 
         {/* Saved */}
         <button
           onClick={onShowSaved}
-          className="relative flex flex-col items-center gap-1 text-[#647067] hover:text-rose-600"
+          className="relative flex flex-col items-center gap-1 text-[#647067] hover:text-rose-600 transition-colors"
         >
           <Heart className="h-5 w-5" />
           {savedCount > 0 && (
@@ -73,13 +67,13 @@ export function MobileBottomNav({
           <span className="text-[10px] font-medium">Saved</span>
         </button>
 
-        {/* Tenant Portal */}
+        {/* User Profile in Rightmost Slot */}
         <Link
-          href="/portal"
-          className="flex flex-col items-center gap-1 text-[#647067] hover:text-[#14532D]"
+          href="/my-profile"
+          className="flex flex-col items-center gap-1 text-[#647067] hover:text-[#14532D] transition-colors"
         >
-          <KeyRound className="h-5 w-5" />
-          <span className="text-[10px] font-medium">Portal</span>
+          <User className="h-5 w-5" />
+          <span className="text-[10px] font-medium">Profile</span>
         </Link>
       </div>
     </div>
