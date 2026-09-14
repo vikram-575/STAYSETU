@@ -38,6 +38,8 @@ import {
   Coffee,
   CheckCircle2,
   Compass,
+  X,
+  ArrowRight,
 } from 'lucide-react'
 import { PropertyListing } from '@/types/marketplace'
 import { MarketplaceNavbar } from '@/components/marketplace/marketplace-navbar'
@@ -62,6 +64,7 @@ export default function PropertyDetailPage({ params }: PropertyPageProps) {
   const [savedIds, setSavedIds] = useState<string[]>([])
   const [isSavedDrawerOpen, setIsSavedDrawerOpen] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
+  const [selectedAmenityModal, setSelectedAmenityModal] = useState<number | null>(null)
 
   // Visit / Booking Form State
   const [visitForm, setVisitForm] = useState({
@@ -513,190 +516,259 @@ export default function PropertyDetailPage({ params }: PropertyPageProps) {
               </div>
             </div>
 
-            {/* 4. MORE EXPLAIN FEATURES: Deep Dives into Living Comfort */}
-            <div className="rounded-3xl border border-gray-200/90 bg-white p-4 sm:p-6 shadow-xs space-y-5">
-              <div>
-                <div className="inline-flex items-center gap-1.5 rounded-full bg-[#DCFCE7] px-3 py-1 text-xs font-bold text-[#14532D]">
-                  <Sparkles className="h-3.5 w-3.5 text-[#16A34A]" />
-                  <span>Comprehensive Feature Explanation</span>
-                </div>
-                <h3 className="text-lg sm:text-xl font-black text-[#14532D] mt-2">
-                  What’s Included & Living Amenities Explained
-                </h3>
-                <p className="text-xs text-[#647067] mt-0.5">
-                  Everything you need to know about food, rooms, security, and daily routines at this space.
-                </p>
-              </div>
+            {/* 4. MORE EXPLAIN FEATURES: Deep Dives into Living Comfort (Compact on mobile, full-view on click) */}
+            {(() => {
+              const AMENITIES_LIST = [
+                {
+                  id: 'food',
+                  icon: Utensils,
+                  title: 'Food & Dining Routine',
+                  badge: property.foodIncluded ? '3 Meals Included' : 'Meals Available',
+                  bgColor: 'bg-[#DCFCE7]',
+                  textColor: 'text-[#14532D]',
+                  badgeColor: 'text-emerald-700',
+                  accentColor: 'text-[#16A34A]',
+                  bullets: [
+                    'Breakfast (7:30–9:30 AM), Lunch/Office Tiffin, Dinner (8:00–10:00 PM).',
+                    'Pure veg & non-veg options prepared in an inspected, hygienic kitchen.',
+                    'Evening tea and weekend special dishes with rotating monthly menu.',
+                  ],
+                },
+                {
+                  id: 'furniture',
+                  icon: Bed,
+                  title: 'Room Inclusions',
+                  badge: property.furnishing ? property.furnishing.replace('_', ' ') : 'Fully Furnished',
+                  bgColor: 'bg-blue-100',
+                  textColor: 'text-blue-800',
+                  badgeColor: 'text-blue-700',
+                  accentColor: 'text-blue-600',
+                  bullets: [
+                    'Premium spring mattress, bed linen, and bedside power charging points.',
+                    'Spacious wooden wardrobe with personal locker key & study workstation.',
+                    'Attached washroom with 24×7 hot water geyser & western fittings.',
+                  ],
+                },
+                {
+                  id: 'power',
+                  icon: Wifi,
+                  title: 'WiFi & Power Backup',
+                  badge: '100% 24×7 Backup',
+                  bgColor: 'bg-amber-100',
+                  textColor: 'text-amber-800',
+                  badgeColor: 'text-amber-700',
+                  accentColor: 'text-amber-600',
+                  bullets: [
+                    '200+ Mbps commercial fiber WiFi with mesh coverage in all rooms.',
+                    'Dual inverter and heavy-duty diesel generator backup during power outages.',
+                    'Perfect setup for IT professionals, work-from-home, and online students.',
+                  ],
+                },
+                {
+                  id: 'safety',
+                  icon: Shield,
+                  title: 'Campus Surveillance',
+                  badge: '24×7 Monitored',
+                  bgColor: 'bg-purple-100',
+                  textColor: 'text-purple-800',
+                  badgeColor: 'text-purple-700',
+                  accentColor: 'text-purple-600',
+                  bullets: [
+                    'CCTV cameras across entrances, corridors, stairwells, and dining hall.',
+                    'Biometric fingerprint / digital RFID gate pass for authorized residents.',
+                    'Uniformed security guard stationed 24 hours with visitor logbook.',
+                  ],
+                },
+                {
+                  id: 'cleaning',
+                  icon: Sparkles,
+                  title: 'Housekeeping & Wash',
+                  badge: 'Daily Cleaned',
+                  bgColor: 'bg-teal-100',
+                  textColor: 'text-teal-800',
+                  badgeColor: 'text-teal-700',
+                  accentColor: 'text-teal-600',
+                  bullets: [
+                    'Daily room sweeping and mopping by dedicated housekeeping team.',
+                    'Commercial RO drinking water purifiers with mineral cartridge on every floor.',
+                    'Automatic washing machines and dedicated terrace drying areas available free.',
+                  ],
+                },
+                {
+                  id: 'rules',
+                  icon: Clock,
+                  title: 'House Rules & Timing',
+                  badge: 'Gate closes 11 PM',
+                  bgColor: 'bg-rose-100',
+                  textColor: 'text-rose-800',
+                  badgeColor: 'text-rose-700',
+                  accentColor: 'text-rose-600',
+                  bullets: [
+                    'Main gate closes at 11:00 PM (Late night-entry pass via online portal).',
+                    'Day visitors allowed in reception lounge till 8:00 PM.',
+                    'Quiet hours after 10:30 PM. Strictly non-smoking inside rooms.',
+                  ],
+                },
+              ]
 
-              {/* Feature Cards Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* 1. Food & Dining */}
-                <div className="rounded-2xl border border-gray-200/80 bg-[#F7FAF7] p-4 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#DCFCE7] text-[#14532D]">
-                      <Utensils className="h-4 w-4" />
-                    </div>
+              return (
+                <div className="rounded-3xl border border-gray-200/90 bg-white p-3.5 sm:p-6 shadow-xs space-y-3.5 sm:space-y-5">
+                  <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="text-xs font-extrabold text-[#17211B]">Food & Dining Routine</h4>
-                      <span className="text-[10px] text-emerald-700 font-bold">
-                        {property.foodIncluded ? '3 Homestyle Meals Included' : 'Food Option Available'}
-                      </span>
+                      <div className="inline-flex items-center gap-1.5 rounded-full bg-[#DCFCE7] px-2.5 py-0.5 sm:px-3 sm:py-1 text-[11px] sm:text-xs font-bold text-[#14532D]">
+                        <Sparkles className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-[#16A34A]" />
+                        <span>Living Features</span>
+                      </div>
+                      <h3 className="text-base sm:text-xl font-black text-[#14532D] mt-1.5 sm:mt-2">
+                        What’s Included & Living Amenities Explained
+                      </h3>
+                      <p className="text-[11px] sm:text-xs text-[#647067] mt-0.5">
+                        Tap any card to view complete food timings, furniture, WiFi & rules details.
+                      </p>
                     </div>
                   </div>
-                  <ul className="text-xs text-[#647067] space-y-1.5 pt-1">
-                    <li className="flex items-start gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-[#16A34A] shrink-0 mt-0.5" />
-                      <span>Breakfast (7:30–9:30 AM), Lunch/Office Tiffin, Dinner (8:00–10:00 PM).</span>
-                    </li>
-                    <li className="flex items-start gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-[#16A34A] shrink-0 mt-0.5" />
-                      <span>Pure veg & non-veg options prepared in an inspected, hygienic kitchen.</span>
-                    </li>
-                    <li className="flex items-start gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-[#16A34A] shrink-0 mt-0.5" />
-                      <span>Evening tea and weekend special dishes with rotating monthly menu.</span>
-                    </li>
-                  </ul>
-                </div>
 
-                {/* 2. Room & Bed Comfort */}
-                <div className="rounded-2xl border border-gray-200/80 bg-[#F7FAF7] p-4 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-100 text-blue-800">
-                      <Bed className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-extrabold text-[#17211B]">Room Furniture & Inclusions</h4>
-                      <span className="text-[10px] text-blue-700 font-bold capitalize">
-                        {property.furnishing.replace('_', ' ')}
-                      </span>
-                    </div>
-                  </div>
-                  <ul className="text-xs text-[#647067] space-y-1.5 pt-1">
-                    <li className="flex items-start gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-blue-600 shrink-0 mt-0.5" />
-                      <span>Premium spring mattress, bed linen, and bedside power charging points.</span>
-                    </li>
-                    <li className="flex items-start gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-blue-600 shrink-0 mt-0.5" />
-                      <span>Spacious wooden wardrobe with personal locker key & study workstation.</span>
-                    </li>
-                    <li className="flex items-start gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-blue-600 shrink-0 mt-0.5" />
-                      <span>Attached washroom with 24×7 hot water geyser & western fittings.</span>
-                    </li>
-                  </ul>
-                </div>
+                  {/* Compact Feature Cards Grid (Compact 2-col on mobile, 3-col on desktop) */}
+                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3.5">
+                    {AMENITIES_LIST.map((item, idx) => {
+                      const Icon = item.icon
+                      return (
+                        <div
+                          key={item.id}
+                          onClick={() => setSelectedAmenityModal(idx)}
+                          className="flex flex-col justify-between rounded-2xl border border-gray-200/80 bg-[#F7FAF7] p-2.5 sm:p-3.5 hover:bg-white hover:border-emerald-300 hover:shadow-xs active:scale-95 transition cursor-pointer text-left min-h-[85px] sm:min-h-[105px]"
+                          title={`Click to view full details for ${item.title}`}
+                        >
+                          <div className="flex items-center justify-between gap-1.5">
+                            <div className={`flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-xl ${item.bgColor} ${item.textColor} shrink-0 shadow-2xs`}>
+                              <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                            </div>
+                            <span className={`text-[9px] sm:text-[10.5px] font-extrabold ${item.badgeColor} truncate rounded-md bg-white/90 px-1.5 py-0.5 border border-gray-200/60`}>
+                              {item.badge}
+                            </span>
+                          </div>
 
-                {/* 3. High-Speed Internet & Power Backup */}
-                <div className="rounded-2xl border border-gray-200/80 bg-[#F7FAF7] p-4 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 text-amber-800">
-                      <Wifi className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-extrabold text-[#17211B]">Internet & Power Resilience</h4>
-                      <span className="text-[10px] text-amber-700 font-bold">100% 24×7 Power Backup</span>
-                    </div>
+                          <div className="mt-1.5">
+                            <h4 className="text-[11px] sm:text-xs font-black text-[#17211B] line-clamp-1 leading-tight">
+                              {item.title}
+                            </h4>
+                            <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-bold text-[#16A34A] mt-1">
+                              <span>Full details</span>
+                              <ArrowRight className="h-2.5 w-2.5" />
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
-                  <ul className="text-xs text-[#647067] space-y-1.5 pt-1">
-                    <li className="flex items-start gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" />
-                      <span>200+ Mbps commercial fiber WiFi with mesh coverage in all rooms.</span>
-                    </li>
-                    <li className="flex items-start gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" />
-                      <span>Dual inverter and heavy-duty diesel generator backup during power outages.</span>
-                    </li>
-                    <li className="flex items-start gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" />
-                      <span>Perfect setup for IT professionals, work-from-home, and online students.</span>
-                    </li>
-                  </ul>
-                </div>
 
-                {/* 4. Safety & Security */}
-                <div className="rounded-2xl border border-gray-200/80 bg-[#F7FAF7] p-4 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-100 text-purple-800">
-                      <Shield className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-extrabold text-[#17211B]">Building Safety & Surveillance</h4>
-                      <span className="text-[10px] text-purple-700 font-bold">24×7 Monitored Campus</span>
-                    </div>
-                  </div>
-                  <ul className="text-xs text-[#647067] space-y-1.5 pt-1">
-                    <li className="flex items-start gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-purple-600 shrink-0 mt-0.5" />
-                      <span>CCTV cameras across entrances, corridors, stairwells, and dining hall.</span>
-                    </li>
-                    <li className="flex items-start gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-purple-600 shrink-0 mt-0.5" />
-                      <span>Biometric fingerprint / digital RFID gate pass for authorized residents.</span>
-                    </li>
-                    <li className="flex items-start gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-purple-600 shrink-0 mt-0.5" />
-                      <span>Uniformed security guard stationed 24 hours with visitor logbook.</span>
-                    </li>
-                  </ul>
-                </div>
+                  {/* FULL-VIEW MODAL / DIALOG */}
+                  {selectedAmenityModal !== null && (
+                    <div
+                      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200"
+                      onClick={() => setSelectedAmenityModal(null)}
+                    >
+                      <div
+                        className="relative w-full max-w-lg bg-white rounded-3xl border border-gray-200 shadow-2xl overflow-hidden flex flex-col max-h-[90dvh] animate-in zoom-in-95 duration-200"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-white">
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#DCFCE7] text-[#14532D]">
+                              <Sparkles className="h-4 w-4" />
+                            </div>
+                            <div>
+                              <h3 className="text-sm font-black text-gray-900">Amenities & Living Details</h3>
+                              <p className="text-[10px] text-gray-500">Verified space inclusions</p>
+                            </div>
+                          </div>
 
-                {/* 5. Housekeeping & Hygiene */}
-                <div className="rounded-2xl border border-gray-200/80 bg-[#F7FAF7] p-4 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-teal-100 text-teal-800">
-                      <Sparkles className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-extrabold text-[#17211B]">Housekeeping & Laundry</h4>
-                      <span className="text-[10px] text-teal-700 font-bold">Daily Cleaning Included</span>
-                    </div>
-                  </div>
-                  <ul className="text-xs text-[#647067] space-y-1.5 pt-1">
-                    <li className="flex items-start gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-teal-600 shrink-0 mt-0.5" />
-                      <span>Daily room sweeping and mopping by dedicated housekeeping team.</span>
-                    </li>
-                    <li className="flex items-start gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-teal-600 shrink-0 mt-0.5" />
-                      <span>Commercial RO drinking water purifiers with mineral cartridge on every floor.</span>
-                    </li>
-                    <li className="flex items-start gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-teal-600 shrink-0 mt-0.5" />
-                      <span>Automatic washing machines and dedicated terrace drying areas available free.</span>
-                    </li>
-                  </ul>
-                </div>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedAmenityModal(null)}
+                            className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 active:scale-95 transition"
+                            aria-label="Close dialog"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
 
-                {/* 6. Campus House Rules & Timings */}
-                <div className="rounded-2xl border border-gray-200/80 bg-[#F7FAF7] p-4 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-100 text-rose-800">
-                      <Clock className="h-4 w-4" />
+                        {/* Quick Category Switcher Tabs */}
+                        <div className="flex items-center gap-1.5 p-3 overflow-x-auto no-scrollbar border-b border-gray-100 bg-gray-50/70">
+                          {AMENITIES_LIST.map((cat, cIdx) => (
+                            <button
+                              key={cat.id}
+                              type="button"
+                              onClick={() => setSelectedAmenityModal(cIdx)}
+                              className={`px-2.5 py-1 rounded-full text-xs font-bold shrink-0 transition active:scale-95 ${
+                                selectedAmenityModal === cIdx
+                                  ? 'bg-[#14532D] text-white shadow-2xs'
+                                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
+                              }`}
+                            >
+                              {cat.title}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Modal Body: Active Category Details */}
+                        {(() => {
+                          const activeItem = AMENITIES_LIST[selectedAmenityModal]
+                          const ActiveIcon = activeItem.icon
+
+                          return (
+                            <div className="p-4 sm:p-5 overflow-y-auto space-y-4">
+                              <div className="flex items-center gap-3 bg-gray-50 p-3.5 rounded-2xl border border-gray-200/80">
+                                <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${activeItem.bgColor} ${activeItem.textColor} shrink-0 shadow-xs`}>
+                                  <ActiveIcon className="h-5 w-5" />
+                                </div>
+                                <div>
+                                  <h4 className="text-sm sm:text-base font-black text-gray-900 leading-tight">
+                                    {activeItem.title}
+                                  </h4>
+                                  <span className={`inline-block mt-0.5 text-xs font-bold ${activeItem.badgeColor}`}>
+                                    {activeItem.badge}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="space-y-2.5">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block">
+                                  Included Specifications & Policies
+                                </span>
+                                <ul className="space-y-2">
+                                  {activeItem.bullets.map((bullet, bIdx) => (
+                                    <li
+                                      key={bIdx}
+                                      className="flex items-start gap-2 text-xs sm:text-sm text-gray-700 bg-white p-2.5 rounded-xl border border-gray-100 shadow-2xs"
+                                    >
+                                      <Check className={`h-4 w-4 ${activeItem.accentColor} shrink-0 mt-0.5`} />
+                                      <span className="leading-snug">{bullet}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            </div>
+                          )
+                        })()}
+
+                        {/* Modal Footer */}
+                        <div className="p-3 border-t border-gray-100 bg-white flex items-center justify-end">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedAmenityModal(null)}
+                            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#14532D] text-xs font-bold text-white shadow-xs hover:bg-[#166534] active:scale-95 transition"
+                          >
+                            Done & Close
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="text-xs font-extrabold text-[#17211B]">Campus Timings & House Rules</h4>
-                      <span className="text-[10px] text-rose-700 font-bold">Safe & Respectful Community</span>
-                    </div>
-                  </div>
-                  <ul className="text-xs text-[#647067] space-y-1.5 pt-1">
-                    <li className="flex items-start gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-rose-600 shrink-0 mt-0.5" />
-                      <span>Main gate closes at 11:00 PM (Late night-entry pass via online portal).</span>
-                    </li>
-                    <li className="flex items-start gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-rose-600 shrink-0 mt-0.5" />
-                      <span>Day visitors allowed in reception lounge till 8:00 PM.</span>
-                    </li>
-                    <li className="flex items-start gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-rose-600 shrink-0 mt-0.5" />
-                      <span>Quiet hours after 10:30 PM. Strictly non-smoking inside rooms.</span>
-                    </li>
-                  </ul>
+                  )}
                 </div>
-              </div>
-            </div>
+              )
+            })()}
 
             {/* 5. Verified Landlord / Campus Host Info */}
             <div className="rounded-3xl border border-gray-200/90 bg-white p-4 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">

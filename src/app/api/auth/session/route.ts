@@ -81,8 +81,8 @@ export async function GET() {
           const beds = bedsRes.status === 'fulfilled' ? (bedsRes.value.data || []) : []
           const invoices = invoicesRes.status === 'fulfilled' ? (invoicesRes.value.data || []) : []
 
-          const totalBeds = beds.length || rooms.reduce((sum: number, r: any) => sum + (r.capacity || 1), 0) || 10
-          const availableBeds = beds.filter((b: any) => b.status === 'available').length || Math.max(0, totalBeds - activeResidents)
+          const totalBeds = beds.length > 0 ? beds.length : rooms.reduce((sum: number, r: any) => sum + (r.capacity || 0), 0)
+          const availableBeds = beds.length > 0 ? beds.filter((b: any) => b.status === 'available').length : Math.max(0, totalBeds - activeResidents)
           const expectedRev = invoices.reduce((sum: number, inv: any) => sum + (inv.total_paise || 0), 0) || rooms.reduce((sum: number, r: any) => sum + (r.base_rent_paise || 0), 0)
 
           propertyStats = {
@@ -98,35 +98,19 @@ export async function GET() {
             hostedProperties = props.map((p: any) => ({
               id: p.id,
               organization_id: p.organization_id,
-              name: p.name || org.name || 'PG-SETU Co-Living',
-              phone: p.phone || org.phone || user.phone,
-              email: p.email || org.email || user.email,
-              address: p.address || org.address || 'Sector 62, Noida',
-              city: p.city || org.city || 'Noida',
-              state: p.state || org.state || 'Uttar Pradesh',
-              pincode: p.pincode || org.pincode || '201309',
-              description: p.description || 'Premium executive PG & co-living residence with high-speed WiFi, clean rooms, and 24/7 security.',
+              name: p.name || org.name || 'PG Property',
+              phone: p.phone || org.phone || user.phone || '',
+              email: p.email || org.email || user.email || '',
+              address: p.address || org.address || '',
+              city: p.city || org.city || '',
+              state: p.state || org.state || '',
+              pincode: p.pincode || org.pincode || '',
+              description: p.description || '',
               settings: p.settings || org.settings || {},
               stats: propertyStats,
             }))
           } else {
-            // Build virtual property representation from organization
-            hostedProperties = [
-              {
-                id: `prop_${orgId.slice(0, 8)}`,
-                organization_id: orgId,
-                name: org.name || 'PG-SETU Management Residence',
-                phone: org.phone || user.phone,
-                email: org.email || user.email,
-                address: org.address || 'Sector 62, Near Electronic City Metro',
-                city: org.city || 'Noida',
-                state: org.state || 'Uttar Pradesh',
-                pincode: org.pincode || '201309',
-                description: 'Executive co-living space with modern amenities, clean rooms, mess food, and 24/7 power backup.',
-                settings: org.settings || {},
-                stats: propertyStats,
-              },
-            ]
+            hostedProperties = []
           }
         } catch (err: any) {
           console.warn('[Session Route Hosted Properties Lookup Error]:', err?.message)
@@ -161,9 +145,9 @@ export async function GET() {
             userStays.push({
               id: res.id,
               registration_number: res.registration_number,
-              property_name: currentView?.property_name || org?.name || 'PG-Setu Network Member',
-              city: org?.city || 'Noida',
-              address: org?.address || 'Sector 62, Noida, Uttar Pradesh',
+              property_name: currentView?.property_name || org?.name || 'PG Property',
+              city: org?.city || '',
+              address: org?.address || '',
               room_number: currentView?.room_number || null,
               bed_label: currentView?.bed_label || null,
               check_in_date: currentView?.check_in_date || (res.created_at ? res.created_at.split('T')[0] : null),
@@ -192,9 +176,9 @@ export async function GET() {
       active_deposits_paise: activeDepositsPaise,
       total_due_paise: totalDuePaise,
       total_stays_count: userStays.length,
-      on_time_payment_rate: userStays.length > 0 ? '100%' : '100%',
-      renter_credit_score: userStays.length > 0 ? '790 / 850' : '750 / 850',
-      renter_tier: userStays.length > 0 ? 'Tier 1 Verified Tenant' : 'Verified Member',
+      on_time_payment_rate: userStays.length > 0 ? '100%' : 'N/A',
+      renter_credit_score: userStays.length > 0 ? '790 / 850' : 'N/A',
+      renter_tier: userStays.length > 0 ? 'Tier 1 Verified Tenant' : 'Member',
     }
 
     // ── 3. Recent Transactions Ledger (Queried from Supabase) ──

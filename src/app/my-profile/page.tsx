@@ -150,29 +150,8 @@ function MyProfileContent() {
 
             if (data.hostedProperties && data.hostedProperties.length > 0) {
               setHostedProperties(data.hostedProperties)
-            } else if (data.organization) {
-              setHostedProperties([
-                {
-                  id: `prop_${data.organization.id?.slice(0, 8)}`,
-                  organization_id: data.organization.id,
-                  name: data.organization.name || 'PG-SETU Management Residence',
-                  phone: data.organization.phone || data.user.phone || '',
-                  email: data.organization.email || data.user.email || '',
-                  address: data.organization.address || 'Sector 62, Near Metro Station',
-                  city: data.organization.city || 'Noida',
-                  state: data.organization.state || 'Uttar Pradesh',
-                  pincode: data.organization.pincode || '201309',
-                  description: 'Executive co-living space with modern amenities, clean rooms, mess food, and 24/7 power backup.',
-                  settings: data.organization.settings || {},
-                  stats: data.propertyStats || {
-                    total_residents: 3,
-                    total_rooms: 4,
-                    total_beds: 10,
-                    available_beds: 7,
-                    expected_revenue_paise: 2250000,
-                  },
-                },
-              ])
+            } else {
+              setHostedProperties([])
             }
             if (data.propertyStats) setPropertyStats(data.propertyStats)
             const isHostRole = data.user.role === 'owner' || data.user.role === 'superadmin' || data.user.role === 'manager'
@@ -208,17 +187,17 @@ function MyProfileContent() {
   }, [])
 
   const handleOpenPropertyModal = (prop?: any) => {
-    const target = prop || hostedProperties[0] || {}
+    const target = prop || null
     setEditingProperty(target)
-    setPropName(target.name || currentUser?.organizations?.name || 'PG-SETU Residence')
-    setPropPhone(target.phone || currentUser?.phone || '')
-    setPropEmail(target.email || currentUser?.email || '')
-    setPropAddress(target.address || 'Sector 62, Noida')
-    setPropCity(target.city || 'Noida')
-    setPropState(target.state || 'Uttar Pradesh')
-    setPropPincode(target.pincode || '201309')
-    setPropDescription(target.description || 'Premium PG & co-living residence with top-tier amenities.')
-    const s = target.settings || {}
+    setPropName(target?.name || currentUser?.organizations?.name || '')
+    setPropPhone(target?.phone || currentUser?.phone || '')
+    setPropEmail(target?.email || currentUser?.email || '')
+    setPropAddress(target?.address || '')
+    setPropCity(target?.city || '')
+    setPropState(target?.state || '')
+    setPropPincode(target?.pincode || '')
+    setPropDescription(target?.description || '')
+    const s = target?.settings || {}
     setPropRent(s.starting_rent_paise ? String(Math.round(s.starting_rent_paise / 100)) : (s.starting_rent ? String(s.starting_rent) : '7500'))
     setPropNoticePeriod(s.notice_period_days ? String(s.notice_period_days) : '30')
     setPropLockIn(s.lock_in_months ? String(s.lock_in_months) : '3')
@@ -226,9 +205,17 @@ function MyProfileContent() {
     setPropUpiId(s.upi_id || currentUser?.organizations?.settings?.upi_id || '')
     if (Array.isArray(s.amenities) && s.amenities.length > 0) {
       setPropAmenities(s.amenities)
+    } else {
+      setPropAmenities([
+        'High-Speed WiFi', 'Power Backup', 'RO Water', '3 Daily Meals', 'Air Conditioning', 'CCTV Security'
+      ])
     }
     if (Array.isArray(s.rules) && s.rules.length > 0) {
       setPropRules(s.rules)
+    } else {
+      setPropRules([
+        'Gate closes at 11:00 PM', 'Visitors in lounge only', 'No smoking inside rooms'
+      ])
     }
     setPropSaveSuccess('')
     setPropSaveError('')
@@ -442,7 +429,7 @@ function MyProfileContent() {
 
   const handleConfirmAadhaar = async () => {
     setVerifyingAadhaar(true)
-    const last4 = aadhaarInput.slice(-4) || '4921'
+    const last4 = aadhaarInput.slice(-4) || ''
 
     try {
       await fetch('/api/profiles/update', {
@@ -1068,16 +1055,45 @@ function MyProfileContent() {
               </div>
 
               <button
-                onClick={() => handleOpenPropertyModal(hostedProperties[0])}
+                onClick={() => handleOpenPropertyModal(hostedProperties[0] || null)}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#166534] transition active:scale-95"
               >
-                <Edit className="h-3.5 w-3.5" />
-                <span>Edit Property</span>
+                {hostedProperties.length > 0 ? (
+                  <>
+                    <Edit className="h-3.5 w-3.5" />
+                    <span>Edit Property</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>List New Property</span>
+                  </>
+                )}
               </button>
             </div>
 
-            {/* Hosted Properties Cards */}
-            <div className="space-y-4">
+            {/* Hosted Properties Cards or Empty State */}
+            {hostedProperties.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-gray-300 bg-white p-8 text-center space-y-3">
+                <div className="mx-auto w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-[#14532D]">
+                  <Building2 className="h-6 w-6" />
+                </div>
+                <h3 className="text-sm sm:text-base font-bold text-gray-900">No Hosted Properties Yet</h3>
+                <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                  You haven&apos;t listed any properties yet. Click below to add your first PG or hostel property and manage rooms, beds, and residents.
+                </p>
+                <div className="pt-2">
+                  <button
+                    onClick={() => handleOpenPropertyModal(null)}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-4 py-2 text-xs font-bold text-white hover:bg-[#166534] transition active:scale-95 shadow-xs"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>List New Property</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
               {hostedProperties.map((prop, idx) => {
                 const s = prop.settings || {}
                 const rentFormatted = s.starting_rent_paise
@@ -1113,7 +1129,7 @@ function MyProfileContent() {
                         <p className="text-xs text-gray-500 flex items-center gap-1.5 flex-wrap">
                           <MapPin className="h-3.5 w-3.5 text-gray-400 shrink-0" />
                           <span>
-                            {prop.address || 'Sector 62'}, {prop.city || 'Noida'}, {prop.state || 'UP'} {prop.pincode ? `- ${prop.pincode}` : ''}
+                            {prop.address ? `${prop.address}, ` : ''}{prop.city || ''}{prop.state ? `, ${prop.state}` : ''}{prop.pincode ? ` - ${prop.pincode}` : ''}
                           </span>
                         </p>
                       </div>
@@ -1257,7 +1273,8 @@ function MyProfileContent() {
                   </div>
                 )
               })}
-            </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1333,10 +1350,12 @@ function MyProfileContent() {
                   </div>
                 </div>
                 <div className="mt-1 text-base sm:text-lg font-black text-purple-900">
-                  790 / 850
+                  {passbookSummary?.renter_credit_score && passbookSummary.renter_credit_score !== 'N/A'
+                    ? passbookSummary.renter_credit_score
+                    : (stays.length > 0 ? '790 / 850' : 'N/A')}
                 </div>
                 <span className="text-[10px] font-bold text-purple-700 block mt-0.5">
-                  Tier 1 Tenant
+                  {passbookSummary?.renter_tier || (stays.length > 0 ? 'Tier 1 Tenant' : 'Member')}
                 </span>
               </div>
             </div>
@@ -1441,35 +1460,6 @@ function MyProfileContent() {
               </div>
             )}
 
-            {/* Verified Perks Grid */}
-            <div className="rounded-3xl border border-gray-200/80 bg-white p-4 sm:p-5 shadow-xs">
-              <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider mb-2.5">
-                Verified Renter Privileges Unlocked
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
-                <div className="flex items-start gap-2 rounded-2xl bg-gray-50 p-2.5">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold text-gray-800 block">Zero-Brokerage Relocation</span>
-                    <span className="text-[11px] text-gray-500">Move between 500+ PG-Setu properties anywhere in India.</span>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2 rounded-2xl bg-gray-50 p-2.5">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold text-gray-800 block">DigiLocker Escrow Trust</span>
-                    <span className="text-[11px] text-gray-500">100% security deposit guarantee with instant UPI checkout refund.</span>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2 rounded-2xl bg-gray-50 p-2.5">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold text-gray-800 block">Form 16 Tax Verification</span>
-                    <span className="text-[11px] text-gray-500">Auto-generated monthly rent receipts with owner PAN for HRA claims.</span>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         )}
 
@@ -1742,12 +1732,19 @@ function MyProfileContent() {
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
                     Police Verification
                   </span>
-                  <div className="flex items-center gap-1 text-emerald-700 font-bold text-xs">
-                    <CheckCircle className="h-3.5 w-3.5" />
-                    <span>Police Clearance Submitted</span>
-                  </div>
+                  {profileData?.police_verified ? (
+                    <div className="flex items-center gap-1 text-emerald-700 font-bold text-xs">
+                      <CheckCircle className="h-3.5 w-3.5" />
+                      <span>Police Clearance Submitted</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 text-amber-700 font-bold text-xs">
+                      <Clock className="h-3.5 w-3.5" />
+                      <span>Pending Submission</span>
+                    </div>
+                  )}
                   <span className="text-[10px] text-gray-500 block">
-                    Approved by Resident Police Liaison
+                    {profileData?.police_verified ? 'Approved by Resident Police Liaison' : 'Submit ID for police verification clearance'}
                   </span>
                 </div>
               </div>
