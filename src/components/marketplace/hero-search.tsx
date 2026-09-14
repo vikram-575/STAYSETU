@@ -14,6 +14,7 @@ import {
   ArrowRight,
   ShieldCheck,
   Building,
+  Zap,
 } from 'lucide-react'
 import { PropertyType } from '@/types/marketplace'
 import { useWebsiteContent } from '@/context/website-content-context'
@@ -147,17 +148,46 @@ export function HeroSearch({ onSearch, selectedCity, onCityChange }: HeroSearchP
               'Discover verified PGs, rooms and flats with transparent digital rent passbooks, live electricity meter readings, and zero middleman commissions.'}
           </p>
 
-          {/* 4 Stats Counters - Responsive 2x2 grid on mobile, inline flex on desktop */}
-          {hero?.stats && hero.stats.length > 0 && (
-            <div className="mt-4 sm:mt-6 grid grid-cols-2 sm:flex sm:flex-wrap items-center justify-center gap-2 sm:gap-8 text-center max-w-xs sm:max-w-none mx-auto">
-              {hero.stats.map((st, i) => (
-                <div key={i} className="flex flex-col items-center bg-white/70 sm:bg-transparent rounded-xl p-2 sm:p-0 border border-emerald-100/70 sm:border-0 shadow-2xs sm:shadow-none">
-                  <span className="text-base sm:text-xl font-black text-[#14532D]">{st.value}</span>
-                  <span className="text-[10.5px] sm:text-xs text-[#647067] font-medium">{st.label}</span>
+          {/* Instant PG Feature Card & 1-Click Trigger Button (No time mentioned, 100% mobile-friendly) */}
+          <div className="mt-4 sm:mt-6 mx-auto max-w-2xl px-1">
+            <div className="relative overflow-hidden rounded-2xl border border-emerald-200/90 bg-gradient-to-r from-emerald-50/90 via-white to-teal-50/90 p-3 sm:p-4 shadow-sm hover:shadow-md transition text-left">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white shadow-md shadow-emerald-950/20 shrink-0">
+                    <Zap className="h-5 w-5 sm:h-6 sm:w-6 fill-amber-300 text-amber-300" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-xs sm:text-sm font-extrabold text-[#14532D] tracking-tight">
+                        Need an Instant Verified PG?
+                      </span>
+                      <span className="rounded-full bg-emerald-100 text-emerald-800 font-bold text-[9.5px] sm:text-[10px] px-2 py-0.5 border border-emerald-200/80">
+                        Zero Brokerage
+                      </span>
+                    </div>
+                    <p className="text-[11px] sm:text-xs text-[#647067] mt-0.5 leading-tight line-clamp-2 sm:line-clamp-1">
+                      Skip middleman calls — get matched directly with ready-to-move verified stays.
+                    </p>
+                  </div>
                 </div>
-              ))}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      window.dispatchEvent(new CustomEvent('open-instant-pg'))
+                    }
+                  }}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] via-emerald-700 to-[#16A34A] px-4 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md shadow-emerald-950/20 hover:brightness-110 active:scale-95 transition shrink-0 cursor-pointer"
+                  title="Open Instant PG Booking Form"
+                >
+                  <Zap className="h-4 w-4 fill-amber-300 text-amber-300" />
+                  <span>Get Instant PG</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Multi-Tab Search Box Card */}

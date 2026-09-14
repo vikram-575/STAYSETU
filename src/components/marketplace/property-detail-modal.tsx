@@ -419,7 +419,7 @@ export function PropertyDetailModal({
                       Visit Request Sent!
                     </h4>
                     <p className="mt-1 text-xs text-[#17211B]">
-                      {property.owner.name} has received your contact details and will call/WhatsApp you within 15 minutes.
+                      {property.owner.name} has received your contact details and will call/WhatsApp you promptly.
                     </p>
                     <a
                       href={whatsappUrl}

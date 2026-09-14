@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import {
   Zap, Sparkles, X, CheckCircle2, Phone, MapPin,
@@ -8,11 +8,24 @@ import {
   Loader2, ArrowRight, ShieldCheck, Clock
 } from 'lucide-react'
 
+export function openInstantPgModal() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('open-instant-pg'))
+  }
+}
+
 export default function InstantPgFloatingWidget() {
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submittedData, setSubmittedData] = useState<any | null>(null)
+
+  // Listen for open-instant-pg global trigger from buttons anywhere on the site
+  useEffect(() => {
+    const handleOpen = () => setIsOpen(true)
+    window.addEventListener('open-instant-pg', handleOpen)
+    return () => window.removeEventListener('open-instant-pg', handleOpen)
+  }, [])
 
   // Form State
   const [name, setName] = useState('')
@@ -118,7 +131,7 @@ export default function InstantPgFloatingWidget() {
         <button
           onClick={() => setIsOpen(true)}
           className="flex sm:hidden relative items-center justify-center w-11 h-11 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white rounded-full shadow-xl shadow-emerald-950/40 active:scale-95 transition-all duration-200 border-2 border-white/30 cursor-pointer"
-          title="Instant PG Support (15 Min Allotment)"
+          title="Instant Verified PG Support"
           aria-label="Get Instant PG"
         >
           {/* Beacon Pulse Ring */}
@@ -152,7 +165,7 @@ export default function InstantPgFloatingWidget() {
             <div className="flex items-center gap-1.5">
               <span className="font-extrabold tracking-tight">⚡ Instant PG</span>
               <span className="inline-block px-1.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-300/25 text-amber-200 border border-amber-300/30">
-                15 MIN ALLOTMENT
+                DIRECT ALLOTMENT
               </span>
             </div>
             <p className="text-[10px] text-emerald-100 font-normal">
@@ -185,7 +198,7 @@ export default function InstantPgFloatingWidget() {
                   Fast-Track Allotment
                 </span>
                 <span className="text-xs text-emerald-200 flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5" /> 15 Mins Response
+                  <ShieldCheck className="w-3.5 h-3.5" /> Direct Host Match
                 </span>
               </div>
 
@@ -224,7 +237,7 @@ export default function InstantPgFloatingWidget() {
                       <span>What happens next?</span>
                     </div>
                     <ul className="text-[11px] text-emerald-800 space-y-1 list-disc pl-4">
-                      <li>Our team will call / WhatsApp you on <strong>{submittedData.phone}</strong> within 15 minutes.</li>
+                      <li>Our team will call / WhatsApp you on <strong>{submittedData.phone}</strong> promptly.</li>
                       <li>You will receive 3 verified PG options with photos and locked pricing.</li>
                       <li>Zero brokerage fee applies.</li>
                     </ul>

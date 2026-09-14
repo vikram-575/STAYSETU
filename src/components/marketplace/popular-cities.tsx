@@ -1,9 +1,9 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { MapPin, ArrowRight, Building, Sparkles } from 'lucide-react'
+import { MapPin, ArrowRight, Building, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useWebsiteContent } from '@/context/website-content-context'
 
 import { PropertyListing } from '@/types/marketplace'
@@ -19,6 +19,39 @@ export function PopularCities({ onSelectCity, activeCity, properties = [] }: Pop
   const { content } = useWebsiteContent()
   const citiesData = content?.cities
   const citiesList = citiesData?.cities || []
+
+  const reelRef = useRef<HTMLDivElement>(null)
+  const [isPaused, setIsPaused] = useState(false)
+
+  // Automatically roll cities carousel on mobile
+  useEffect(() => {
+    if (isPaused) return
+
+    const interval = setInterval(() => {
+      const el = reelRef.current
+      if (!el) return
+
+      const maxScroll = el.scrollWidth - el.clientWidth
+      if (maxScroll <= 5) return // Not horizontally scrollable (e.g. desktop grid)
+
+      // If near or at the end, loop smoothly back to beginning
+      if (el.scrollLeft >= maxScroll - 15) {
+        el.scrollTo({ left: 0, behavior: 'smooth' })
+      } else {
+        // Step forward by one card width (136px) + gap (10px) = 146px
+        el.scrollBy({ left: 146, behavior: 'smooth' })
+      }
+    }, 2800)
+
+    return () => clearInterval(interval)
+  }, [isPaused])
+
+  const scrollReel = (direction: 'left' | 'right') => {
+    const el = reelRef.current
+    if (!el) return
+    const step = 146 * 2
+    el.scrollBy({ left: direction === 'left' ? -step : step, behavior: 'smooth' })
+  }
 
   const handleCityClick = (cityName: string) => {
     onSelectCity?.(cityName)
@@ -50,11 +83,36 @@ export function PopularCities({ onSelectCity, activeCity, properties = [] }: Pop
             </p>
           </div>
 
-          <div className="flex items-center justify-between w-full sm:w-auto mt-1 sm:mt-0">
-            <span className="sm:hidden text-[11px] font-bold text-[#16A34A] flex items-center gap-1">
-              <span>Swipe cities</span>
-              <ArrowRight className="h-3 w-3" />
-            </span>
+          <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto mt-2 sm:mt-0">
+            {/* Mobile Auto-roll status badge & Chevron controls */}
+            <div className="flex items-center gap-1.5 sm:hidden">
+              <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-[#16A34A] bg-[#DCFCE7]/70 px-2 py-0.5 rounded-full border border-emerald-200">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#16A34A]" />
+                </span>
+                <span>Auto-rolling</span>
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => scrollReel('left')}
+                  className="flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-2xs hover:bg-gray-50 active:scale-95 transition"
+                  aria-label="Previous cities"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => scrollReel('right')}
+                  className="flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-2xs hover:bg-gray-50 active:scale-95 transition"
+                  aria-label="Next cities"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+
             <button
               onClick={() => handleCityClick('all')}
               className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#16A34A] hover:underline"
@@ -65,8 +123,17 @@ export function PopularCities({ onSelectCity, activeCity, properties = [] }: Pop
           </div>
         </div>
 
-        {/* Cities Rolling Reel (Mobile horizontal carousel + Desktop responsive grid) */}
-        <div className="mt-4 sm:mt-8 flex overflow-x-auto snap-x snap-mandatory gap-2.5 pb-2.5 pt-1 -mx-3.5 px-3.5 no-scrollbar sm:mx-0 sm:px-0 sm:grid sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 sm:gap-4">
+        {/* Cities Rolling Reel (Mobile horizontal auto-rolling carousel + Desktop responsive grid) */}
+        <div
+          ref={reelRef}
+          onMouseEnter={() => setIsPaused(true)}
+          onMouseLeave={() => setIsPaused(false)}
+          onTouchStart={() => setIsPaused(true)}
+          onTouchEnd={() => {
+            setTimeout(() => setIsPaused(false), 2500)
+          }}
+          className="mt-4 sm:mt-8 flex overflow-x-auto snap-x snap-mandatory gap-2.5 pb-2.5 pt-1 -mx-3.5 px-3.5 no-scrollbar sm:mx-0 sm:px-0 sm:grid sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 sm:gap-4 scroll-smooth"
+        >
           {citiesList.map((city) => {
             const isSelected = activeCity === city.name
 
