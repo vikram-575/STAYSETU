@@ -43,21 +43,39 @@ export async function POST(request: NextRequest) {
 
       if (requestedRole === 'owner') {
         // ── PG OWNER EXISTENCE VERIFICATION ──
-        // 1. Check in Supabase users table for PG Owners / Admins / Managers
-        const { data: matchedOwnerUser } = await serviceClient
+        // 1. Check in Supabase users table for PG Owners / Managers / Staff / Accountants
+        let { data: matchedOwnerUser } = await serviceClient
           .from('users')
           .select('id, full_name, email, phone, role, organization_id')
           .or(`phone.eq.${cleaned},phone.ilike.%${cleaned}%`)
-          .in('role', ['owner', 'superadmin', 'admin', 'manager'])
+          .in('role', ['owner', 'manager', 'staff', 'accountant'])
+          .limit(1)
           .maybeSingle()
 
         // 2. Check in organizations table by phone
-        const { data: matchedOrg } = await serviceClient
+        let { data: matchedOrg } = await serviceClient
           .from('organizations')
           .select('id, name, email, phone, owner_user_id')
           .or(`phone.eq.${cleaned},phone.ilike.%${cleaned}%`)
           .limit(1)
           .maybeSingle()
+
+        // Bidirectional resolution: if user found, fetch org; if org found, fetch user
+        if (matchedOwnerUser?.organization_id && !matchedOrg) {
+          const { data: orgById } = await serviceClient
+            .from('organizations')
+            .select('id, name, email, phone, owner_user_id')
+            .eq('id', matchedOwnerUser.organization_id)
+            .maybeSingle()
+          if (orgById) matchedOrg = orgById
+        } else if (matchedOrg?.owner_user_id && !matchedOwnerUser) {
+          const { data: userById } = await serviceClient
+            .from('users')
+            .select('id, full_name, email, phone, role, organization_id')
+            .eq('id', matchedOrg.owner_user_id)
+            .maybeSingle()
+          if (userById) matchedOwnerUser = userById
+        }
 
         if (matchedOwnerUser || matchedOrg) {
           return NextResponse.json({
@@ -103,12 +121,13 @@ export async function POST(request: NextRequest) {
           .limit(1)
           .maybeSingle()
 
-        // 2. Check in Supabase users table where role is resident / tenant / user
+        // 2. Check in Supabase users table where role is resident
         const { data: matchedUser } = await serviceClient
           .from('users')
           .select('id, full_name, email, phone, role, organization_id, resident_id')
           .or(`phone.eq.${cleaned},phone.ilike.%${cleaned}%`)
-          .in('role', ['resident', 'tenant', 'user'])
+          .in('role', ['resident'])
+          .limit(1)
           .maybeSingle()
 
         if (matchedResident || matchedUser) {
@@ -130,7 +149,8 @@ export async function POST(request: NextRequest) {
           .from('users')
           .select('id, full_name, role')
           .or(`phone.eq.${cleaned},phone.ilike.%${cleaned}%`)
-          .in('role', ['owner', 'superadmin', 'admin', 'manager'])
+          .in('role', ['owner', 'manager', 'staff', 'accountant'])
+          .limit(1)
           .maybeSingle()
 
         return NextResponse.json({
@@ -248,7 +268,8 @@ export async function POST(request: NextRequest) {
           .from('users')
           .select('id, full_name, email, phone, role, organization_id')
           .or(`phone.eq.${cleaned},phone.ilike.%${cleaned}%`)
-          .in('role', ['owner', 'superadmin', 'admin', 'manager'])
+          .in('role', ['owner', 'manager', 'staff', 'accountant'])
+          .limit(1)
           .maybeSingle()
         user = matchedOwnerUser
 
@@ -259,12 +280,30 @@ export async function POST(request: NextRequest) {
           .limit(1)
           .maybeSingle()
         matchedOrg = orgData
+
+        // Bidirectional resolution: if user found, fetch org; if org found, fetch user
+        if (user?.organization_id && !matchedOrg) {
+          const { data: orgById } = await serviceClient
+            .from('organizations')
+            .select('id, name, email, phone, owner_user_id')
+            .eq('id', user.organization_id)
+            .maybeSingle()
+          if (orgById) matchedOrg = orgById
+        } else if (matchedOrg?.owner_user_id && !user) {
+          const { data: userById } = await serviceClient
+            .from('users')
+            .select('id, full_name, email, phone, role, organization_id')
+            .eq('id', matchedOrg.owner_user_id)
+            .maybeSingle()
+          if (userById) user = userById
+        }
       } else {
         const { data: tenantUser } = await serviceClient
           .from('users')
           .select('id, full_name, email, phone, role, organization_id, resident_id')
           .or(`phone.eq.${cleaned},phone.ilike.%${cleaned}%`)
-          .in('role', ['resident', 'tenant', 'user'])
+          .in('role', ['resident'])
+          .limit(1)
           .maybeSingle()
         user = tenantUser
 
@@ -309,7 +348,8 @@ export async function POST(request: NextRequest) {
           .from('users')
           .select('id, full_name, role')
           .or(`phone.eq.${cleaned},phone.ilike.%${cleaned}%`)
-          .in('role', ['owner', 'superadmin', 'admin', 'manager'])
+          .in('role', ['owner', 'manager', 'staff', 'accountant'])
+          .limit(1)
           .maybeSingle()
 
         return NextResponse.json({
@@ -455,11 +495,30 @@ export async function POST(request: NextRequest) {
         })
       }
 
+      if (orgId) {
+        cookieStore.set('org_id', orgId, {
+          httpOnly: false,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 30,
+          path: '/',
+        })
+        cookieStore.set('organization_id', orgId, {
+          httpOnly: false,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 30,
+          path: '/',
+        })
+      }
+
       const isOwnerOrStaff = ['superadmin', 'owner', 'manager', 'accountant', 'staff'].includes(effectiveRole)
       const destination = isOwnerOrStaff ? '/dashboard' : '/my-profile'
 
       return NextResponse.json({
         success: true,
+        exists: true,
+        verified: true,
         redirect: destination,
         user: savedUser || {
           id: targetUserId,

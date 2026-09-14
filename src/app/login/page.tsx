@@ -140,7 +140,7 @@ function UnifiedLoginForm() {
       }
 
       // If user exists for this role -> immediately redirect!
-      if (data.exists && data.redirect) {
+      if (data.redirect && data.exists !== false) {
         window.location.href = data.redirect
         return
       }
