@@ -16,9 +16,14 @@ import {
   MapPin,
   ArrowRight,
 } from 'lucide-react'
+import dynamic from 'next/dynamic'
 import { PropertyListing, PropertyType, GenderPreference } from '@/types/marketplace'
 import { PropertyCard } from './property-card'
-import { MapDiscoveryModal } from './map-discovery-modal'
+
+const MapDiscoveryModal = dynamic(
+  () => import('./map-discovery-modal').then((mod) => mod.MapDiscoveryModal),
+  { ssr: false }
+)
 
 interface FeaturedListingsProps {
   properties: PropertyListing[]

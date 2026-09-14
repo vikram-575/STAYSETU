@@ -10,10 +10,22 @@ import { FeaturedListings } from '@/components/marketplace/featured-listings'
 import { WhyChooseUs } from '@/components/marketplace/why-choose-us'
 import { OwnerCtaBanner } from '@/components/marketplace/owner-cta-banner'
 import { MarketplaceFooter } from '@/components/marketplace/marketplace-footer'
-import { PropertyDetailModal } from '@/components/marketplace/property-detail-modal'
-import { PropertyCompareDrawer } from '@/components/marketplace/property-compare-drawer'
-import { ListPropertyModal } from '@/components/marketplace/list-property-modal'
 import { MobileBottomNav } from '@/components/marketplace/mobile-bottom-nav'
+import dynamic from 'next/dynamic'
+
+// Dynamically import heavy modals off critical rendering path
+const PropertyDetailModal = dynamic(
+  () => import('@/components/marketplace/property-detail-modal').then((mod) => mod.PropertyDetailModal),
+  { ssr: false }
+)
+const PropertyCompareDrawer = dynamic(
+  () => import('@/components/marketplace/property-compare-drawer').then((mod) => mod.PropertyCompareDrawer),
+  { ssr: false }
+)
+const ListPropertyModal = dynamic(
+  () => import('@/components/marketplace/list-property-modal').then((mod) => mod.ListPropertyModal),
+  { ssr: false }
+)
 
 export default function MarketplaceHomePage() {
   const [properties, setProperties] = useState<PropertyListing[]>([])

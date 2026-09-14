@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+Allow: /search
+Allow: /search-pg
+Allow: /software
+Allow: /portal
+Allow: /community
+Allow: /login
+Allow: /register
+
+Disallow: /dashboard/
+Disallow: /api/
+Disallow: /portal/kyc/
+Disallow: /set-password
+Disallow: /forgot-password
+
+Sitemap: https://pgsetu.online/sitemap.xml

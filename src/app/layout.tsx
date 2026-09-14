@@ -1,12 +1,16 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter, Geist } from 'next/font/google'
+import { Inter } from 'next/font/google'
 import './globals.css'
 import { Toaster } from '@/components/ui/toast'
 import Providers from '@/components/providers'
 import { cn } from "@/lib/utils"
 
-const geist = Geist({ subsets: ['latin'], variable: '--font-sans' })
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  preload: true,
+  variable: '--font-sans',
+})
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -14,12 +18,12 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: 'cover',
-  themeColor: '#2563EB',
+  themeColor: '#16A34A',
 }
 
 export const metadata: Metadata = {
-  title: 'PG-SETU — PG Management System',
-  description: 'Professional PG Management, Billing & Revenue Control System',
+  title: 'PG-SETU — PropTech & PG Rental Network',
+  description: 'Verified PGs, flats and co-living rentals with digital rent passbook and zero brokerage.',
   manifest: '/manifest.json',
   icons: { icon: '/favicon.ico', apple: '/icon-192.png' },
   appleWebApp: {
@@ -30,19 +34,20 @@ export const metadata: Metadata = {
   applicationName: 'PG-SETU',
 }
 
-import InstantPgFloatingWidget from '@/components/shared/instant-pg-floating-widget'
-
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning className={cn("font-sans", geist.variable)}>
-      <body className={`${inter.className} antialiased bg-gray-50 text-gray-900 selection:bg-blue-100 selection:text-blue-900`}>
+    <html lang="en" suppressHydrationWarning className={cn("font-sans", inter.variable)}>
+      <head>
+        <link rel="preconnect" href="https://images.unsplash.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://images.unsplash.com" />
+      </head>
+      <body className={`${inter.className} antialiased bg-gray-50 text-gray-900 selection:bg-[#DCFCE7] selection:text-[#14532D]`}>
         <Providers>
           {children}
-          <InstantPgFloatingWidget />
           <Toaster />
         </Providers>
       </body>

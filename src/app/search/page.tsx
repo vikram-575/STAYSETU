@@ -30,11 +30,25 @@ import { PropertyListing, PropertyType, GenderPreference, SharingType } from '@/
 import { MarketplaceNavbar } from '@/components/marketplace/marketplace-navbar'
 import { MarketplaceFooter } from '@/components/marketplace/marketplace-footer'
 import { PropertyCard } from '@/components/marketplace/property-card'
-import { PropertyDetailModal } from '@/components/marketplace/property-detail-modal'
-import { PropertyCompareDrawer } from '@/components/marketplace/property-compare-drawer'
-import { MapDiscoveryModal } from '@/components/marketplace/map-discovery-modal'
+import dynamic from 'next/dynamic'
 import { MobileBottomNav } from '@/components/marketplace/mobile-bottom-nav'
-import { ListPropertyModal } from '@/components/marketplace/list-property-modal'
+
+const PropertyDetailModal = dynamic(
+  () => import('@/components/marketplace/property-detail-modal').then((mod) => mod.PropertyDetailModal),
+  { ssr: false }
+)
+const PropertyCompareDrawer = dynamic(
+  () => import('@/components/marketplace/property-compare-drawer').then((mod) => mod.PropertyCompareDrawer),
+  { ssr: false }
+)
+const MapDiscoveryModal = dynamic(
+  () => import('@/components/marketplace/map-discovery-modal').then((mod) => mod.MapDiscoveryModal),
+  { ssr: false }
+)
+const ListPropertyModal = dynamic(
+  () => import('@/components/marketplace/list-property-modal').then((mod) => mod.ListPropertyModal),
+  { ssr: false }
+)
 import { POPULAR_CITIES } from '@/data/mock-properties'
 
 const CITIES_LIST = [
