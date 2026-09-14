@@ -22,16 +22,21 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Allow logged-in PG owner/staff to view resident passbook
+    // Allow logged-in PG owner/staff to view resident passbook, OR authenticated resident to view their own portal data
     if (!session) {
       const authUser = await getAuthenticatedUser()
       if (authUser) {
-        const residentParam = request.nextUrl.searchParams.get('resident_id') || request.nextUrl.searchParams.get('id')
+        const residentParam =
+          request.nextUrl.searchParams.get('resident_id') ||
+          request.nextUrl.searchParams.get('id') ||
+          authUser.resident_id ||
+          (authUser.role === 'resident' || (authUser as any).role === 'tenant' ? authUser.id : null)
+
         if (residentParam) {
           session = {
             residentId: residentParam,
             orgId: authUser.organization_id || '',
-            phone: '',
+            phone: authUser.phone || '',
             exp: Math.floor(Date.now() / 1000) + 86400,
           }
         }

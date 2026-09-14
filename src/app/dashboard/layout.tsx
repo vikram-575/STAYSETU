@@ -17,6 +17,15 @@ export default async function DashboardLayout({
     redirect('/login?error=session_expired')
   }
 
+  // Strict Role-Based Isolation: Residents and Tenants must NEVER access PG Owner ERP!
+  if (
+    user.role === 'resident' ||
+    (user as any).role === 'tenant' ||
+    (user as any).role === 'user'
+  ) {
+    redirect('/my-profile')
+  }
+
   // Ensure robust effective organization context is provided
   const effectiveOrg = await resolveEffectiveOrg(user)
 

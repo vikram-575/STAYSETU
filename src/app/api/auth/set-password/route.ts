@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
     const cookieStore = await cookies()
     const authEmail = cookieStore.get('auth_email')?.value
     const authUserId = cookieStore.get('auth_user_id')?.value
+    const authRole = cookieStore.get('auth_role')?.value || ''
 
     const serviceClient = await createServiceClient()
     const supabase = await createClient()
@@ -157,10 +158,15 @@ export async function POST(request: NextRequest) {
       path: '/',
     })
 
+    const isResident = authRole === 'resident' || authRole === 'tenant' || authRole === 'user'
+    const destination = isResident ? '/my-profile' : '/dashboard'
+
     return NextResponse.json({
       success: true,
-      message: 'Permanent password set successfully! Launching PG dashboard...',
-      redirect: '/dashboard',
+      message: isResident
+        ? 'Permanent password set successfully! Launching your resident profile...'
+        : 'Permanent password set successfully! Launching PG dashboard...',
+      redirect: destination,
     })
   } catch (err: any) {
     console.error('[POST /api/auth/set-password Exception]:', err)

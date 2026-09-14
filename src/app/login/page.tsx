@@ -218,7 +218,7 @@ function UnifiedLoginForm() {
         throw new Error(data.error || 'Invalid email or password.')
       }
 
-      window.location.href = '/my-profile'
+      window.location.href = data.redirect || (data.role === 'resident' || data.role === 'tenant' || data.role === 'user' ? '/my-profile' : '/dashboard')
     } catch (err: any) {
       setError(err.message || 'Login failed.')
       setLoading(false)

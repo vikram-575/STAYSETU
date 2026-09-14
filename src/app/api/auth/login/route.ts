@@ -120,7 +120,8 @@ export async function POST(request: NextRequest) {
           .then(() => {})
       }
 
-      const destination = isFromSuperAdminPortal ? '/superman' : '/dashboard'
+      const isResidentRole = resolvedRole === 'resident' || resolvedRole === 'tenant' || resolvedRole === 'user'
+      const destination = isFromSuperAdminPortal ? '/superman' : isResidentRole ? '/my-profile' : '/dashboard'
 
       return NextResponse.json({
         success: true,
@@ -233,11 +234,14 @@ export async function POST(request: NextRequest) {
             .then(() => {})
         }
 
+        const isResidentRole = role === 'resident' || role === 'tenant' || role === 'user'
         let destination: string
         if (isSuperAdmin && isFromSuperAdminPortal) {
           destination = '/superman'
         } else if (mustChangePassword) {
           destination = '/set-password'
+        } else if (isResidentRole) {
+          destination = '/my-profile'
         } else {
           destination = '/dashboard'
         }
@@ -333,10 +337,13 @@ export async function POST(request: NextRequest) {
             cookieStore.set('superadmin_token', '', { maxAge: 0, path: '/' })
           }
 
+          const isResidentRole = role === 'resident' || role === 'tenant' || role === 'user'
           const destination = (isSuperAdmin && isFromSuperAdminPortal)
             ? '/superman'
             : mustChangePassword
             ? '/set-password'
+            : isResidentRole
+            ? '/my-profile'
             : '/dashboard'
 
           return NextResponse.json({

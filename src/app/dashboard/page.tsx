@@ -19,6 +19,14 @@ export default async function DashboardPage() {
   const user = await getAuthenticatedUser()
   if (!user) redirect('/login?error=session_expired')
 
+  if (
+    user.role === 'resident' ||
+    (user as any).role === 'tenant' ||
+    (user as any).role === 'user'
+  ) {
+    redirect('/my-profile')
+  }
+
   const supabase = await createServiceClient()
   const orgId = await resolveEffectiveOrgId(user)
 

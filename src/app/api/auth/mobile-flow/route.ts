@@ -368,9 +368,12 @@ export async function POST(request: NextRequest) {
         })
       }
 
+      const isOwnerOrStaff = ['superadmin', 'owner', 'manager', 'accountant', 'staff'].includes(effectiveRole)
+      const destination = isOwnerOrStaff ? '/dashboard' : '/my-profile'
+
       return NextResponse.json({
         success: true,
-        redirect: '/my-profile',
+        redirect: destination,
         user: savedUser || {
           id: targetUserId,
           full_name: effectiveName,

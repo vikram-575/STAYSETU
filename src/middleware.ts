@@ -53,6 +53,8 @@ export async function middleware(request: NextRequest) {
 
   const authUserId = request.cookies.get('auth_user_id')?.value
   const authEmail = request.cookies.get('auth_email')?.value
+  const authRole = request.cookies.get('auth_role')?.value || sbUser?.user_metadata?.role || ''
+  const isResident = authRole === 'resident' || authRole === 'tenant' || authRole === 'user'
   const isAuthenticated = Boolean(isSuperAdmin || sbUser || (authUserId && authEmail))
 
   const mustChangePassword = request.cookies.get('must_change_password')?.value === 'true'
@@ -82,6 +84,8 @@ export async function middleware(request: NextRequest) {
       ? '/set-password'
       : isSuperAdmin && isSuperAdminLoginPage
       ? '/superman'
+      : isResident
+      ? '/my-profile'
       : '/dashboard'
     return NextResponse.redirect(targetUrl)
   }
@@ -96,7 +100,7 @@ export async function middleware(request: NextRequest) {
   // If user visits /set-password but does not have a temporary password
   if (isAuthenticated && !mustChangePassword && pathname === '/set-password') {
     const targetUrl = request.nextUrl.clone()
-    targetUrl.pathname = '/dashboard'
+    targetUrl.pathname = isResident ? '/my-profile' : '/dashboard'
     return NextResponse.redirect(targetUrl)
   }
 
@@ -109,10 +113,12 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/admin/login') ||
     pathname.startsWith('/superadmin/login') ||
     pathname.startsWith('/portal') ||
+    pathname.startsWith('/my-profile') ||
     pathname.startsWith('/forgot-password') ||
     pathname.startsWith('/reset-password') ||
     pathname.startsWith('/set-password') ||
-    pathname.startsWith('/api/')
+    pathname.startsWith('/api/') ||
+    pathname.startsWith('/software')
 
   if (isPublicRoute) {
     return response
@@ -129,7 +135,7 @@ export async function middleware(request: NextRequest) {
     return response
   }
 
-  // Protect /dashboard and /onboarding routes (All authenticated staff/owners/superadmins)
+  // Protect /dashboard and /onboarding routes (Owner/Staff ERP only)
   if (pathname.startsWith('/dashboard') || pathname.startsWith('/onboarding')) {
     if (!isAuthenticated) {
       const redirectUrl = request.nextUrl.clone()
@@ -139,6 +145,15 @@ export async function middleware(request: NextRequest) {
       }
       return NextResponse.redirect(redirectUrl)
     }
+
+    // Role-Based Isolation: Residents/tenants MUST NEVER access PG Owner / Staff ERP dashboard!
+    if (isResident) {
+      const redirectUrl = request.nextUrl.clone()
+      redirectUrl.pathname = '/my-profile'
+      redirectUrl.search = ''
+      return NextResponse.redirect(redirectUrl)
+    }
+
     return response
   }
 
