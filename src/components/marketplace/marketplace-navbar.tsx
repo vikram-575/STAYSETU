@@ -134,12 +134,12 @@ export function MarketplaceNavbar({
 
         {/* Desktop Navigation Links */}
         <nav className="hidden items-center gap-7 md:flex">
-          <button
-            onClick={() => handleNavClick('featured-properties')}
+          <Link
+            href="/search"
             className="text-sm font-medium text-[#17211B] transition hover:text-[#16A34A]"
           >
-            Explore Spaces
-          </button>
+            Search PG
+          </Link>
           <button
             onClick={() => handleNavClick('popular-cities')}
             className="text-sm font-medium text-[#647067] transition hover:text-[#16A34A]"
@@ -288,13 +288,14 @@ export function MarketplaceNavbar({
       {mobileMenuOpen && (
         <div className="border-b border-gray-200 bg-white px-4 pt-3 pb-6 shadow-xl md:hidden animate-in slide-in-from-top-2">
           <div className="flex flex-col gap-3">
-            <button
-              onClick={() => handleNavClick('featured-properties')}
+            <Link
+              href="/search"
+              onClick={() => setMobileMenuOpen(false)}
               className="flex items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-[#17211B] hover:bg-gray-50"
             >
-              <span>Explore Spaces</span>
+              <span>Search PG</span>
               <Search className="h-4 w-4 text-[#647067]" />
-            </button>
+            </Link>
             <button
               onClick={() => handleNavClick('popular-cities')}
               className="flex items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-[#17211B] hover:bg-gray-50"

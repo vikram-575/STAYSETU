@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Search,
   MapPin,
@@ -53,6 +54,7 @@ const POPULAR_SUGGESTIONS = [
 ]
 
 export function HeroSearch({ onSearch, selectedCity, onCityChange }: HeroSearchProps) {
+  const router = useRouter()
   const { content } = useWebsiteContent()
   const hero = content?.hero
 
@@ -80,11 +82,18 @@ export function HeroSearch({ onSearch, selectedCity, onCityChange }: HeroSearchP
       maxBudget: budgetRange,
       quickChip: activeChip || undefined,
     })
-    // Smooth scroll down to listings
-    const target = document.getElementById('featured-properties')
-    if (target) {
-      target.scrollIntoView({ behavior: 'smooth' })
-    }
+
+    // Jump immediately to dedicated Search PG page with selected filters
+    const params = new URLSearchParams()
+    if (selectedCity && selectedCity !== 'all') params.set('city', selectedCity)
+    if (locationQuery) params.set('locality', locationQuery)
+    if (activeTab && activeTab !== 'all') params.set('type', activeTab)
+    if (sharingType && sharingType !== 'all') params.set('sharing', sharingType)
+    if (budgetRange > 0) params.set('budget', budgetRange.toString())
+    if (activeChip) params.set('quickChip', activeChip)
+
+    const queryStr = params.toString()
+    router.push(`/search${queryStr ? `?${queryStr}` : ''}`)
   }
 
   const handleChipClick = (chipKey: string) => {
@@ -98,10 +107,15 @@ export function HeroSearch({ onSearch, selectedCity, onCityChange }: HeroSearchP
       maxBudget: budgetRange,
       quickChip: nextChip || undefined,
     })
-    const target = document.getElementById('featured-properties')
-    if (target) {
-      target.scrollIntoView({ behavior: 'smooth' })
-    }
+
+    const params = new URLSearchParams()
+    if (selectedCity && selectedCity !== 'all') params.set('city', selectedCity)
+    if (locationQuery) params.set('locality', locationQuery)
+    if (activeTab && activeTab !== 'all') params.set('type', activeTab)
+    if (nextChip) params.set('quickChip', nextChip)
+
+    const queryStr = params.toString()
+    router.push(`/search${queryStr ? `?${queryStr}` : ''}`)
   }
 
   return (
@@ -271,7 +285,7 @@ export function HeroSearch({ onSearch, selectedCity, onCityChange }: HeroSearchP
                   className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] py-2.5 sm:py-2.5 px-4 text-xs sm:text-sm font-bold text-white shadow-md hover:opacity-95 active:scale-98 transition"
                 >
                   <Search className="h-4 w-4" />
-                  <span>Search Spaces</span>
+                  <span>Search PG</span>
                 </button>
               </div>
             </form>

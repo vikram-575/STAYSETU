@@ -2,6 +2,7 @@
 
 import React from 'react'
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 import { MapPin, ArrowRight, Building, Sparkles } from 'lucide-react'
 import { useWebsiteContent } from '@/context/website-content-context'
 
@@ -14,15 +15,17 @@ interface PopularCitiesProps {
 }
 
 export function PopularCities({ onSelectCity, activeCity, properties = [] }: PopularCitiesProps) {
+  const router = useRouter()
   const { content } = useWebsiteContent()
   const citiesData = content?.cities
   const citiesList = citiesData?.cities || []
 
   const handleCityClick = (cityName: string) => {
-    onSelectCity(cityName)
-    const target = document.getElementById('featured-properties')
-    if (target) {
-      target.scrollIntoView({ behavior: 'smooth' })
+    onSelectCity?.(cityName)
+    if (cityName === 'all') {
+      router.push('/search')
+    } else {
+      router.push(`/search?city=${encodeURIComponent(cityName)}`)
     }
   }
 

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useMemo } from 'react'
+import Link from 'next/link'
 import {
   SlidersHorizontal,
   LayoutGrid,
@@ -13,6 +14,7 @@ import {
   Building,
   Sparkles,
   MapPin,
+  ArrowRight,
 } from 'lucide-react'
 import { PropertyListing, PropertyType, GenderPreference } from '@/types/marketplace'
 import { PropertyCard } from './property-card'
@@ -145,17 +147,28 @@ export function FeaturedListings({
               <Sparkles className="h-3.5 w-3.5 text-[#16A34A]" />
               <span>Verified Market Feed</span>
             </div>
-            <h2 className="mt-2 text-xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-[#14532D]">
-              Featured PGs, Flats & Rooms for Rent
-            </h2>
+            <Link href="/search" className="group flex items-center gap-2 mt-2">
+              <h2 className="text-xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-[#14532D] group-hover:text-[#16A34A] transition">
+                Featured PGs, Flats & Rooms for Rent
+              </h2>
+              <ArrowRight className="h-5 w-5 sm:h-6 sm:w-6 text-[#16A34A] opacity-70 group-hover:opacity-100 group-hover:translate-x-1 transition-all shrink-0" />
+            </Link>
             <p className="mt-1 text-xs sm:text-sm text-[#647067]">
               Showing {filteredProperties.length} verified spaces
               {activeCity !== 'all' ? ` in ${activeCity}` : ' across India'} with direct owner connect.
             </p>
           </div>
 
-          {/* View Toggle (Grid vs Split Map) */}
-          <div className="flex items-center gap-2">
+          {/* View Toggle & Search PG CTA */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Link
+              href="/search"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] px-3.5 py-2 text-xs sm:text-sm font-bold text-white shadow-xs hover:opacity-95 active:scale-98 transition"
+            >
+              <span>Explore All in Search PG</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+
             <div className="inline-flex rounded-xl border border-gray-200 bg-white p-1 shadow-2xs">
               <button
                 onClick={() => setViewMode('grid')}

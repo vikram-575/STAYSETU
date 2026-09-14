@@ -2,7 +2,7 @@
 
 import React from 'react'
 import Link from 'next/link'
-import { Home, Compass, Map, Heart, KeyRound, GitCompare } from 'lucide-react'
+import { Home, Search, Map, Heart, KeyRound, GitCompare } from 'lucide-react'
 
 interface MobileBottomNavProps {
   savedCount?: number
@@ -10,6 +10,7 @@ interface MobileBottomNavProps {
   onToggleMap?: () => void
   onShowSaved?: () => void
   onOpenCompare?: () => void
+  onOpenListModal?: () => void
 }
 
 export function MobileBottomNav({
@@ -18,12 +19,8 @@ export function MobileBottomNav({
   onToggleMap,
   onShowSaved,
   onOpenCompare,
+  onOpenListModal,
 }: MobileBottomNavProps) {
-  const scrollToExplore = () => {
-    const el = document.getElementById('featured-properties')
-    if (el) el.scrollIntoView({ behavior: 'smooth' })
-  }
-
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -32,22 +29,22 @@ export function MobileBottomNav({
     <div className="fixed bottom-0 inset-x-0 z-30 border-t border-gray-200 bg-white/95 py-2 px-3 backdrop-blur-md md:hidden safe-bottom shadow-lg">
       <div className="flex items-center justify-around">
         {/* Home */}
-        <button
-          onClick={scrollToTop}
+        <Link
+          href="/"
           className="flex flex-col items-center gap-1 text-[#647067] hover:text-[#16A34A]"
         >
           <Home className="h-5 w-5" />
           <span className="text-[10px] font-medium">Home</span>
-        </button>
+        </Link>
 
-        {/* Explore */}
-        <button
-          onClick={scrollToExplore}
+        {/* Search PG */}
+        <Link
+          href="/search"
           className="flex flex-col items-center gap-1 text-[#647067] hover:text-[#16A34A]"
         >
-          <Compass className="h-5 w-5" />
-          <span className="text-[10px] font-medium">Explore</span>
-        </button>
+          <Search className="h-5 w-5" />
+          <span className="text-[10px] font-medium">Search PG</span>
+        </Link>
 
         {/* Map View */}
         {onToggleMap && (

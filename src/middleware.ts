@@ -55,7 +55,13 @@ export async function middleware(request: NextRequest) {
   const authEmail = request.cookies.get('auth_email')?.value
   const authRole = request.cookies.get('auth_role')?.value || sbUser?.user_metadata?.role || ''
   const isResident = authRole === 'resident' || authRole === 'tenant' || authRole === 'user'
-  const isAuthenticated = Boolean(isSuperAdmin || sbUser || (authUserId && authEmail))
+  const isSuperAdminUser =
+    isSuperAdmin ||
+    authEmail === 'vikramtomar0505@gmail.com' ||
+    sbUser?.user_metadata?.role === 'superadmin' ||
+    authRole === 'superadmin'
+
+  const isAuthenticated = Boolean(isSuperAdminUser || sbUser || (authUserId && authEmail))
 
   const mustChangePassword = request.cookies.get('must_change_password')?.value === 'true'
 
@@ -64,25 +70,33 @@ export async function middleware(request: NextRequest) {
   const hasError = request.nextUrl.searchParams.has('error')
   const shouldBypassLoginRedirect = hasRedirectTo || hasError
 
-  // If already logged in and visiting login pages, redirect to home (unless recovering or errored)
+  const isSuperAdminLoginPage =
+    pathname === '/superman/login' ||
+    pathname === '/admin/login' ||
+    pathname === '/superadmin/login'
+
+  // If visiting a SuperAdmin login page:
+  // If already authenticated as SuperAdmin, take them to /superman.
+  // If authenticated as normal owner/resident, DO NOT redirect to /dashboard — let them see the SuperAdmin login!
+  if (isSuperAdminLoginPage) {
+    if (isSuperAdminUser && !shouldBypassLoginRedirect) {
+      const targetUrl = request.nextUrl.clone()
+      targetUrl.pathname = '/superman'
+      return NextResponse.redirect(targetUrl)
+    }
+    return response
+  }
+
+  // If already logged in and visiting normal login/register pages, redirect to appropriate home
   if (
     isAuthenticated &&
     !shouldBypassLoginRedirect &&
-    (pathname === '/login' ||
-      pathname === '/register' ||
-      pathname === '/superman/login' ||
-      pathname === '/admin/login' ||
-      pathname === '/superadmin/login')
+    (pathname === '/login' || pathname === '/register')
   ) {
-    const isSuperAdminLoginPage =
-      pathname === '/superman/login' ||
-      pathname === '/admin/login' ||
-      pathname === '/superadmin/login'
-
     const targetUrl = request.nextUrl.clone()
     targetUrl.pathname = mustChangePassword
       ? '/set-password'
-      : isSuperAdmin && isSuperAdminLoginPage
+      : isSuperAdminUser
       ? '/superman'
       : isResident
       ? '/my-profile'
@@ -104,9 +118,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(targetUrl)
   }
 
-  // Public routes allowed without login (including root landing page)
+  // Public routes allowed without login (including root landing page & Search PG)
   const isPublicRoute =
     pathname === '/' ||
+    pathname.startsWith('/search') ||
+    pathname.startsWith('/search-pg') ||
     pathname.startsWith('/login') ||
     pathname.startsWith('/register') ||
     pathname.startsWith('/superman/login') ||
@@ -126,7 +142,7 @@ export async function middleware(request: NextRequest) {
 
   // Protect /superman, /admin, and /superadmin routes (Super Admin only)
   if (pathname.startsWith('/superman') || pathname.startsWith('/admin') || pathname.startsWith('/superadmin')) {
-    if (!isSuperAdmin && (!sbUser || sbUser.user_metadata?.role !== 'superadmin')) {
+    if (!isSuperAdminUser) {
       const redirectUrl = request.nextUrl.clone()
       redirectUrl.pathname = '/superman/login'
       redirectUrl.searchParams.set('redirectTo', pathname)

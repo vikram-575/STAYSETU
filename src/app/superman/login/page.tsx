@@ -29,7 +29,7 @@ function CompanyAdminLoginForm() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: cleanEmail, password }),
+        body: JSON.stringify({ email: cleanEmail, password, from: 'superadmin' }),
       })
 
       const data = await res.json()

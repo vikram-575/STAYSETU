@@ -762,10 +762,10 @@ export default function LoginPage() {
           <span className="font-extrabold text-sm tracking-tight">PGSetu</span>
         </Link>
         <Link
-          href="/"
+          href="/search"
           className="text-xs font-bold bg-[#DCFCE7] text-[#14532D] px-3 py-1.5 rounded-full hover:bg-white transition flex items-center gap-1"
         >
-          <span>Explore Spaces</span>
+          <span>Search PG</span>
           <ArrowRight className="w-3 h-3" />
         </Link>
       </div>
