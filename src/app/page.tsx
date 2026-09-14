@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { PropertyListing, PropertyType } from '@/types/marketplace'
 import { MarketplaceNavbar } from '@/components/marketplace/marketplace-navbar'
 import { HeroSearch } from '@/components/marketplace/hero-search'
@@ -11,6 +12,7 @@ import { WhyChooseUs } from '@/components/marketplace/why-choose-us'
 import { OwnerCtaBanner } from '@/components/marketplace/owner-cta-banner'
 import { MarketplaceFooter } from '@/components/marketplace/marketplace-footer'
 import { MobileBottomNav } from '@/components/marketplace/mobile-bottom-nav'
+import { SavedPropertiesModal } from '@/components/marketplace/saved-properties-modal'
 import dynamic from 'next/dynamic'
 
 // Dynamically import heavy modals off critical rendering path
@@ -28,11 +30,13 @@ const ListPropertyModal = dynamic(
 )
 
 export default function MarketplaceHomePage() {
+  const router = useRouter()
   const [properties, setProperties] = useState<PropertyListing[]>([])
   const [loadingProperties, setLoadingProperties] = useState(true)
   const [selectedProperty, setSelectedProperty] = useState<PropertyListing | null>(null)
   const [savedIds, setSavedIds] = useState<string[]>([])
   const [comparedProperties, setComparedProperties] = useState<PropertyListing[]>([])
+  const [isSavedDrawerOpen, setIsSavedDrawerOpen] = useState(false)
   const [isListModalOpen, setIsListModalOpen] = useState(false)
   const [activeCity, setActiveCity] = useState<string>('all')
 
@@ -193,6 +197,7 @@ export default function MarketplaceHomePage() {
         savedCount={savedIds.length}
         compareCount={comparedProperties.length}
         onOpenCompare={() => {}}
+        onShowSaved={() => setIsSavedDrawerOpen(true)}
       />
 
       {/* 2. Hero Section with Search Card */}
@@ -217,7 +222,7 @@ export default function MarketplaceHomePage() {
         <FeaturedListings
           properties={properties}
           isLoading={loadingProperties}
-          onSelectDetails={(prop) => setSelectedProperty(prop)}
+          onSelectDetails={(prop) => router.push(`/property/${prop.id}`)}
           savedIds={savedIds}
           onToggleSave={handleToggleSave}
           comparedIds={comparedProperties.map((p) => p.id)}
@@ -244,16 +249,21 @@ export default function MarketplaceHomePage() {
           const el = document.getElementById('featured-properties')
           if (el) el.scrollIntoView({ behavior: 'smooth' })
         }}
-        onShowSaved={() => {
-          // Scroll to listings with saved filter or open details
-          const el = document.getElementById('featured-properties')
-          if (el) el.scrollIntoView({ behavior: 'smooth' })
-        }}
+        onShowSaved={() => setIsSavedDrawerOpen(true)}
         onOpenCompare={() => {}}
       />
 
       {/* 10. Modals & Drawers */}
-      {/* Property Details Modal */}
+      {/* Saved Properties Drawer */}
+      <SavedPropertiesModal
+        isOpen={isSavedDrawerOpen}
+        onClose={() => setIsSavedDrawerOpen(false)}
+        properties={properties}
+        savedIds={savedIds}
+        onToggleSave={handleToggleSave}
+      />
+
+      {/* Property Details Modal (Fallback) */}
       {selectedProperty && (
         <PropertyDetailModal
           property={selectedProperty}
@@ -268,7 +278,7 @@ export default function MarketplaceHomePage() {
         comparedProperties={comparedProperties}
         onRemoveFromCompare={handleRemoveFromCompare}
         onClearCompare={handleClearCompare}
-        onSelectDetails={(prop) => setSelectedProperty(prop)}
+        onSelectDetails={(prop) => router.push(`/property/${prop.id}`)}
       />
 
       {/* 10-Step List Your Property Wizard Modal */}

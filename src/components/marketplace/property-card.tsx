@@ -1,6 +1,8 @@
 'use client'
 
 import React, { useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   Heart,
   Star,
@@ -22,7 +24,7 @@ import { PropertyListing } from '@/types/marketplace'
 
 interface PropertyCardProps {
   property: PropertyListing
-  onSelectDetails: (property: PropertyListing) => void
+  onSelectDetails?: (property: PropertyListing) => void
   isSaved?: boolean
   onToggleSave?: (propertyId: string) => void
   isCompared?: boolean
@@ -37,7 +39,16 @@ export function PropertyCard({
   isCompared = false,
   onToggleCompare,
 }: PropertyCardProps) {
+  const router = useRouter()
   const [currentImageIdx, setCurrentImageIdx] = useState(0)
+
+  const handleCardClick = () => {
+    if (onSelectDetails) {
+      onSelectDetails(property)
+    } else {
+      router.push(`/property/${property.id}`)
+    }
+  }
 
   const handlePrevImage = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -80,7 +91,7 @@ export function PropertyCard({
 
   return (
     <div
-      onClick={() => onSelectDetails(property)}
+      onClick={handleCardClick}
       className="group relative flex flex-col overflow-hidden rounded-xl sm:rounded-2xl border border-gray-200/90 bg-white shadow-xs transition-all duration-200 hover:-translate-y-1 hover:border-[#16A34A]/60 hover:shadow-xl cursor-pointer"
     >
       {/* Aspect Ratio Image Container */}
@@ -273,16 +284,19 @@ export function PropertyCard({
               </button>
 
               {/* View Details CTA */}
-              <button
+              <Link
+                href={`/property/${property.id}`}
                 onClick={(e) => {
                   e.stopPropagation()
-                  onSelectDetails(property)
+                  if (onSelectDetails) {
+                    onSelectDetails(property)
+                  }
                 }}
                 className="inline-flex items-center gap-0.5 sm:gap-1 rounded-lg sm:rounded-xl bg-[#14532D] px-2 sm:px-3 py-1 sm:py-1.5 text-[9.5px] sm:text-xs font-bold text-white shadow-xs hover:bg-[#16A34A] transition active:scale-95"
               >
                 <span>View</span>
                 <Eye className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-              </button>
+              </Link>
             </div>
           </div>
         </div>

@@ -168,6 +168,21 @@ export async function GET(request: NextRequest) {
       }
     })
 
+    const id = searchParams.get('id')
+    if (id) {
+      const match = listings.find((l) => l.id === id || l.slug === id)
+      const sameCity = match ? listings.filter((l) => l.id !== match.id && l.city.toLowerCase() === match.city.toLowerCase()) : []
+      const otherCities = match ? listings.filter((l) => l.id !== match.id && l.city.toLowerCase() !== match.city.toLowerCase()) : []
+      const recommended = [...sameCity, ...otherCities].slice(0, 6)
+
+      return NextResponse.json({
+        success: true,
+        property: match || null,
+        recommended,
+        properties: listings,
+      })
+    }
+
     let filtered = listings
 
     if (city && city !== 'all') {

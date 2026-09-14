@@ -26,6 +26,7 @@ interface MarketplaceNavbarProps {
   compareCount?: number
   onOpenCompare?: () => void
   onScrollToSection?: (sectionId: string) => void
+  onShowSaved?: () => void
 }
 
 export function MarketplaceNavbar({
@@ -34,6 +35,7 @@ export function MarketplaceNavbar({
   compareCount = 0,
   onOpenCompare,
   onScrollToSection,
+  onShowSaved,
 }: MarketplaceNavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [currentUser, setCurrentUser] = useState<any>(null)
@@ -169,6 +171,23 @@ export function MarketplaceNavbar({
 
         {/* Right CTA Actions */}
         <div className="hidden items-center gap-3 lg:flex">
+          {/* Saved Properties Button */}
+          {onShowSaved && (
+            <button
+              onClick={onShowSaved}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200/90 bg-white px-3 py-1.5 text-xs font-bold text-[#17211B] shadow-2xs hover:border-rose-300 hover:text-rose-600 transition active:scale-95"
+              title="Saved Properties"
+            >
+              <Heart className={`h-3.5 w-3.5 ${savedCount > 0 ? 'fill-rose-500 text-rose-500' : 'text-gray-500'}`} />
+              <span>Saved</span>
+              {savedCount > 0 && (
+                <span className="flex h-4.5 w-4.5 items-center justify-center rounded-full bg-rose-500 text-[10px] text-white">
+                  {savedCount}
+                </span>
+              )}
+            </button>
+          )}
+
           {/* Compare Badge */}
           {compareCount > 0 && (
             <button
@@ -328,6 +347,26 @@ export function MarketplaceNavbar({
               <span>Why PGSetu</span>
               <Sparkles className="h-4 w-4 text-[#F59E0B]" />
             </button>
+
+            {onShowSaved && (
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false)
+                  onShowSaved()
+                }}
+                className="flex items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-[#17211B] hover:bg-rose-50"
+              >
+                <div className="flex items-center gap-2">
+                  <Heart className={`h-4 w-4 ${savedCount > 0 ? 'fill-rose-500 text-rose-500' : 'text-gray-500'}`} />
+                  <span>Saved Properties</span>
+                </div>
+                {savedCount > 0 && (
+                  <span className="rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                    {savedCount}
+                  </span>
+                )}
+              </button>
+            )}
 
             <div className="my-2 border-t border-gray-200" />
 

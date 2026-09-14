@@ -25,6 +25,7 @@ import {
   RotateCcw,
   Share2,
   ChevronDown,
+  Heart,
 } from 'lucide-react'
 import { PropertyListing, PropertyType, GenderPreference, SharingType } from '@/types/marketplace'
 import { MarketplaceNavbar } from '@/components/marketplace/marketplace-navbar'
@@ -32,6 +33,7 @@ import { MarketplaceFooter } from '@/components/marketplace/marketplace-footer'
 import { PropertyCard } from '@/components/marketplace/property-card'
 import dynamic from 'next/dynamic'
 import { MobileBottomNav } from '@/components/marketplace/mobile-bottom-nav'
+import { SavedPropertiesModal } from '@/components/marketplace/saved-properties-modal'
 
 const PropertyDetailModal = dynamic(
   () => import('@/components/marketplace/property-detail-modal').then((mod) => mod.PropertyDetailModal),
@@ -123,6 +125,8 @@ function SearchPGContent() {
   const [comparedProperties, setComparedProperties] = useState<PropertyListing[]>([])
   const [isMapModalOpen, setIsMapModalOpen] = useState(false)
   const [isListModalOpen, setIsListModalOpen] = useState(false)
+  const [isSavedDrawerOpen, setIsSavedDrawerOpen] = useState(false)
+  const [filterSavedOnly, setFilterSavedOnly] = useState(false)
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
   const [copySuccess, setCopySuccess] = useState(false)
 
@@ -329,6 +333,11 @@ function SearchPGContent() {
           }
         }
 
+        // Saved / Bookmarked filter
+        if (filterSavedOnly && !savedIds.includes(item.id)) {
+          return false
+        }
+
         // Search text query
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase().trim()
@@ -366,6 +375,8 @@ function SearchPGContent() {
     selectedAmenities,
     searchQuery,
     sortBy,
+    filterSavedOnly,
+    savedIds,
   ])
 
   return (
@@ -376,6 +387,7 @@ function SearchPGContent() {
         savedCount={savedIds.length}
         compareCount={comparedProperties.length}
         onOpenCompare={() => {}}
+        onShowSaved={() => setIsSavedDrawerOpen(true)}
       />
 
       {/* Search Header Banner */}
@@ -672,6 +684,24 @@ function SearchPGContent() {
 
             {/* Quick Filter Badges Bar */}
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+              {/* Saved Properties Pill */}
+              <button
+                onClick={() => {
+                  if (savedIds.length === 0) {
+                    setIsSavedDrawerOpen(true)
+                  } else {
+                    setFilterSavedOnly(!filterSavedOnly)
+                  }
+                }}
+                className={`rounded-full px-3 py-1 text-xs font-bold shrink-0 transition active:scale-95 inline-flex items-center gap-1.5 ${
+                  filterSavedOnly
+                    ? 'bg-rose-500 text-white shadow-xs'
+                    : 'bg-white border border-rose-200 text-rose-700 hover:bg-rose-50'
+                }`}
+              >
+                <Heart className={`h-3 w-3 ${filterSavedOnly ? 'fill-white' : 'fill-rose-500 text-rose-500'}`} />
+                <span>Saved ({savedIds.length})</span>
+              </button>
               {[
                 { label: 'Near Metro', key: 'near_metro' },
                 { label: 'Food Included', key: 'food_included' },
@@ -748,7 +778,7 @@ function SearchPGContent() {
                   <PropertyCard
                     key={prop.id}
                     property={prop}
-                    onSelectDetails={(p) => setSelectedProperty(p)}
+                    onSelectDetails={(p) => router.push(`/property/${p.id}`)}
                     isSaved={savedIds.includes(prop.id)}
                     onToggleSave={handleToggleSave}
                     isCompared={comparedProperties.some((cp) => cp.id === prop.id)}
@@ -892,7 +922,7 @@ function SearchPGContent() {
         comparedProperties={comparedProperties}
         onRemoveFromCompare={(id) => setComparedProperties((prev) => prev.filter((p) => p.id !== id))}
         onClearCompare={() => setComparedProperties([])}
-        onSelectDetails={(p) => setSelectedProperty(p)}
+        onSelectDetails={(p) => router.push(`/property/${p.id}`)}
       />
 
       {/* Interactive Map Discovery Modal */}
@@ -900,7 +930,7 @@ function SearchPGContent() {
         <MapDiscoveryModal
           properties={filteredProperties}
           selectedProperty={selectedProperty}
-          onSelectProperty={(p) => setSelectedProperty(p)}
+          onSelectProperty={(p) => router.push(`/property/${p.id}`)}
           onClose={() => setIsMapModalOpen(false)}
           isModal={true}
         />
@@ -920,9 +950,18 @@ function SearchPGContent() {
       <MobileBottomNav
         savedCount={savedIds.length}
         compareCount={comparedProperties.length}
-        onShowSaved={() => {}}
+        onShowSaved={() => setIsSavedDrawerOpen(true)}
         onOpenCompare={() => {}}
         onOpenListModal={() => setIsListModalOpen(true)}
+      />
+
+      {/* Saved Properties Drawer */}
+      <SavedPropertiesModal
+        isOpen={isSavedDrawerOpen}
+        onClose={() => setIsSavedDrawerOpen(false)}
+        properties={properties}
+        savedIds={savedIds}
+        onToggleSave={handleToggleSave}
       />
 
       {/* Footer */}
