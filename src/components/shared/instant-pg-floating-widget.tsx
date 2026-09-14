@@ -26,7 +26,7 @@ export default function InstantPgFloatingWidget() {
   const [notes, setNotes] = useState('')
   const [formError, setFormError] = useState('')
 
-  // Hide widget inside dashboard and admin consoles to keep their workspace clean
+  // Hide widget inside dashboard, admin consoles, and property/portal detail pages to prevent UI overlap
   if (
     pathname?.startsWith('/dashboard') ||
     pathname?.startsWith('/admin') ||
@@ -34,7 +34,10 @@ export default function InstantPgFloatingWidget() {
     pathname?.startsWith('/superadmin') ||
     pathname?.startsWith('/login') ||
     pathname?.startsWith('/register') ||
-    pathname?.startsWith('/set-password')
+    pathname?.startsWith('/set-password') ||
+    pathname?.startsWith('/property') ||
+    pathname?.startsWith('/portal') ||
+    pathname?.startsWith('/my-profile')
   ) {
     return null
   }
@@ -109,32 +112,50 @@ export default function InstantPgFloatingWidget() {
 
   return (
     <>
-      {/* FLOATING ACTION BUTTON (TRIGGER) - Sits cleanly above mobile bottom nav bar & safe area */}
-      <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-6 right-3 sm:right-6 z-40 select-none">
+      {/* FLOATING ACTION BUTTON (TRIGGER) - Sits cleanly above mobile bottom nav bar */}
+      <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-6 right-3 sm:right-6 z-30 select-none">
+        {/* Mobile Compact Circular FAB (44px) - never blocks property cards */}
         <button
           onClick={() => setIsOpen(true)}
-          className="group relative flex items-center gap-2 sm:gap-3 px-3 py-2 sm:px-4 sm:py-3 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:via-teal-500 hover:to-emerald-600 text-white font-black text-xs sm:text-sm rounded-full shadow-2xl shadow-emerald-950/30 hover:shadow-emerald-600/50 active:scale-95 transition-all duration-300 border-2 border-white/25 backdrop-blur-sm cursor-pointer"
+          className="flex sm:hidden relative items-center justify-center w-11 h-11 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white rounded-full shadow-xl shadow-emerald-950/40 active:scale-95 transition-all duration-200 border-2 border-white/30 cursor-pointer"
+          title="Instant PG Support (15 Min Allotment)"
+          aria-label="Get Instant PG"
+        >
+          {/* Beacon Pulse Ring */}
+          <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-amber-500 border-2 border-white shadow-xs" />
+          </span>
+          <div className="w-6 h-6 rounded-full bg-amber-400 text-emerald-950 flex items-center justify-center shadow-inner">
+            <Zap className="w-3.5 h-3.5 fill-emerald-950" />
+          </div>
+        </button>
+
+        {/* Desktop / Tablet Rich Button */}
+        <button
+          onClick={() => setIsOpen(true)}
+          className="hidden sm:flex group relative items-center gap-3 px-4 py-3 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:via-teal-500 hover:to-emerald-600 text-white font-black text-sm rounded-full shadow-2xl shadow-emerald-950/30 hover:shadow-emerald-600/50 active:scale-95 transition-all duration-300 border-2 border-white/25 backdrop-blur-sm cursor-pointer"
           title="Book Instant Verified PG"
           aria-label="Get Instant PG"
         >
           {/* Beacon Pulse Ring */}
-          <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 sm:h-4 sm:w-4">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3.5 w-3.5 sm:h-4 sm:w-4 bg-amber-500 border-2 border-white shadow-xs"></span>
+          <span className="absolute -top-1 -right-1 flex h-4 w-4">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-4 w-4 bg-amber-500 border-2 border-white shadow-xs" />
           </span>
 
-          <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-amber-400 text-emerald-950 flex items-center justify-center shadow-inner group-hover:rotate-12 transition-transform shrink-0">
-            <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-emerald-950" />
+          <div className="w-7 h-7 rounded-full bg-amber-400 text-emerald-950 flex items-center justify-center shadow-inner group-hover:rotate-12 transition-transform shrink-0">
+            <Zap className="w-4 h-4 fill-emerald-950" />
           </div>
 
-          <div className="text-left leading-tight pr-0.5 sm:pr-1">
+          <div className="text-left leading-tight pr-1">
             <div className="flex items-center gap-1.5">
               <span className="font-extrabold tracking-tight">⚡ Instant PG</span>
-              <span className="hidden sm:inline-block px-1.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-300/25 text-amber-200 border border-amber-300/30">
+              <span className="inline-block px-1.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-300/25 text-amber-200 border border-amber-300/30">
                 15 MIN ALLOTMENT
               </span>
             </div>
-            <p className="text-[10px] text-emerald-100 font-normal hidden sm:block">
+            <p className="text-[10px] text-emerald-100 font-normal">
               Zero Brokerage • Verified Stays
             </p>
           </div>

@@ -256,6 +256,27 @@ function SearchPGContent() {
     }
   }
 
+  // Active filters count for badges
+  const activeFiltersCount = useMemo(() => {
+    return (
+      selectedAmenities.length +
+      (propertyType !== 'all' ? 1 : 0) +
+      (genderPref !== 'all' ? 1 : 0) +
+      (sharingType !== 'all' ? 1 : 0) +
+      (maxBudget > 0 ? 1 : 0) +
+      (foodOnly ? 1 : 0) +
+      (filterSavedOnly ? 1 : 0)
+    )
+  }, [
+    selectedAmenities,
+    propertyType,
+    genderPref,
+    sharingType,
+    maxBudget,
+    foodOnly,
+    filterSavedOnly,
+  ])
+
   // Filtered & Sorted properties
   const filteredProperties = useMemo(() => {
     return properties
@@ -391,10 +412,10 @@ function SearchPGContent() {
       />
 
       {/* Search Header Banner */}
-      <div className="bg-gradient-to-b from-white to-[#F7FAF7] border-b border-gray-200/80 pt-6 pb-6 px-4 sm:px-6 lg:px-8">
+      <div className="bg-gradient-to-b from-white to-[#F7FAF7] border-b border-gray-200/80 pt-3 pb-3 sm:pt-6 sm:pb-6 px-3 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
-          {/* Breadcrumb & Title */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          {/* Desktop Only: Breadcrumb & Title */}
+          <div className="hidden sm:flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <div className="flex items-center gap-2 text-xs font-semibold text-[#647067] mb-1.5">
                 <Link href="/" className="hover:text-[#16A34A] transition">Home</Link>
@@ -433,22 +454,23 @@ function SearchPGContent() {
             </div>
           </div>
 
-          {/* Primary Top Search Input & Quick Cities Strip */}
-          <div className="mt-5 flex flex-col gap-3">
-            <div className="flex flex-col sm:flex-row items-center gap-2.5">
-              <div className="relative w-full flex-1">
-                <Search className="absolute left-3.5 top-3 h-4 w-4 text-[#16A34A]" />
+          {/* Search Controls (Mobile-First Compact Row) */}
+          <div className="mt-1 sm:mt-5 flex flex-col gap-2 sm:gap-3">
+            <div className="flex items-center gap-2">
+              {/* Search Input */}
+              <div className="relative flex-1 min-w-0">
+                <Search className="absolute left-3 top-2.5 sm:top-3 h-4 w-4 text-[#16A34A]" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by locality, area, landmark, PG name or metro station..."
-                  className="w-full rounded-2xl border border-gray-200 bg-white py-2.5 pl-10 pr-9 text-xs sm:text-sm font-medium text-[#17211B] placeholder-gray-400 focus:border-[#16A34A] focus:outline-hidden shadow-xs transition"
+                  placeholder="Search locality, PG name, metro..."
+                  className="w-full rounded-xl sm:rounded-2xl border border-gray-200 bg-white py-2 sm:py-2.5 pl-9 sm:pl-10 pr-8 text-xs sm:text-sm font-medium text-[#17211B] placeholder-gray-400 focus:border-[#16A34A] focus:outline-hidden shadow-2xs transition"
                 />
                 {searchQuery && (
                   <button
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                    className="absolute right-2.5 top-2 sm:top-2.5 text-gray-400 hover:text-gray-600"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -458,15 +480,35 @@ function SearchPGContent() {
               {/* Mobile Filter Toggle Button */}
               <button
                 onClick={() => setMobileFilterOpen(true)}
-                className="flex lg:hidden w-full sm:w-auto items-center justify-center gap-2 rounded-2xl border border-[#16A34A] bg-[#DCFCE7] px-4 py-2.5 text-xs font-bold text-[#14532D] shadow-xs active:scale-98 transition"
+                className={`flex lg:hidden items-center gap-1 rounded-xl px-2.5 sm:px-3 py-2 text-xs font-bold transition shadow-xs shrink-0 active:scale-95 ${
+                  activeFiltersCount > 0
+                    ? 'bg-[#14532D] text-white border border-[#14532D]'
+                    : 'bg-[#DCFCE7] text-[#14532D] border border-[#16A34A]'
+                }`}
+                aria-label="Open Filters"
               >
-                <Filter className="h-4 w-4 text-[#16A34A]" />
-                <span>All Filters ({selectedAmenities.length + (propertyType !== 'all' ? 1 : 0) + (genderPref !== 'all' ? 1 : 0) + (maxBudget > 0 ? 1 : 0)})</span>
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                <span>Filters</span>
+                {activeFiltersCount > 0 && (
+                  <span className="flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-white text-[10px] font-black text-[#14532D]">
+                    {activeFiltersCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Mobile Map Icon Button */}
+              <button
+                onClick={() => setIsMapModalOpen(true)}
+                className="flex sm:hidden items-center justify-center h-9 w-9 rounded-xl bg-white border border-gray-200 text-[#14532D] shadow-xs shrink-0 active:scale-95"
+                title="Map View"
+                aria-label="Map View"
+              >
+                <MapIcon className="h-4 w-4 text-[#16A34A]" />
               </button>
             </div>
 
             {/* City Selector Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 -mx-1 px-1">
               <span className="text-xs font-bold text-[#647067] mr-1 shrink-0 hidden sm:inline">Cities:</span>
               {CITIES_LIST.map((city) => {
                 const isSelected = selectedCity === city
@@ -474,7 +516,7 @@ function SearchPGContent() {
                   <button
                     key={city}
                     onClick={() => setSelectedCity(city)}
-                    className={`rounded-full px-3 py-1 text-xs font-semibold shrink-0 transition active:scale-95 ${
+                    className={`rounded-full px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs font-semibold shrink-0 transition active:scale-95 ${
                       isSelected
                         ? 'bg-[#14532D] text-white shadow-xs'
                         : 'bg-white border border-gray-200 text-[#17211B] hover:border-[#16A34A] hover:bg-[#DCFCE7]/30'
@@ -490,7 +532,7 @@ function SearchPGContent() {
       </div>
 
       {/* Main Filter & Results Container */}
-      <div className="mx-auto max-w-7xl px-2 sm:px-6 lg:px-8 py-4 sm:py-6 flex-1 w-full">
+      <div className="mx-auto max-w-7xl px-2 sm:px-6 lg:px-8 py-3 sm:py-6 flex-1 w-full pb-28 sm:pb-12">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
           {/* Desktop Filter Sidebar (4 cols) */}
           <aside className="hidden lg:block lg:col-span-3 space-y-5 sticky top-24 self-start max-h-[calc(100vh-7rem)] overflow-y-auto pr-1 no-scrollbar">
@@ -652,27 +694,32 @@ function SearchPGContent() {
           {/* Results Grid Area (9 cols on desktop, 12 on mobile) */}
           <main className="col-span-1 lg:col-span-9 space-y-4">
             {/* Top Toolbar: Count, Quick Filters, Sort Dropdown */}
-            <div className="rounded-2xl border border-gray-200/90 bg-white p-3 sm:p-4 shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-extrabold text-[#14532D]">
-                  {filteredProperties.length} {filteredProperties.length === 1 ? 'Space Available' : 'Spaces Available'}
+            <div className="rounded-xl sm:rounded-2xl border border-gray-200/90 bg-white p-2 sm:p-3.5 shadow-2xs flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 truncate">
+                <span className="text-xs sm:text-sm font-extrabold text-[#14532D] truncate">
+                  {filteredProperties.length} {filteredProperties.length === 1 ? 'Space' : 'Spaces'}
                 </span>
                 {selectedCity !== 'All Cities' && (
-                  <span className="rounded-md bg-[#DCFCE7] px-2 py-0.5 text-[11px] font-bold text-[#14532D]">
+                  <span className="rounded-md bg-[#DCFCE7] px-1.5 py-0.5 text-[10px] sm:text-[11px] font-bold text-[#14532D] truncate">
                     in {selectedCity}
                   </span>
                 )}
+                {activeFiltersCount > 0 && (
+                  <button
+                    onClick={handleResetFilters}
+                    className="text-[10px] font-bold text-rose-600 hover:underline shrink-0 ml-1"
+                  >
+                    Clear ({activeFiltersCount})
+                  </button>
+                )}
               </div>
 
-              <div className="flex items-center gap-2.5 self-end sm:self-auto">
-                <div className="flex items-center gap-1 text-xs text-[#647067]">
-                  <ArrowUpDown className="h-3.5 w-3.5 text-[#16A34A]" />
-                  <span className="font-semibold hidden sm:inline">Sort:</span>
-                </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <ArrowUpDown className="h-3 w-3 text-[#16A34A] hidden sm:inline" />
                 <select
                   value={sortBy}
                   onChange={(e: any) => setSortBy(e.target.value)}
-                  className="rounded-xl border border-gray-200 bg-[#F7FAF7] py-1.5 pl-2.5 pr-7 text-xs font-bold text-[#17211B] focus:border-[#16A34A] focus:outline-hidden transition"
+                  className="rounded-lg sm:rounded-xl border border-gray-200 bg-[#F7FAF7] py-1 pl-2 pr-6 text-[11px] sm:text-xs font-bold text-[#17211B] focus:border-[#16A34A] focus:outline-hidden transition"
                 >
                   <option value="recommended">Recommended</option>
                   <option value="price_low">Price: Low to High</option>
@@ -793,16 +840,29 @@ function SearchPGContent() {
 
       {/* Mobile Filters Slide-over Drawer */}
       {mobileFilterOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs lg:hidden animate-in fade-in">
-          <div className="w-full max-w-sm bg-white h-full overflow-y-auto flex flex-col justify-between p-5 shadow-2xl animate-in slide-in-from-right">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <h3 className="font-bold text-[#14532D] text-base">Filter Spaces</h3>
-                <button onClick={() => setMobileFilterOpen(false)} className="p-1 rounded-lg hover:bg-gray-100">
-                  <X className="h-5 w-5 text-gray-500" />
-                </button>
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs lg:hidden animate-in fade-in">
+          <div className="w-full max-w-sm bg-white h-full flex flex-col shadow-2xl animate-in slide-in-from-right">
+            {/* Sticky Header */}
+            <div className="flex items-center justify-between border-b border-gray-100 p-4 shrink-0 bg-white">
+              <div className="flex items-center gap-2">
+                <h3 className="font-extrabold text-[#14532D] text-base">Filter Spaces</h3>
+                {activeFiltersCount > 0 && (
+                  <span className="rounded-full bg-[#DCFCE7] text-[#14532D] font-bold text-[10px] px-2 py-0.5">
+                    {activeFiltersCount} active
+                  </span>
+                )}
               </div>
+              <button
+                onClick={() => setMobileFilterOpen(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 active:scale-95 transition"
+                aria-label="Close filters"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
 
+            {/* Scrollable Content Body */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {/* Space Type */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-[#647067] mb-2">Space Type</label>
@@ -811,11 +871,33 @@ function SearchPGContent() {
                     <button
                       key={pt.id}
                       onClick={() => setPropertyType(pt.id)}
-                      className={`p-2 rounded-xl text-xs font-semibold text-left ${
-                        propertyType === pt.id ? 'bg-[#14532D] text-white' : 'bg-gray-50 text-gray-800'
+                      className={`p-2 rounded-xl text-xs font-semibold text-left transition active:scale-98 ${
+                        propertyType === pt.id
+                          ? 'bg-[#14532D] text-white shadow-xs font-bold'
+                          : 'bg-gray-50 text-gray-800 hover:bg-gray-100'
                       }`}
                     >
                       {pt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Occupancy / Sharing Type */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#647067] mb-2">Occupancy & Sharing</label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {SHARING_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.id}
+                      onClick={() => setSharingType(opt.id)}
+                      className={`p-2 rounded-xl text-xs font-semibold text-left transition active:scale-98 ${
+                        sharingType === opt.id
+                          ? 'bg-[#14532D] text-white shadow-xs font-bold'
+                          : 'bg-gray-50 text-gray-800 hover:bg-gray-100'
+                      }`}
+                    >
+                      {opt.label}
                     </button>
                   ))}
                 </div>
@@ -829,8 +911,10 @@ function SearchPGContent() {
                     <button
                       key={g.id}
                       onClick={() => setGenderPref(g.id)}
-                      className={`p-2 rounded-xl text-xs font-semibold text-left ${
-                        genderPref === g.id ? 'bg-[#14532D] text-white' : 'bg-gray-50 text-gray-800'
+                      className={`p-2 rounded-xl text-xs font-semibold text-left transition active:scale-98 ${
+                        genderPref === g.id
+                          ? 'bg-[#14532D] text-white shadow-xs font-bold'
+                          : 'bg-gray-50 text-gray-800 hover:bg-gray-100'
                       }`}
                     >
                       {g.label}
@@ -847,8 +931,10 @@ function SearchPGContent() {
                     <button
                       key={b.value}
                       onClick={() => setMaxBudget(b.value)}
-                      className={`p-2 rounded-xl text-xs font-semibold text-left ${
-                        maxBudget === b.value ? 'bg-[#16A34A] text-white' : 'bg-gray-50 text-gray-800'
+                      className={`p-2 rounded-xl text-xs font-semibold text-left transition active:scale-98 ${
+                        maxBudget === b.value
+                          ? 'bg-[#16A34A] text-white shadow-xs font-bold'
+                          : 'bg-gray-50 text-gray-800 hover:bg-gray-100'
                       }`}
                     >
                       {b.label}
@@ -859,13 +945,13 @@ function SearchPGContent() {
 
               {/* Food Only */}
               <div>
-                <label className="flex items-center justify-between p-2.5 rounded-xl bg-gray-50 text-xs font-bold">
+                <label className="flex items-center justify-between p-2.5 rounded-xl bg-gray-50 text-xs font-bold cursor-pointer">
                   <span>Food / Meals Included</span>
                   <input
                     type="checkbox"
                     checked={foodOnly}
                     onChange={(e) => setFoodOnly(e.target.checked)}
-                    className="accent-[#16A34A] h-4 w-4"
+                    className="accent-[#16A34A] h-4 w-4 rounded-sm"
                   />
                 </label>
               </div>
@@ -873,15 +959,15 @@ function SearchPGContent() {
               {/* Amenities */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-[#647067] mb-2">Amenities</label>
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   {AMENITY_FILTERS.map((a) => (
-                    <label key={a.id} className="flex items-center justify-between p-1.5 text-xs font-medium">
+                    <label key={a.id} className="flex items-center justify-between p-2 rounded-xl bg-gray-50/70 text-xs font-medium cursor-pointer hover:bg-gray-100">
                       <span>{a.label}</span>
                       <input
                         type="checkbox"
                         checked={selectedAmenities.includes(a.id)}
                         onChange={() => handleToggleAmenity(a.id)}
-                        className="accent-[#16A34A] h-4 w-4"
+                        className="accent-[#16A34A] h-4 w-4 rounded-sm"
                       />
                     </label>
                   ))}
@@ -889,16 +975,17 @@ function SearchPGContent() {
               </div>
             </div>
 
-            <div className="pt-4 border-t border-gray-100 flex items-center gap-2">
+            {/* Sticky Bottom Action Bar */}
+            <div className="p-3 border-t border-gray-100 bg-white/95 backdrop-blur-md flex items-center gap-2 shrink-0 shadow-lg safe-bottom">
               <button
                 onClick={handleResetFilters}
-                className="w-1/2 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700"
+                className="w-1/3 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 active:scale-95 transition"
               >
                 Reset All
               </button>
               <button
                 onClick={() => setMobileFilterOpen(false)}
-                className="w-1/2 py-2.5 rounded-xl bg-[#14532D] text-xs font-bold text-white shadow-xs"
+                className="w-2/3 py-2.5 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] text-xs font-bold text-white shadow-xs active:scale-95 transition"
               >
                 Apply ({filteredProperties.length})
               </button>

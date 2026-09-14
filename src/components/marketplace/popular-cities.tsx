@@ -50,17 +50,23 @@ export function PopularCities({ onSelectCity, activeCity, properties = [] }: Pop
             </p>
           </div>
 
-          <button
-            onClick={() => handleCityClick('all')}
-            className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#16A34A] hover:underline"
-          >
-            <span>View all {citiesList.length} cities</span>
-            <ArrowRight className="h-4 w-4" />
-          </button>
+          <div className="flex items-center justify-between w-full sm:w-auto mt-1 sm:mt-0">
+            <span className="sm:hidden text-[11px] font-bold text-[#16A34A] flex items-center gap-1">
+              <span>Swipe cities</span>
+              <ArrowRight className="h-3 w-3" />
+            </span>
+            <button
+              onClick={() => handleCityClick('all')}
+              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#16A34A] hover:underline"
+            >
+              <span>View all {citiesList.length} cities</span>
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
-        {/* Cities Grid */}
-        <div className="mt-6 sm:mt-8 grid grid-cols-2 gap-2.5 sm:gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        {/* Cities Rolling Reel (Mobile horizontal carousel + Desktop responsive grid) */}
+        <div className="mt-4 sm:mt-8 flex overflow-x-auto snap-x snap-mandatory gap-2.5 pb-2.5 pt-1 -mx-3.5 px-3.5 no-scrollbar sm:mx-0 sm:px-0 sm:grid sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 sm:gap-4">
           {citiesList.map((city) => {
             const isSelected = activeCity === city.name
 
@@ -82,14 +88,14 @@ export function PopularCities({ onSelectCity, activeCity, properties = [] }: Pop
               <div
                 key={city.name}
                 onClick={() => handleCityClick(city.name)}
-                className={`group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border transition-all hover:-translate-y-1 hover:shadow-lg active:scale-98 ${
+                className={`group relative flex cursor-pointer flex-col overflow-hidden rounded-xl sm:rounded-2xl border transition-all hover:-translate-y-1 hover:shadow-lg active:scale-98 w-[136px] sm:w-auto shrink-0 snap-start ${
                   isSelected
                     ? 'border-[#16A34A] ring-2 ring-[#16A34A] shadow-md'
                     : 'border-gray-200/80 bg-white hover:border-gray-300'
                 }`}
               >
                 {/* City Image Container (responsive aspect ratio) */}
-                <div className="relative aspect-[16/11] sm:aspect-4/3 w-full overflow-hidden bg-gray-100">
+                <div className="relative aspect-[4/3] w-full overflow-hidden bg-gray-100">
                   <img
                     src={city.image}
                     alt={city.name}
@@ -103,24 +109,24 @@ export function PopularCities({ onSelectCity, activeCity, properties = [] }: Pop
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
 
                   {/* Starting Price Pill */}
-                  <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 rounded-md bg-white/95 px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold text-[#14532D] shadow-xs backdrop-blur-xs">
-                    From ₹{realMinPrice.toLocaleString('en-IN')}/mo
+                  <div className="absolute top-1 right-1 sm:top-2 sm:right-2 rounded-md bg-white/95 px-1 sm:px-1.5 py-0.5 text-[8px] sm:text-[10px] font-bold text-[#14532D] shadow-xs backdrop-blur-xs">
+                    ₹{realMinPrice >= 1000 ? `${Math.round(realMinPrice / 1000)}k` : realMinPrice}/mo
                   </div>
 
                   {/* City Name & State Overlay */}
-                  <div className="absolute bottom-2 sm:bottom-2.5 left-2 sm:left-2.5 text-white pr-2">
-                    <h3 className="text-xs sm:text-base font-bold tracking-tight line-clamp-1">{city.name}</h3>
-                    <p className="text-[9px] sm:text-[10px] text-gray-200 font-medium">{city.state}</p>
+                  <div className="absolute bottom-1.5 sm:bottom-2.5 left-1.5 sm:left-2.5 text-white pr-1">
+                    <h3 className="text-xs sm:text-base font-extrabold tracking-tight line-clamp-1">{city.name}</h3>
+                    <p className="text-[8px] sm:text-[10px] text-gray-200 font-medium">{city.state}</p>
                   </div>
                 </div>
 
                 {/* Card Details Bottom */}
-                <div className="p-2 sm:p-3">
-                  <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-medium text-[#647067]">
-                    <span className="font-semibold text-gray-800">{displaySpaces}</span>
-                    <span className="text-[#16A34A] font-semibold group-hover:underline">Explore →</span>
+                <div className="p-1.5 sm:p-3">
+                  <div className="flex items-center justify-between text-[9px] sm:text-[11px] font-medium text-[#647067]">
+                    <span className="font-bold text-gray-800 truncate">{displaySpaces}</span>
+                    <span className="text-[#16A34A] font-bold group-hover:underline shrink-0">Explore →</span>
                   </div>
-                  <div className="mt-1 flex flex-wrap gap-1">
+                  <div className="hidden sm:flex mt-1 flex-wrap gap-1">
                     {city.popularLocalities.slice(0, 2).map((loc, i) => (
                       <span
                         key={i}
