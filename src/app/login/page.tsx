@@ -1,16 +1,17 @@
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   Building2, Eye, EyeOff, Loader2, Lock, Mail,
   ShieldCheck, CheckCircle2, ArrowRight, ArrowLeft,
   Sparkles, Star, Phone, User, Briefcase, Calendar,
-  KeyRound, Shield, Check, Info, RefreshCw
+  KeyRound, Shield, Check, Info, RefreshCw, AlertCircle
 } from 'lucide-react'
 
-type FlowStep = 'mobile_entry' | 'existing_otp' | 'new_details' | 'optional_aadhaar'
+type FlowStep = 'role_select' | 'mobile_entry' | 'existing_otp' | 'new_details' | 'optional_aadhaar' | 'owner_not_found'
+type AccountType = 'tenant' | 'owner'
 
 const PROFESSIONS = [
   'IT & Software Engineer',
@@ -26,9 +27,14 @@ const PROFESSIONS = [
 
 function UnifiedLoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const roleParam = searchParams.get('role')
 
-  // Steps state
-  const [step, setStep] = useState<FlowStep>('mobile_entry')
+  // Account Type: tenant or owner
+  const [accountType, setAccountType] = useState<AccountType>(roleParam === 'owner' ? 'owner' : 'tenant')
+
+  // Steps state: defaults to 'role_select' to ask user first if tenant or PG owner
+  const [step, setStep] = useState<FlowStep>(roleParam === 'owner' || roleParam === 'tenant' ? 'mobile_entry' : 'role_select')
   const [usePasswordLogin, setUsePasswordLogin] = useState(false)
 
   // Form Fields
@@ -73,11 +79,11 @@ function UnifiedLoginForm() {
 
     setLoading(true)
     try {
-      // Check if mobile exists in database & trigger OTP dispatch in single call
+      // Check if mobile exists in database for the selected role & trigger OTP dispatch
       const checkRes = await fetch('/api/auth/mobile-flow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'check-mobile', mobile: cleaned }),
+        body: JSON.stringify({ action: 'check-mobile', mobile: cleaned, role: accountType }),
       })
       const checkData = await checkRes.json()
 
@@ -89,15 +95,22 @@ function UnifiedLoginForm() {
         setDevOtp(checkData.devOtp)
       }
 
+      setExistingUserInfo(checkData)
+
       if (checkData.exists) {
-        // Existing user -> Directly ask for OTP!
-        setExistingUserInfo(checkData)
+        // Existing user verified in DB for this role -> Directly ask for OTP!
         setInfoMessage(checkData.message || `Welcome back, ${checkData.name || 'Member'}! Enter the 6-digit OTP sent to +91 ${cleaned}`)
         setStep('existing_otp')
       } else {
-        // New user -> Ask for other information!
-        setInfoMessage(checkData.message || `New member! Enter the OTP sent to +91 ${cleaned} and fill in your details to create your profile.`)
-        setStep('new_details')
+        // Mobile does NOT exist in DB for this role
+        if (accountType === 'owner') {
+          // No owner account found
+          setStep('owner_not_found')
+        } else {
+          // New tenant -> Proceed to profile creation details
+          setInfoMessage(checkData.message || `New member! Enter the OTP sent to +91 ${cleaned} and fill in your details to create your profile.`)
+          setStep('new_details')
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Something went wrong. Please try again.')
@@ -121,6 +134,7 @@ function UnifiedLoginForm() {
           action: 'verify-otp-login',
           mobile: cleaned,
           otp: otp.trim(),
+          role: accountType,
         }),
       })
       const data = await res.json()
@@ -128,7 +142,7 @@ function UnifiedLoginForm() {
         throw new Error(data.error || 'Invalid OTP. Please try again.')
       }
 
-      window.location.href = data.redirect || '/my-profile'
+      window.location.href = data.redirect || (accountType === 'owner' ? '/dashboard' : '/my-profile')
     } catch (err: any) {
       setError(err.message || 'Verification failed. Please try again.')
       setLoading(false)
@@ -236,15 +250,19 @@ function UnifiedLoginForm() {
           <span className="text-2xl font-extrabold tracking-tight text-[#14532D]">PGSetu</span>
         </Link>
         <h1 className="text-xl font-bold text-gray-900">
-          {step === 'mobile_entry' && !usePasswordLogin && 'Sign In or Create Profile'}
+          {step === 'role_select' && !usePasswordLogin && 'Welcome to PGSetu'}
+          {step === 'mobile_entry' && !usePasswordLogin && (accountType === 'owner' ? 'PG Owner & Host Login' : 'Tenant & Resident Login')}
           {step === 'existing_otp' && 'Verify Mobile Number'}
+          {step === 'owner_not_found' && 'Owner Account Not Found'}
           {step === 'new_details' && 'Set Up Your Profile'}
           {step === 'optional_aadhaar' && 'Identity Verification'}
           {usePasswordLogin && 'Owner & Staff Password Login'}
         </h1>
         <p className="mt-1 text-xs text-gray-600">
-          {step === 'mobile_entry' && !usePasswordLogin && 'One unified login for tenants, PG owners, and residents.'}
+          {step === 'role_select' && !usePasswordLogin && 'Please select whether you are a Tenant or a PG Owner to continue.'}
+          {step === 'mobile_entry' && !usePasswordLogin && (accountType === 'owner' ? 'Enter your registered mobile number to access your PG Owner ERP dashboard.' : 'Enter your mobile number for passbooks, rent receipts, and bookings.')}
           {step === 'existing_otp' && `Enter the 6-digit code sent to +91 ${cleanMobile(mobile)}`}
+          {step === 'owner_not_found' && 'No registered PG owner profile was found for this mobile number.'}
           {step === 'new_details' && 'Required details to create your verified PGSetu profile.'}
           {step === 'optional_aadhaar' && 'Optional government KYC for instant verified badge.'}
           {usePasswordLogin && 'Sign in using your registered email and password.'}
@@ -284,39 +302,94 @@ function UnifiedLoginForm() {
       )}
 
       {/* ────────────────────────────────────────────────────────── */}
-      {/* 1. MOBILE NUMBER ENTRY */}
+      {/* 0. ROLE SELECTION STEP (FIRST QUESTION) */}
       {/* ────────────────────────────────────────────────────────── */}
-      {step === 'mobile_entry' && !usePasswordLogin && (
-        <form onSubmit={handleMobileSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-              Mobile Number <span className="text-red-500">*</span>
-            </label>
-            <div className="relative flex items-center rounded-xl border border-gray-300 bg-white shadow-xs focus-within:border-[#16A34A] focus-within:ring-2 focus-within:ring-[#16A34A]/20">
-              <span className="pl-3.5 pr-2 text-xs font-bold text-gray-500 select-none">+91</span>
-              <input
-                type="tel"
-                maxLength={10}
-                required
-                value={mobile}
-                onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                placeholder="Enter 10-digit mobile"
-                className="w-full py-2.5 pr-3 text-sm font-semibold text-gray-900 outline-none placeholder:text-gray-400"
-                autoFocus
-              />
-            </div>
-            <p className="mt-1 text-[11px] text-gray-500">
-              We will check if you are an existing member or help you set up a new profile.
-            </p>
-          </div>
+      {step === 'role_select' && !usePasswordLogin && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-3">
+            {/* Tenant / Resident Card */}
+            <button
+              type="button"
+              onClick={() => {
+                setAccountType('tenant')
+                setStep('mobile_entry')
+                setError('')
+                setInfoMessage('')
+              }}
+              className="group relative flex items-start gap-3.5 rounded-2xl border-2 border-emerald-200 bg-white p-4 text-left shadow-xs transition-all hover:border-[#16A34A] hover:bg-emerald-50/40 hover:shadow-md active:scale-[0.99]"
+            >
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#14532D] to-[#16A34A] text-white shadow-xs group-hover:scale-105 transition">
+                <User className="h-6 w-6" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-sm text-gray-900 group-hover:text-[#14532D]">
+                    Tenant / Resident
+                  </span>
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                    Renter / Student
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-gray-600 leading-snug">
+                  I am renting or looking for a PG. Access digital passbook, rent receipts, gate passes, and verified tenant ID.
+                </p>
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-700">
+                    ✓ Digital Passbook
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-700">
+                    ✓ Rent Receipts
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-700">
+                    ✓ Gate Passes
+                  </span>
+                </div>
+              </div>
+              <div className="self-center pl-1 text-gray-400 group-hover:text-[#16A34A] transition">
+                <ArrowRight className="h-5 w-5" />
+              </div>
+            </button>
 
-          <button
-            type="submit"
-            disabled={loading || cleanMobile(mobile).length < 10}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] py-3 text-sm font-bold text-white shadow-md hover:opacity-95 disabled:opacity-50 transition"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><span>Continue with Mobile</span><ArrowRight className="h-4 w-4" /></>}
-          </button>
+            {/* PG Owner / Manager Card */}
+            <button
+              type="button"
+              onClick={() => {
+                setAccountType('owner')
+                setStep('mobile_entry')
+                setError('')
+                setInfoMessage('')
+              }}
+              className="group relative flex items-start gap-3.5 rounded-2xl border-2 border-gray-200 bg-white p-4 text-left shadow-xs transition-all hover:border-[#14532D] hover:bg-emerald-50/40 hover:shadow-md active:scale-[0.99]"
+            >
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-gray-800 to-gray-950 text-white shadow-xs group-hover:scale-105 transition">
+                <Building2 className="h-6 w-6 text-[#DCFCE7]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-sm text-gray-900 group-hover:text-[#14532D]">
+                    PG Owner / Manager
+                  </span>
+                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-800">
+                    Property Host
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-gray-600 leading-snug">
+                  I operate or manage a PG or hostel. Manage rooms, beds, automated rent collection, staff, and operations ERP.
+                </p>
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-700">
+                    ✓ Room & Bed Allocations
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-700">
+                    ✓ Auto Rent ERP
+                  </span>
+                </div>
+              </div>
+              <div className="self-center pl-1 text-gray-400 group-hover:text-[#14532D] transition">
+                <ArrowRight className="h-5 w-5" />
+              </div>
+            </button>
+          </div>
 
           <div className="pt-3 border-t border-gray-200 text-center">
             <button
@@ -328,7 +401,195 @@ function UnifiedLoginForm() {
               <span>Owner & Admin Password Login →</span>
             </button>
           </div>
+        </div>
+      )}
+
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* 1. MOBILE NUMBER ENTRY */}
+      {/* ────────────────────────────────────────────────────────── */}
+      {step === 'mobile_entry' && !usePasswordLogin && (
+        <form onSubmit={handleMobileSubmit} className="space-y-4">
+          {/* Active Role Selector Pill */}
+          <div className="flex items-center justify-between rounded-xl bg-gray-100 p-2.5 border border-gray-200 text-xs">
+            <div className="flex items-center gap-2 font-bold text-gray-800">
+              {accountType === 'owner' ? (
+                <Building2 className="h-4 w-4 text-[#14532D]" />
+              ) : (
+                <User className="h-4 w-4 text-[#16A34A]" />
+              )}
+              <span>
+                Selected: <span className="text-[#14532D]">{accountType === 'owner' ? 'PG Owner / Host' : 'Tenant / Resident'}</span>
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setStep('role_select')
+                setError('')
+                setInfoMessage('')
+              }}
+              className="text-[11px] font-bold text-[#14532D] hover:underline"
+            >
+              Change Role
+            </button>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+              {accountType === 'owner' ? 'Registered PG Owner Mobile' : 'Tenant Mobile Number'}{' '}
+              <span className="text-red-500">*</span>
+            </label>
+            <div className="relative flex items-center rounded-xl border border-gray-300 bg-white shadow-xs focus-within:border-[#16A34A] focus-within:ring-2 focus-within:ring-[#16A34A]/20">
+              <span className="pl-3.5 pr-2 text-xs font-bold text-gray-500 select-none">+91</span>
+              <input
+                type="tel"
+                maxLength={10}
+                required
+                value={mobile}
+                onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                placeholder={accountType === 'owner' ? 'Enter registered owner mobile' : 'Enter 10-digit mobile'}
+                className="w-full py-2.5 pr-3 text-sm font-semibold text-gray-900 outline-none placeholder:text-gray-400"
+                autoFocus
+              />
+            </div>
+            <p className="mt-1 text-[11px] text-gray-500">
+              {accountType === 'owner'
+                ? 'We will verify whether your mobile number is registered to a PG property or organization.'
+                : 'We will verify whether you have an existing tenant profile or help you set up a new one.'}
+            </p>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading || cleanMobile(mobile).length < 10}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] py-3 text-sm font-bold text-white shadow-md hover:opacity-95 disabled:opacity-50 transition"
+          >
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <>
+                <span>{accountType === 'owner' ? 'Verify Owner Mobile' : 'Continue with Mobile'}</span>
+                <ArrowRight className="h-4 w-4" />
+              </>
+            )}
+          </button>
+
+          <div className="flex items-center justify-between text-xs pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                setStep('role_select')
+                setError('')
+              }}
+              className="text-gray-500 hover:text-gray-900"
+            >
+              ← Back to Role Selection
+            </button>
+            <button
+              type="button"
+              onClick={() => setUsePasswordLogin(true)}
+              className="font-semibold text-gray-600 hover:text-[#14532D] transition inline-flex items-center gap-1"
+            >
+              <Lock className="h-3.5 w-3.5" />
+              <span>Password Login</span>
+            </button>
+          </div>
         </form>
+      )}
+
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* 1B. OWNER ACCOUNT NOT FOUND NOTICE */}
+      {/* ────────────────────────────────────────────────────────── */}
+      {step === 'owner_not_found' && (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-xs text-amber-950">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800">
+                <AlertCircle className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-amber-900">
+                  No PG Owner Account Found
+                </h3>
+                <p className="mt-1 text-amber-800 leading-relaxed">
+                  The mobile number <span className="font-mono font-bold">+91 {cleanMobile(mobile)}</span> is not currently registered as a PG owner or property manager on PGSetu.
+                </p>
+              </div>
+            </div>
+
+            {/* If they are registered as a tenant instead */}
+            {existingUserInfo?.hasAlternateAccount === 'tenant' && (
+              <div className="mt-3 rounded-xl bg-white border border-amber-200 p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-bold text-gray-900 block text-xs">
+                      Registered Tenant Profile Found!
+                    </span>
+                    <span className="text-[11px] text-gray-600">
+                      {existingUserInfo.alternateName || 'Resident'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAccountType('tenant')
+                      setStep('existing_otp')
+                      setInfoMessage(`Switched to Tenant profile. Enter the 6-digit OTP sent to +91 ${cleanMobile(mobile)}`)
+                    }}
+                    className="rounded-lg bg-[#14532D] text-white px-3 py-1.5 text-[11px] font-bold hover:bg-[#166534] transition"
+                  >
+                    Log In as Tenant →
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* CTAs */}
+          <div className="space-y-2">
+            <Link
+              href={`/onboarding?phone=${cleanMobile(mobile)}`}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] py-3 text-sm font-bold text-white shadow-md hover:opacity-95 transition"
+            >
+              <Building2 className="h-4 w-4" />
+              <span>Register Your PG Property Now (Free)</span>
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => {
+                setStep('mobile_entry')
+                setMobile('')
+                setError('')
+              }}
+              className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-gray-300 bg-white py-2.5 text-xs font-bold text-gray-700 hover:bg-gray-50 transition"
+            >
+              <span>Try Another Mobile Number</span>
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between text-xs pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                setStep('role_select')
+                setError('')
+              }}
+              className="text-gray-500 hover:text-gray-900"
+            >
+              ← Choose Different Role
+            </button>
+            <button
+              type="button"
+              onClick={() => setUsePasswordLogin(true)}
+              className="font-semibold text-[#14532D] hover:underline inline-flex items-center gap-1"
+            >
+              <Lock className="h-3 w-3" />
+              <span>Sign In with Password</span>
+            </button>
+          </div>
+        </div>
       )}
 
       {/* ────────────────────────────────────────────────────────── */}
@@ -339,10 +600,10 @@ function UnifiedLoginForm() {
           <div className="rounded-xl bg-[#F7FAF7] p-3 border border-gray-200 text-xs text-gray-700">
             <div className="flex items-center justify-between">
               <span className="font-semibold text-gray-900">
-                {existingUserInfo?.name || 'Registered Account'}
+                {existingUserInfo?.name || (accountType === 'owner' ? 'Registered PG Owner' : 'Registered Tenant')}
               </span>
               <span className="rounded-full bg-[#DCFCE7] px-2 py-0.5 text-[10px] font-bold text-[#14532D]">
-                Existing User
+                {accountType === 'owner' ? '🏢 PG Owner' : '👤 Verified Tenant'}
               </span>
             </div>
             <div className="mt-1 text-gray-500 font-mono">+91 {cleanMobile(mobile)}</div>
@@ -369,7 +630,14 @@ function UnifiedLoginForm() {
             disabled={loading || otp.length < 6}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] py-3 text-sm font-bold text-white shadow-md hover:opacity-95 disabled:opacity-50 transition"
           >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><span>Verify & Sign In</span><Check className="h-4 w-4" /></>}
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <>
+                <span>{accountType === 'owner' ? 'Verify & Access Owner ERP' : 'Verify & Access Tenant Profile'}</span>
+                <Check className="h-4 w-4" />
+              </>
+            )}
           </button>
 
           <div className="flex items-center justify-between text-xs pt-2">
@@ -382,6 +650,16 @@ function UnifiedLoginForm() {
               className="text-gray-500 hover:text-gray-900"
             >
               ← Change Mobile
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setStep('role_select')
+                setOtp('')
+              }}
+              className="text-gray-500 hover:text-gray-900"
+            >
+              Switch Role
             </button>
             <button
               type="button"
@@ -737,11 +1015,11 @@ function UnifiedLoginForm() {
               type="button"
               onClick={() => {
                 setUsePasswordLogin(false)
-                setStep('mobile_entry')
+                setStep('role_select')
               }}
               className="text-xs font-semibold text-[#14532D] hover:underline"
             >
-              ← Back to Mobile OTP Login
+              ← Back to Role Selection & Mobile Login
             </button>
           </div>
         </form>

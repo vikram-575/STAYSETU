@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
     if (action === 'check-mobile') {
       const rawMobile = body.mobile || ''
       const cleaned = cleanMobile(rawMobile)
+      const requestedRole = body.role === 'owner' ? 'owner' : 'tenant'
 
       if (!cleaned || cleaned.length < 10) {
         return NextResponse.json(
@@ -38,96 +39,112 @@ export async function POST(request: NextRequest) {
         code: otpCode,
         expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
       })
-      console.log(`[PG-SETU OTP]: Generated OTP ${otpCode} for mobile ${cleaned}`)
+      console.log(`[PG-SETU OTP]: Generated OTP ${otpCode} for mobile ${cleaned} (Role: ${requestedRole})`)
 
-      // A. Check in Supabase users table (Owners, Managers, Staff, Registered Residents)
-      const { data: matchedUser } = await serviceClient
-        .from('users')
-        .select('id, full_name, email, phone, role, organization_id')
-        .or(`phone.eq.${cleaned},phone.ilike.%${cleaned}%`)
-        .maybeSingle()
+      if (requestedRole === 'owner') {
+        // ── PG OWNER EXISTENCE VERIFICATION ──
+        // 1. Check in Supabase users table for PG Owners / Admins / Managers
+        const { data: matchedOwnerUser } = await serviceClient
+          .from('users')
+          .select('id, full_name, email, phone, role, organization_id')
+          .or(`phone.eq.${cleaned},phone.ilike.%${cleaned}%`)
+          .in('role', ['owner', 'superadmin', 'admin', 'manager'])
+          .maybeSingle()
 
-      if (matchedUser) {
-        return NextResponse.json({
-          exists: true,
-          userType: matchedUser.role === 'owner' || matchedUser.role === 'superadmin' ? 'owner' : 'user',
-          name: matchedUser.full_name || 'PG-Setu Member',
-          role: matchedUser.role,
-          email: matchedUser.email,
-          mobile: cleaned,
-          devOtp: otpCode,
-          message: `Welcome back, ${matchedUser.full_name || 'Member'}! OTP sent to your registered mobile.`,
-        })
-      }
+        // 2. Check in organizations table by phone
+        const { data: matchedOrg } = await serviceClient
+          .from('organizations')
+          .select('id, name, email, phone, owner_user_id')
+          .or(`phone.eq.${cleaned},phone.ilike.%${cleaned}%`)
+          .limit(1)
+          .maybeSingle()
 
-      // B. Check in Supabase residents table (Checked-in PG Tenants across properties)
-      const { data: matchedResident } = await serviceClient
-        .from('residents')
-        .select('id, full_name, email, phone, registration_number, status, organization_id')
-        .or(`phone.ilike.%${cleaned}%,alternate_phone.ilike.%${cleaned}%`)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (matchedResident) {
-        return NextResponse.json({
-          exists: true,
-          userType: 'tenant',
-          name: matchedResident.full_name,
-          role: 'resident',
-          email: matchedResident.email,
-          tenantId: matchedResident.registration_number,
-          mobile: cleaned,
-          devOtp: otpCode,
-          message: `Welcome back, ${matchedResident.full_name}! OTP sent to your registered mobile.`,
-        })
-      }
-
-      // C. Check in Firestore profiles (tenant_profiles / owner_profiles) with timeout safeguard
-      try {
-        const firestoreCheck = (async () => {
-          const { queryCollection } = await import('@/lib/firebase/firestore')
-          const tenantMatches = await queryCollection('tenant_profiles', [['mobile', '==', cleaned]])
-          if (tenantMatches && tenantMatches.length > 0) {
-            return { matched: true, type: 'tenant', profile: tenantMatches[0] }
-          }
-          const ownerMatches = await queryCollection('owner_profiles', [['mobile', '==', cleaned]])
-          if (ownerMatches && ownerMatches.length > 0) {
-            return { matched: true, type: 'owner', profile: ownerMatches[0] }
-          }
-          return { matched: false }
-        })()
-
-        const timeoutCheck = new Promise<{ matched: boolean }>((resolve) =>
-          setTimeout(() => resolve({ matched: false }), 800)
-        )
-
-        const fRes = await Promise.race([firestoreCheck, timeoutCheck])
-        if (fRes.matched && (fRes as any).profile) {
-          const p = (fRes as any).profile
+        if (matchedOwnerUser || matchedOrg) {
           return NextResponse.json({
             exists: true,
-            userType: (fRes as any).type,
-            name: p.full_name || 'Verified Member',
-            role: (fRes as any).type === 'owner' ? 'owner' : 'resident',
-            email: p.email,
-            tenantId: p.id,
+            userType: 'owner',
+            role: matchedOwnerUser?.role || 'owner',
+            name: matchedOwnerUser?.full_name || matchedOrg?.name || 'PG Owner',
+            email: matchedOwnerUser?.email || matchedOrg?.email || '',
+            organizationId: matchedOwnerUser?.organization_id || matchedOrg?.id,
             mobile: cleaned,
             devOtp: otpCode,
-            message: `Welcome back, ${p.full_name || 'Member'}! OTP sent to your registered mobile.`,
+            message: `Welcome back, ${matchedOwnerUser?.full_name || matchedOrg?.name || 'Owner'}! Existing PG owner account verified. OTP sent to your registered mobile.`,
           })
         }
-      } catch (err: any) {
-        console.warn('[Firestore profile check warning in check-mobile]:', err?.message)
-      }
 
-      // D. Mobile does not exist in database -> New user flow (Ask for other information)
-      return NextResponse.json({
-        exists: false,
-        mobile: cleaned,
-        devOtp: otpCode,
-        message: 'New mobile number detected. Please enter your details to set up your profile.',
-      })
+        // Check if this mobile exists as a resident/tenant instead (helpful cross-check)
+        const { data: existingTenant } = await serviceClient
+          .from('residents')
+          .select('id, full_name')
+          .or(`phone.ilike.%${cleaned}%,alternate_phone.ilike.%${cleaned}%`)
+          .limit(1)
+          .maybeSingle()
+
+        return NextResponse.json({
+          exists: false,
+          userType: 'owner',
+          hasAlternateAccount: existingTenant ? 'tenant' : null,
+          alternateName: existingTenant?.full_name || null,
+          mobile: cleaned,
+          devOtp: otpCode,
+          message: existingTenant
+            ? `No PG Owner account found. This mobile is registered as a Tenant (${existingTenant.full_name}).`
+            : `No existing PG Owner account found for +91 ${cleaned}.`,
+        })
+      } else {
+        // ── TENANT / RESIDENT EXISTENCE VERIFICATION ──
+        // 1. Check in Supabase residents table
+        const { data: matchedResident } = await serviceClient
+          .from('residents')
+          .select('id, full_name, email, phone, registration_number, status, organization_id')
+          .or(`phone.ilike.%${cleaned}%,alternate_phone.ilike.%${cleaned}%`)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        // 2. Check in Supabase users table where role is resident / tenant / user
+        const { data: matchedUser } = await serviceClient
+          .from('users')
+          .select('id, full_name, email, phone, role, organization_id, resident_id')
+          .or(`phone.eq.${cleaned},phone.ilike.%${cleaned}%`)
+          .in('role', ['resident', 'tenant', 'user'])
+          .maybeSingle()
+
+        if (matchedResident || matchedUser) {
+          return NextResponse.json({
+            exists: true,
+            userType: 'tenant',
+            role: 'resident',
+            name: matchedResident?.full_name || matchedUser?.full_name || 'Resident',
+            email: matchedResident?.email || matchedUser?.email || '',
+            tenantId: matchedResident?.registration_number || (matchedUser as any)?.resident_id,
+            mobile: cleaned,
+            devOtp: otpCode,
+            message: `Welcome back, ${matchedResident?.full_name || matchedUser?.full_name || 'Resident'}! Existing tenant account verified. OTP sent to your registered mobile.`,
+          })
+        }
+
+        // Check if this mobile exists as an owner instead (helpful cross-check)
+        const { data: existingOwner } = await serviceClient
+          .from('users')
+          .select('id, full_name, role')
+          .or(`phone.eq.${cleaned},phone.ilike.%${cleaned}%`)
+          .in('role', ['owner', 'superadmin', 'admin', 'manager'])
+          .maybeSingle()
+
+        return NextResponse.json({
+          exists: false,
+          userType: 'tenant',
+          hasAlternateAccount: existingOwner ? 'owner' : null,
+          alternateName: existingOwner?.full_name || null,
+          mobile: cleaned,
+          devOtp: otpCode,
+          message: existingOwner
+            ? `No tenant profile found. This mobile is registered as a PG Owner (${existingOwner.full_name}).`
+            : `No existing tenant profile found for +91 ${cleaned}. Please enter your details to set up your profile.`,
+        })
+      }
     }
 
     // ─────────────────────────────────────────────────────────
@@ -212,6 +229,8 @@ export async function POST(request: NextRequest) {
       // Clear used OTP
       OTP_STORE.delete(cleaned)
 
+      const requestedRole = body.role === 'owner' ? 'owner' : 'tenant'
+
       // Fetch default organization for foreign key association
       const { data: defaultOrg } = await serviceClient
         .from('organizations')
@@ -220,31 +239,53 @@ export async function POST(request: NextRequest) {
         .maybeSingle()
       const defaultOrgId = defaultOrg?.id || null
 
-      // Look up in Supabase users table
-      const { data: user } = await serviceClient
-        .from('users')
-        .select('id, full_name, email, phone, role, organization_id, resident_id')
-        .or(`phone.eq.${cleaned},phone.ilike.%${cleaned}%`)
-        .maybeSingle()
+      let user: any = null
+      let resident: any = null
+      let matchedOrg: any = null
 
-      // Look up in Supabase residents table
-      const { data: resident } = await serviceClient
-        .from('residents')
-        .select('id, full_name, email, phone, registration_number, organization_id')
-        .or(`phone.ilike.%${cleaned}%,alternate_phone.ilike.%${cleaned}%`)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
+      if (requestedRole === 'owner') {
+        const { data: matchedOwnerUser } = await serviceClient
+          .from('users')
+          .select('id, full_name, email, phone, role, organization_id')
+          .or(`phone.eq.${cleaned},phone.ilike.%${cleaned}%`)
+          .in('role', ['owner', 'superadmin', 'admin', 'manager'])
+          .maybeSingle()
+        user = matchedOwnerUser
+
+        const { data: orgData } = await serviceClient
+          .from('organizations')
+          .select('id, name, email, phone, owner_user_id')
+          .or(`phone.eq.${cleaned},phone.ilike.%${cleaned}%`)
+          .limit(1)
+          .maybeSingle()
+        matchedOrg = orgData
+      } else {
+        const { data: tenantUser } = await serviceClient
+          .from('users')
+          .select('id, full_name, email, phone, role, organization_id, resident_id')
+          .or(`phone.eq.${cleaned},phone.ilike.%${cleaned}%`)
+          .in('role', ['resident', 'tenant', 'user'])
+          .maybeSingle()
+        user = tenantUser
+
+        const { data: residentData } = await serviceClient
+          .from('residents')
+          .select('id, full_name, email, phone, registration_number, organization_id')
+          .or(`phone.ilike.%${cleaned}%,alternate_phone.ilike.%${cleaned}%`)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        resident = residentData
+      }
 
       // Look up in Firestore tenant_profiles / owner_profiles with timeout safeguard
       let firestoreProfile: any = null
       try {
         const firestorePromise = (async () => {
           const { queryCollection } = await import('@/lib/firebase/firestore')
-          const tMatches = await queryCollection('tenant_profiles', [['mobile', '==', cleaned]])
-          if (tMatches && tMatches.length > 0) return tMatches[0]
-          const oMatches = await queryCollection('owner_profiles', [['mobile', '==', cleaned]])
-          if (oMatches && oMatches.length > 0) return oMatches[0]
+          const collectionName = requestedRole === 'owner' ? 'owner_profiles' : 'tenant_profiles'
+          const matches = await queryCollection(collectionName, [['mobile', '==', cleaned]])
+          if (matches && matches.length > 0) return matches[0]
           return null
         })()
         const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 800))
@@ -252,18 +293,18 @@ export async function POST(request: NextRequest) {
       } catch {}
 
       // Consolidate identity
-      const targetUserId = user?.id || resident?.id || crypto.randomUUID()
-      const effectiveName = user?.full_name || resident?.full_name || firestoreProfile?.full_name || 'PG-Setu Member'
-      const effectiveEmail = user?.email || resident?.email || firestoreProfile?.email || `${cleaned}@user.pgsetu.com`
-      const effectiveRole = user?.role || (resident ? 'resident' : (firestoreProfile?.type === 'owner' ? 'owner' : 'resident'))
-      let residentId = resident?.id || user?.resident_id || null
-      const orgId = user?.organization_id || resident?.organization_id || defaultOrgId
+      const targetUserId = user?.id || resident?.id || matchedOrg?.owner_user_id || crypto.randomUUID()
+      const effectiveName = user?.full_name || resident?.full_name || matchedOrg?.name || firestoreProfile?.full_name || (requestedRole === 'owner' ? 'PG Owner' : 'PG-Setu Resident')
+      const effectiveEmail = user?.email || resident?.email || matchedOrg?.email || firestoreProfile?.email || `${cleaned}@${requestedRole === 'owner' ? 'owner' : 'user'}.pgsetu.com`
+      const effectiveRole = requestedRole === 'owner' ? (user?.role || 'owner') : 'resident'
+      let residentId = requestedRole === 'tenant' ? (resident?.id || user?.resident_id || null) : null
+      const orgId = user?.organization_id || resident?.organization_id || matchedOrg?.id || defaultOrgId
       const tenantRegId = resident?.registration_number || firestoreProfile?.id || `TN-${cleaned.slice(-4)}`
 
       const now = new Date().toISOString()
 
-      // Ensure resident record exists in Supabase so profile is maintained on server
-      if (!residentId) {
+      // Ensure resident record exists in Supabase ONLY for tenants so profile is maintained on server
+      if (requestedRole === 'tenant' && !residentId) {
         try {
           const defaultNotes = {
             age: 25,
