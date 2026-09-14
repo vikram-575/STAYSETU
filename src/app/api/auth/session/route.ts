@@ -27,6 +27,15 @@ export async function GET() {
     const cleanMobile = authMobile.replace(/\D/g, '').slice(-10)
 
     let staffUsers: any[] = []
+    let hostedProperties: any[] = []
+    let propertyStats = {
+      total_residents: 0,
+      total_rooms: 0,
+      total_beds: 0,
+      available_beds: 0,
+      expected_revenue_paise: 0,
+    }
+
     if (user.organization_id) {
       const { data } = await serviceClient
         .from('users')
@@ -34,6 +43,95 @@ export async function GET() {
         .eq('organization_id', user.organization_id)
         .order('created_at', { ascending: false })
       staffUsers = data || []
+
+      // If user has host/owner privileges, query hosted properties & capacity stats
+      const isOwnerOrStaff = ['superadmin', 'owner', 'manager', 'accountant', 'staff'].includes(user.role)
+      if (isOwnerOrStaff) {
+        try {
+          const orgId = user.organization_id
+          const [propsRes, residentsCountRes, roomsRes, bedsRes, invoicesRes] = await Promise.allSettled([
+            serviceClient
+              .from('properties')
+              .select('*')
+              .eq('organization_id', orgId)
+              .order('created_at', { ascending: false }),
+            serviceClient
+              .from('residents')
+              .select('id', { count: 'exact', head: true })
+              .eq('organization_id', orgId)
+              .eq('status', 'active'),
+            serviceClient
+              .from('rooms')
+              .select('id, base_rent_paise, capacity')
+              .eq('organization_id', orgId),
+            serviceClient
+              .from('beds')
+              .select('id, status')
+              .eq('organization_id', orgId),
+            serviceClient
+              .from('invoices')
+              .select('total_paise')
+              .eq('organization_id', orgId)
+              .not('status', 'in', '(cancelled,draft)'),
+          ])
+
+          const props = propsRes.status === 'fulfilled' ? (propsRes.value.data || []) : []
+          const activeResidents = residentsCountRes.status === 'fulfilled' ? (residentsCountRes.value.count || 0) : 0
+          const rooms = roomsRes.status === 'fulfilled' ? (roomsRes.value.data || []) : []
+          const beds = bedsRes.status === 'fulfilled' ? (bedsRes.value.data || []) : []
+          const invoices = invoicesRes.status === 'fulfilled' ? (invoicesRes.value.data || []) : []
+
+          const totalBeds = beds.length || rooms.reduce((sum: number, r: any) => sum + (r.capacity || 1), 0) || 10
+          const availableBeds = beds.filter((b: any) => b.status === 'available').length || Math.max(0, totalBeds - activeResidents)
+          const expectedRev = invoices.reduce((sum: number, inv: any) => sum + (inv.total_paise || 0), 0) || rooms.reduce((sum: number, r: any) => sum + (r.base_rent_paise || 0), 0)
+
+          propertyStats = {
+            total_residents: activeResidents,
+            total_rooms: rooms.length,
+            total_beds: totalBeds,
+            available_beds: availableBeds,
+            expected_revenue_paise: expectedRev,
+          }
+
+          const org = (user.organizations as any) || {}
+          if (props && props.length > 0) {
+            hostedProperties = props.map((p: any) => ({
+              id: p.id,
+              organization_id: p.organization_id,
+              name: p.name || org.name || 'PG-SETU Co-Living',
+              phone: p.phone || org.phone || user.phone,
+              email: p.email || org.email || user.email,
+              address: p.address || org.address || 'Sector 62, Noida',
+              city: p.city || org.city || 'Noida',
+              state: p.state || org.state || 'Uttar Pradesh',
+              pincode: p.pincode || org.pincode || '201309',
+              description: p.description || 'Premium executive PG & co-living residence with high-speed WiFi, clean rooms, and 24/7 security.',
+              settings: p.settings || org.settings || {},
+              stats: propertyStats,
+            }))
+          } else {
+            // Build virtual property representation from organization
+            hostedProperties = [
+              {
+                id: `prop_${orgId.slice(0, 8)}`,
+                organization_id: orgId,
+                name: org.name || 'PG-SETU Management Residence',
+                phone: org.phone || user.phone,
+                email: org.email || user.email,
+                address: org.address || 'Sector 62, Near Electronic City Metro',
+                city: org.city || 'Noida',
+                state: org.state || 'Uttar Pradesh',
+                pincode: org.pincode || '201309',
+                description: 'Executive co-living space with modern amenities, clean rooms, mess food, and 24/7 power backup.',
+                settings: org.settings || {},
+                stats: propertyStats,
+              },
+            ]
+          }
+        } catch (err: any) {
+          console.warn('[Session Route Hosted Properties Lookup Error]:', err?.message)
+        }
+      }
     }
 
     // ── 1. Fetch stays / PG history for this user ──
@@ -209,6 +307,8 @@ export async function GET() {
         user,
         organization: user.organizations,
         staffUsers,
+        hostedProperties,
+        propertyStats,
         stays: userStays,
         passbookSummary,
         transactions,

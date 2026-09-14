@@ -207,6 +207,8 @@ export function MarketplaceNavbar({
               {currentUser.role === 'owner' || currentUser.role === 'superadmin' || currentUser.role === 'manager' ? (
                 <Link
                   href="/dashboard"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 rounded-xl border border-[#14532D] bg-[#14532D] px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#166534] transition"
                 >
                   <Building2 className="h-3.5 w-3.5" />
@@ -347,6 +349,8 @@ export function MarketplaceNavbar({
                 {currentUser.role === 'owner' || currentUser.role === 'superadmin' || currentUser.role === 'manager' ? (
                   <Link
                     href="/dashboard"
+                    target="_blank"
+                    rel="noopener noreferrer"
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#14532D] py-3 text-sm font-bold text-white shadow-sm"
                   >

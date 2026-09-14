@@ -337,6 +337,8 @@ function OnboardingContent() {
             </div>
             <Link
               href="/dashboard"
+              target="_blank"
+              rel="noopener noreferrer"
               className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black rounded-xl text-xs transition flex items-center gap-2 shrink-0 shadow-lg shadow-emerald-500/20 active:scale-95"
             >
               <span>Go to PG Dashboard</span>

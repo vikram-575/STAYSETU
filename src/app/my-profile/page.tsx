@@ -10,10 +10,10 @@ import {
   KeyRound, PlusCircle, ExternalLink, ShieldAlert, AlertCircle, X,
   Download, FileText, Wallet, Receipt, CreditCard, ChevronRight, Award, Shield,
   CheckCircle, MapPin, QrCode, Share2, Sparkles, Zap, Smartphone,
-  HeartHandshake, ChevronDown, Filter, AlertTriangle
+  HeartHandshake, ChevronDown, Filter, AlertTriangle, BedDouble, TrendingUp, Plus
 } from 'lucide-react'
 
-type ProfileTab = 'overview' | 'passbook' | 'stays' | 'kyc'
+type ProfileTab = 'properties' | 'overview' | 'passbook' | 'stays' | 'kyc'
 
 function MyProfileContent() {
   const router = useRouter()
@@ -28,6 +28,72 @@ function MyProfileContent() {
   const [sharedToast, setSharedToast] = useState(false)
   const [receiptDownloaded, setReceiptDownloaded] = useState<string | null>(null)
   const [txnFilter, setTxnFilter] = useState<'all' | 'rent' | 'deposit' | 'electricity'>('all')
+
+  // Host & Properties State
+  const [hostedProperties, setHostedProperties] = useState<any[]>([])
+  const [propertyStats, setPropertyStats] = useState<any>(null)
+  const [isPropertyModalOpen, setIsPropertyModalOpen] = useState(false)
+  const [editingProperty, setEditingProperty] = useState<any>(null)
+
+  // Property Form State
+  const [propName, setPropName] = useState('')
+  const [propPhone, setPropPhone] = useState('')
+  const [propEmail, setPropEmail] = useState('')
+  const [propAddress, setPropAddress] = useState('')
+  const [propCity, setPropCity] = useState('')
+  const [propState, setPropState] = useState('')
+  const [propPincode, setPropPincode] = useState('')
+  const [propDescription, setPropDescription] = useState('')
+  const [propRent, setPropRent] = useState('7500')
+  const [propNoticePeriod, setPropNoticePeriod] = useState('30')
+  const [propLockIn, setPropLockIn] = useState('3')
+  const [propGateClosing, setPropGateClosing] = useState('11:00 PM')
+  const [propUpiId, setPropUpiId] = useState('')
+  const [propAmenities, setPropAmenities] = useState<string[]>([
+    'High-Speed WiFi', 'Power Backup', 'RO Water', '3 Daily Meals', 'Air Conditioning', 'CCTV Security', 'Housekeeping', 'Washing Machine'
+  ])
+  const [propRules, setPropRules] = useState<string[]>([
+    'Gate closes at 11:00 PM', 'Visitors in lounge only', 'No smoking inside rooms'
+  ])
+  const [savingProperty, setSavingProperty] = useState(false)
+  const [propSaveSuccess, setPropSaveSuccess] = useState('')
+  const [propSaveError, setPropSaveError] = useState('')
+
+  const ALL_AMENITIES = [
+    'High-Speed WiFi',
+    'Air Conditioning',
+    'Power Backup',
+    'RO Water',
+    '3 Daily Meals',
+    'Daily Housekeeping',
+    'CCTV Security',
+    'Washing Machine',
+    'Gym / Fitness',
+    'Geyser / Hot Water',
+    'Attached Washroom',
+    'Refrigerator',
+  ]
+
+  const ALL_RULES = [
+    'Gate closes at 11:00 PM',
+    'Visitors in lounge only',
+    'No smoking inside rooms',
+    'Quiet hours after 10 PM',
+    'Advance rent by 5th of month',
+    'Valid Govt ID required',
+  ]
+
+  const toggleAmenity = (item: string) => {
+    setPropAmenities((prev) =>
+      prev.includes(item) ? prev.filter((a) => a !== item) : [...prev, item]
+    )
+  }
+
+  const toggleRule = (item: string) => {
+    setPropRules((prev) =>
+      prev.includes(item) ? prev.filter((r) => r !== item) : [...prev, item]
+    )
+  }
 
   // Modals state
   const [isEditing, setIsEditing] = useState(false)
@@ -82,6 +148,38 @@ function MyProfileContent() {
             if (data.passbookSummary) setPassbookSummary(data.passbookSummary)
             if (data.transactions) setTransactions(data.transactions)
 
+            if (data.hostedProperties && data.hostedProperties.length > 0) {
+              setHostedProperties(data.hostedProperties)
+            } else if (data.organization) {
+              setHostedProperties([
+                {
+                  id: `prop_${data.organization.id?.slice(0, 8)}`,
+                  organization_id: data.organization.id,
+                  name: data.organization.name || 'PG-SETU Management Residence',
+                  phone: data.organization.phone || data.user.phone || '',
+                  email: data.organization.email || data.user.email || '',
+                  address: data.organization.address || 'Sector 62, Near Metro Station',
+                  city: data.organization.city || 'Noida',
+                  state: data.organization.state || 'Uttar Pradesh',
+                  pincode: data.organization.pincode || '201309',
+                  description: 'Executive co-living space with modern amenities, clean rooms, mess food, and 24/7 power backup.',
+                  settings: data.organization.settings || {},
+                  stats: data.propertyStats || {
+                    total_residents: 3,
+                    total_rooms: 4,
+                    total_beds: 10,
+                    available_beds: 7,
+                    expected_revenue_paise: 2250000,
+                  },
+                },
+              ])
+            }
+            if (data.propertyStats) setPropertyStats(data.propertyStats)
+            const isHostRole = data.user.role === 'owner' || data.user.role === 'superadmin' || data.user.role === 'manager'
+            if (isHostRole) {
+              setActiveTab('properties')
+            }
+
             // Server profile is the authoritative source of truth
             const serverProfile = data.profile || {}
             setProfileData(serverProfile)
@@ -109,6 +207,108 @@ function MyProfileContent() {
     loadSession()
   }, [])
 
+  const handleOpenPropertyModal = (prop?: any) => {
+    const target = prop || hostedProperties[0] || {}
+    setEditingProperty(target)
+    setPropName(target.name || currentUser?.organizations?.name || 'PG-SETU Residence')
+    setPropPhone(target.phone || currentUser?.phone || '')
+    setPropEmail(target.email || currentUser?.email || '')
+    setPropAddress(target.address || 'Sector 62, Noida')
+    setPropCity(target.city || 'Noida')
+    setPropState(target.state || 'Uttar Pradesh')
+    setPropPincode(target.pincode || '201309')
+    setPropDescription(target.description || 'Premium PG & co-living residence with top-tier amenities.')
+    const s = target.settings || {}
+    setPropRent(s.starting_rent_paise ? String(Math.round(s.starting_rent_paise / 100)) : (s.starting_rent ? String(s.starting_rent) : '7500'))
+    setPropNoticePeriod(s.notice_period_days ? String(s.notice_period_days) : '30')
+    setPropLockIn(s.lock_in_months ? String(s.lock_in_months) : '3')
+    setPropGateClosing(s.gate_closing_time || '11:00 PM')
+    setPropUpiId(s.upi_id || currentUser?.organizations?.settings?.upi_id || '')
+    if (Array.isArray(s.amenities) && s.amenities.length > 0) {
+      setPropAmenities(s.amenities)
+    }
+    if (Array.isArray(s.rules) && s.rules.length > 0) {
+      setPropRules(s.rules)
+    }
+    setPropSaveSuccess('')
+    setPropSaveError('')
+    setIsPropertyModalOpen(true)
+  }
+
+  const handleSaveProperty = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSavingProperty(true)
+    setPropSaveError('')
+    setPropSaveSuccess('')
+
+    try {
+      const res = await fetch('/api/properties/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          property_id: editingProperty?.id,
+          organization_id: editingProperty?.organization_id || currentUser?.organization_id,
+          name: propName,
+          phone: propPhone,
+          email: propEmail,
+          address: propAddress,
+          city: propCity,
+          state: propState,
+          pincode: propPincode,
+          description: propDescription,
+          starting_rent_paise: Number(propRent) * 100,
+          notice_period_days: Number(propNoticePeriod),
+          lock_in_months: Number(propLockIn),
+          gate_closing_time: propGateClosing,
+          amenities: propAmenities,
+          rules: propRules,
+          upi_id: propUpiId,
+        }),
+      })
+
+      const resData = await res.json()
+      if (!res.ok) {
+        throw new Error(resData.error || 'Failed to update property details.')
+      }
+
+      const updated = {
+        ...(editingProperty || {}),
+        name: propName,
+        phone: propPhone,
+        email: propEmail,
+        address: propAddress,
+        city: propCity,
+        state: propState,
+        pincode: propPincode,
+        description: propDescription,
+        settings: {
+          ...(editingProperty?.settings || {}),
+          starting_rent_paise: Number(propRent) * 100,
+          notice_period_days: Number(propNoticePeriod),
+          lock_in_months: Number(propLockIn),
+          gate_closing_time: propGateClosing,
+          amenities: propAmenities,
+          rules: propRules,
+          upi_id: propUpiId,
+        },
+      }
+
+      setHostedProperties((prev) => {
+        if (!prev || prev.length === 0) return [updated]
+        return prev.map((p) => (p.id === editingProperty?.id ? { ...p, ...updated } : p))
+      })
+      setPropSaveSuccess('Property details & terms updated live!')
+      setTimeout(() => {
+        setIsPropertyModalOpen(false)
+        setPropSaveSuccess('')
+      }, 1200)
+    } catch (err: any) {
+      setPropSaveError(err.message || 'Failed to save property.')
+    } finally {
+      setSavingProperty(false)
+    }
+  }
+
   const uniqueId =
     currentUser?.registration_number ||
     profileData?.id ||
@@ -117,6 +317,7 @@ function MyProfileContent() {
   const isAadhaarVerified = Boolean(profileData?.aadhaar_verified)
   const aadhaarLast4 = profileData?.aadhaar_last4 || ''
   const activeStay = stays.find((s) => s.status === 'active') || stays[0]
+  const isOwner = currentUser?.role === 'owner' || currentUser?.role === 'superadmin' || currentUser?.role === 'manager'
 
   const totalRentFormatted = passbookSummary
     ? `₹${(passbookSummary.total_rent_paid_paise / 100).toLocaleString('en-IN')}`
@@ -363,14 +564,17 @@ function MyProfileContent() {
           </div>
 
           <div className="flex items-center gap-2">
-            {currentUser.role === 'owner' || currentUser.role === 'superadmin' ? (
-              <Link
+            {isOwner ? (
+              <a
                 href="/dashboard"
-                className="inline-flex items-center gap-1 rounded-xl bg-[#14532D] px-2.5 sm:px-3.5 py-1.5 text-[11px] sm:text-xs font-bold text-white shadow-xs hover:bg-[#166534]"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-2.5 sm:px-3.5 py-1.5 text-[11px] sm:text-xs font-bold text-white shadow-xs hover:bg-[#166534] transition"
               >
                 <Building2 className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Owner ERP</span>
-              </Link>
+                <ExternalLink className="h-3 w-3 opacity-80" />
+              </a>
             ) : (
               <Link
                 href="/portal"
@@ -405,11 +609,20 @@ function MyProfileContent() {
           {/* Card Top Strip */}
           <div className="flex items-center justify-between pb-3 border-b border-white/15 text-[11px]">
             <div className="flex items-center gap-1.5 text-emerald-300 font-bold uppercase tracking-widest text-[10px]">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              <span>Universal Tenant Identity Pass</span>
+              {isOwner ? (
+                <>
+                  <Building2 className="h-3.5 w-3.5" />
+                  <span>Verified Property Host Identity Pass</span>
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  <span>Universal Tenant Identity Pass</span>
+                </>
+              )}
             </div>
             <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[10px] font-bold backdrop-blur-xs text-white">
-              {currentUser.role === 'owner' ? 'Property Host' : 'Verified Resident'}
+              {isOwner ? 'Property Host & Owner' : 'Verified Resident'}
             </span>
           </div>
 
@@ -431,10 +644,10 @@ function MyProfileContent() {
                 )}
               </div>
 
-              {/* Tenant Details */}
+              {/* User/Host Details */}
               <div className="space-y-0.5">
                 <h1 className="text-base sm:text-xl font-black tracking-tight text-white flex items-center gap-2">
-                  <span>{currentUser.full_name || 'PG-Setu Member'}</span>
+                  <span>{currentUser.full_name || (isOwner ? 'PG Host & Owner' : 'PG-Setu Member')}</span>
                   {isAadhaarVerified && (
                     <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded-md">
                       <ShieldCheck className="h-3 w-3" />
@@ -443,7 +656,9 @@ function MyProfileContent() {
                   )}
                 </h1>
                 <p className="text-xs text-emerald-200/90 font-medium">
-                  {profileData?.profession || 'Verified Member'} • {activeStay?.city || 'PG-Setu Resident'}
+                  {isOwner
+                    ? `${currentUser?.organizations?.name || hostedProperties[0]?.name || 'PG-Setu Certified Host'} • Host Profile`
+                    : `${profileData?.profession || 'Verified Member'} • ${activeStay?.city || 'PG-Setu Resident'}`}
                 </p>
                 <p className="text-[11px] text-white/70 font-mono">
                   +91 {currentUser.phone || profileData?.mobile || 'Verified Mobile'}
@@ -451,11 +666,11 @@ function MyProfileContent() {
               </div>
             </div>
 
-            {/* Universal Tenant ID Box */}
+            {/* Universal ID Box */}
             <div className="w-full sm:w-auto rounded-2xl bg-black/25 backdrop-blur-md p-3 border border-white/10 flex items-center justify-between sm:justify-end gap-3">
               <div>
                 <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-300/80 block">
-                  Unique Tenant ID
+                  {isOwner ? 'Host Account ID' : 'Unique Tenant ID'}
                 </span>
                 <span className="font-mono text-xs sm:text-sm font-black tracking-wide text-white block">
                   {uniqueId}
@@ -464,7 +679,7 @@ function MyProfileContent() {
               <button
                 onClick={() => handleCopyId(uniqueId)}
                 className="flex items-center gap-1 rounded-xl bg-white/15 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-white/25 active:scale-95 transition"
-                title="Copy Unique ID"
+                title="Copy ID"
               >
                 {copied ? (
                   <>
@@ -481,23 +696,58 @@ function MyProfileContent() {
             </div>
           </div>
 
-          {/* Current Stay & Room Footer */}
+          {/* Current Stay or Hosted Property Footer */}
           <div className="mt-4 pt-3 border-t border-white/15 flex flex-wrap items-center justify-between gap-2 text-xs">
             <div className="flex items-center gap-1.5 text-emerald-200 text-[11px]">
-              <Home className="h-3.5 w-3.5 text-emerald-300 shrink-0" />
-              <span className="font-semibold text-white">
-                {activeStay?.property_name || 'PG-Setu Member'}
-              </span>
-              <span className="text-white/40">•</span>
-              <span className="font-bold text-emerald-300">
-                {activeStay?.room_number
-                  ? `${activeStay.room_number} (${activeStay.bed_label || 'Bed A'})`
-                  : 'Pending Room Assignment'}
-              </span>
+              {isOwner ? (
+                <>
+                  <Building2 className="h-3.5 w-3.5 text-emerald-300 shrink-0" />
+                  <span className="font-semibold text-white">
+                    {hostedProperties[0]?.name || currentUser?.organizations?.name || 'Hosted Property'}
+                  </span>
+                  <span className="text-white/40">•</span>
+                  <span className="font-bold text-emerald-300">
+                    {propertyStats?.total_residents ?? 0} Residents ({propertyStats?.total_rooms ?? 0} Rooms, {propertyStats?.total_beds ?? 0} Beds)
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Home className="h-3.5 w-3.5 text-emerald-300 shrink-0" />
+                  <span className="font-semibold text-white">
+                    {activeStay?.property_name || 'PG-Setu Member'}
+                  </span>
+                  <span className="text-white/40">•</span>
+                  <span className="font-bold text-emerald-300">
+                    {activeStay?.room_number
+                      ? `${activeStay.room_number} (${activeStay.bed_label || 'Bed A'})`
+                      : 'Pending Room Assignment'}
+                  </span>
+                </>
+              )}
             </div>
 
             {/* Quick Card Actions */}
             <div className="flex items-center gap-2 w-full sm:w-auto justify-end pt-1 sm:pt-0">
+              {isOwner && (
+                <>
+                  <button
+                    onClick={() => handleOpenPropertyModal()}
+                    className="inline-flex items-center gap-1 rounded-xl bg-white/20 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-white/30 active:scale-95 transition"
+                  >
+                    <Edit className="h-3 w-3" />
+                    <span>Edit Property</span>
+                  </button>
+                  <a
+                    href="/dashboard"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 rounded-xl bg-emerald-400 text-emerald-950 px-2.5 py-1 text-[11px] font-bold hover:bg-emerald-300 active:scale-95 transition shadow-xs"
+                  >
+                    <Building2 className="h-3 w-3" />
+                    <span>Open ERP ↗</span>
+                  </a>
+                </>
+              )}
               <button
                 onClick={() => setIsQrModalOpen(true)}
                 className="inline-flex items-center gap-1 rounded-xl bg-white/15 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-white/25 active:scale-95 transition"
@@ -512,84 +762,166 @@ function MyProfileContent() {
                 <Share2 className="h-3 w-3" />
                 <span>Share ID</span>
               </button>
-              <button
-                onClick={() => setIsEditing(true)}
-                className="inline-flex items-center gap-1 rounded-xl bg-white/20 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-white/30 active:scale-95 transition"
-              >
-                <Edit className="h-3 w-3" />
-                <span>Edit</span>
-              </button>
+              {!isOwner && (
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="inline-flex items-center gap-1 rounded-xl bg-white/20 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-white/30 active:scale-95 transition"
+                >
+                  <Edit className="h-3 w-3" />
+                  <span>Edit</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
 
         {/* ────────────────────────────────────────────────────────── */}
-        {/* 3. MOBILE QUICK ACTION DOCK (4 TOUCH PILLS) */}
+        {/* 3. MOBILE QUICK ACTION DOCK (ROLE-ADAPTIVE 4 TOUCH PILLS) */}
         {/* ────────────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-4 gap-2 sm:gap-3">
-          {/* Quick Pay Rent */}
-          <button
-            onClick={() => setIsUpiPayModalOpen(true)}
-            className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-gray-200/80 shadow-xs hover:border-emerald-300 active:scale-95 transition text-center group"
-          >
-            <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white transition">
-              <Zap className="h-4 w-4 sm:h-5 sm:w-5" />
-            </div>
-            <span className="mt-1.5 text-[10px] sm:text-xs font-bold text-gray-800 line-clamp-1">
-              Pay Rent
-            </span>
-            <span className="text-[9px] text-gray-400 hidden sm:block">Instant UPI</span>
-          </button>
+        {isOwner ? (
+          <div className="grid grid-cols-4 gap-2 sm:gap-3">
+            {/* Owner ERP Dashboard (Opens in New Tab) */}
+            <a
+              href="/dashboard"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-gray-200/80 shadow-xs hover:border-emerald-300 active:scale-95 transition text-center group"
+            >
+              <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 group-hover:bg-[#14532D] group-hover:text-white transition">
+                <Building2 className="h-4 w-4 sm:h-5 sm:w-5" />
+              </div>
+              <span className="mt-1.5 text-[10px] sm:text-xs font-bold text-gray-800 line-clamp-1 flex items-center justify-center gap-0.5">
+                Owner ERP <ExternalLink className="h-2.5 w-2.5 opacity-60" />
+              </span>
+              <span className="text-[9px] text-gray-400 hidden sm:block">Full Dashboard</span>
+            </a>
 
-          {/* Quick Gate Pass */}
-          <button
-            onClick={() => setIsGatePassModalOpen(true)}
-            className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-gray-200/80 shadow-xs hover:border-emerald-300 active:scale-95 transition text-center group"
-          >
-            <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700 group-hover:bg-blue-600 group-hover:text-white transition">
-              <KeyRound className="h-4 w-4 sm:h-5 sm:w-5" />
-            </div>
-            <span className="mt-1.5 text-[10px] sm:text-xs font-bold text-gray-800 line-clamp-1">
-              Gate Pass
-            </span>
-            <span className="text-[9px] text-gray-400 hidden sm:block">Visitor Code</span>
-          </button>
+            {/* Quick Edit Property Modal */}
+            <button
+              onClick={() => handleOpenPropertyModal()}
+              className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-gray-200/80 shadow-xs hover:border-emerald-300 active:scale-95 transition text-center group"
+            >
+              <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700 group-hover:bg-blue-600 group-hover:text-white transition">
+                <Edit className="h-4 w-4 sm:h-5 sm:w-5" />
+              </div>
+              <span className="mt-1.5 text-[10px] sm:text-xs font-bold text-gray-800 line-clamp-1">
+                Edit Property
+              </span>
+              <span className="text-[9px] text-gray-400 hidden sm:block">Rates & Rules</span>
+            </button>
 
-          {/* Receipts / HRA */}
-          <Link
-            href="/portal?tab=hra"
-            className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-gray-200/80 shadow-xs hover:border-emerald-300 active:scale-95 transition text-center group"
-          >
-            <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-700 group-hover:bg-amber-600 group-hover:text-white transition">
-              <Receipt className="h-4 w-4 sm:h-5 sm:w-5" />
-            </div>
-            <span className="mt-1.5 text-[10px] sm:text-xs font-bold text-gray-800 line-clamp-1">
-              HRA Kit
-            </span>
-            <span className="text-[9px] text-gray-400 hidden sm:block">Rent Receipts</span>
-          </Link>
+            {/* Residents CRM (Opens in New Tab) */}
+            <a
+              href="/dashboard/residents"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-gray-200/80 shadow-xs hover:border-emerald-300 active:scale-95 transition text-center group"
+            >
+              <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-700 group-hover:bg-amber-600 group-hover:text-white transition">
+                <Users className="h-4 w-4 sm:h-5 sm:w-5" />
+              </div>
+              <span className="mt-1.5 text-[10px] sm:text-xs font-bold text-gray-800 line-clamp-1 flex items-center justify-center gap-0.5">
+                Residents <ExternalLink className="h-2.5 w-2.5 opacity-60" />
+              </span>
+              <span className="text-[9px] text-gray-400 hidden sm:block">CRM & Check-in</span>
+            </a>
 
-          {/* Warden / Support */}
-          <a
-            href="https://wa.me/919453522757?text=Hi%20PG-Setu%20Support,%20I%20need%20assistance%20with%20my%20stay"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-gray-200/80 shadow-xs hover:border-emerald-300 active:scale-95 transition text-center group"
-          >
-            <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-700 group-hover:bg-purple-600 group-hover:text-white transition">
-              <HeartHandshake className="h-4 w-4 sm:h-5 sm:w-5" />
-            </div>
-            <span className="mt-1.5 text-[10px] sm:text-xs font-bold text-gray-800 line-clamp-1">
-              Helpdesk
-            </span>
-            <span className="text-[9px] text-gray-400 hidden sm:block">Warden Chat</span>
-          </a>
-        </div>
+            {/* Rooms & Beds (Opens in New Tab) */}
+            <a
+              href="/dashboard/rooms"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-gray-200/80 shadow-xs hover:border-emerald-300 active:scale-95 transition text-center group"
+            >
+              <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-700 group-hover:bg-purple-600 group-hover:text-white transition">
+                <BedDouble className="h-4 w-4 sm:h-5 sm:w-5" />
+              </div>
+              <span className="mt-1.5 text-[10px] sm:text-xs font-bold text-gray-800 line-clamp-1 flex items-center justify-center gap-0.5">
+                Rooms & Beds <ExternalLink className="h-2.5 w-2.5 opacity-60" />
+              </span>
+              <span className="text-[9px] text-gray-400 hidden sm:block">Tariff Matrix</span>
+            </a>
+          </div>
+        ) : (
+          <div className="grid grid-cols-4 gap-2 sm:gap-3">
+            {/* Quick Pay Rent */}
+            <button
+              onClick={() => setIsUpiPayModalOpen(true)}
+              className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-gray-200/80 shadow-xs hover:border-emerald-300 active:scale-95 transition text-center group"
+            >
+              <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white transition">
+                <Zap className="h-4 w-4 sm:h-5 sm:w-5" />
+              </div>
+              <span className="mt-1.5 text-[10px] sm:text-xs font-bold text-gray-800 line-clamp-1">
+                Pay Rent
+              </span>
+              <span className="text-[9px] text-gray-400 hidden sm:block">Instant UPI</span>
+            </button>
+
+            {/* Quick Gate Pass */}
+            <button
+              onClick={() => setIsGatePassModalOpen(true)}
+              className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-gray-200/80 shadow-xs hover:border-emerald-300 active:scale-95 transition text-center group"
+            >
+              <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700 group-hover:bg-blue-600 group-hover:text-white transition">
+                <KeyRound className="h-4 w-4 sm:h-5 sm:w-5" />
+              </div>
+              <span className="mt-1.5 text-[10px] sm:text-xs font-bold text-gray-800 line-clamp-1">
+                Gate Pass
+              </span>
+              <span className="text-[9px] text-gray-400 hidden sm:block">Visitor Code</span>
+            </button>
+
+            {/* Receipts / HRA */}
+            <Link
+              href="/portal?tab=hra"
+              className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-gray-200/80 shadow-xs hover:border-emerald-300 active:scale-95 transition text-center group"
+            >
+              <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-700 group-hover:bg-amber-600 group-hover:text-white transition">
+                <Receipt className="h-4 w-4 sm:h-5 sm:w-5" />
+              </div>
+              <span className="mt-1.5 text-[10px] sm:text-xs font-bold text-gray-800 line-clamp-1">
+                HRA Kit
+              </span>
+              <span className="text-[9px] text-gray-400 hidden sm:block">Rent Receipts</span>
+            </Link>
+
+            {/* Warden / Support */}
+            <a
+              href="https://wa.me/919453522757?text=Hi%20PG-Setu%20Support,%20I%20need%20assistance%20with%20my%20stay"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-gray-200/80 shadow-xs hover:border-emerald-300 active:scale-95 transition text-center group"
+            >
+              <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-700 group-hover:bg-purple-600 group-hover:text-white transition">
+                <HeartHandshake className="h-4 w-4 sm:h-5 sm:w-5" />
+              </div>
+              <span className="mt-1.5 text-[10px] sm:text-xs font-bold text-gray-800 line-clamp-1">
+                Helpdesk
+              </span>
+              <span className="text-[9px] text-gray-400 hidden sm:block">Warden Chat</span>
+            </a>
+          </div>
+        )}
 
         {/* ────────────────────────────────────────────────────────── */}
         {/* 4. MOBILE-FIRST SEGMENTED TABS BAR */}
         {/* ────────────────────────────────────────────────────────── */}
         <div className="flex rounded-2xl bg-gray-200/70 p-1 gap-1 overflow-x-auto no-scrollbar">
+          {isOwner && (
+            <button
+              onClick={() => setActiveTab('properties')}
+              className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap ${
+                activeTab === 'properties'
+                  ? 'bg-white text-[#14532D] shadow-xs'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Building2 className="h-3.5 w-3.5" />
+              <span>Hosted Properties ({hostedProperties.length})</span>
+            </button>
+          )}
+
           <button
             onClick={() => setActiveTab('overview')}
             className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap ${
@@ -614,17 +946,19 @@ function MyProfileContent() {
             <span>Passbook</span>
           </button>
 
-          <button
-            onClick={() => setActiveTab('stays')}
-            className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'stays'
-                ? 'bg-white text-[#14532D] shadow-xs'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <Building2 className="h-3.5 w-3.5" />
-            <span>Stays ({stays.length})</span>
-          </button>
+          {(!isOwner || stays.length > 0) && (
+            <button
+              onClick={() => setActiveTab('stays')}
+              className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap ${
+                activeTab === 'stays'
+                  ? 'bg-white text-[#14532D] shadow-xs'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Building2 className="h-3.5 w-3.5" />
+              <span>Stays ({stays.length})</span>
+            </button>
+          )}
 
           <button
             onClick={() => setActiveTab('kyc')}
@@ -635,9 +969,297 @@ function MyProfileContent() {
             }`}
           >
             <ShieldCheck className="h-3.5 w-3.5" />
-            <span>KYC & Info</span>
+            <span>{isOwner ? 'KYC & Host Info' : 'KYC & Info'}</span>
           </button>
         </div>
+
+        {/* ────────────────────────────────────────────────────────── */}
+        {/* TAB 0: HOSTED PROPERTIES & LIVE PROPERTY EDITOR (OWNERS)   */}
+        {/* ────────────────────────────────────────────────────────── */}
+        {activeTab === 'properties' && (
+          <div className="space-y-4">
+            {/* Host KPI Micro-Dashboard */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+              {/* Total Capacity */}
+              <div className="rounded-2xl border border-gray-200/80 bg-white p-3 sm:p-4 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                    Total Capacity
+                  </span>
+                  <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                    <BedDouble className="h-3 w-3" />
+                  </div>
+                </div>
+                <div className="mt-1 text-base sm:text-lg font-black text-gray-900">
+                  {propertyStats?.total_beds ?? 0} Beds
+                </div>
+                <span className="text-[10px] text-gray-400 block mt-0.5">
+                  Across {propertyStats?.total_rooms ?? 0} Rooms
+                </span>
+              </div>
+
+              {/* Active Residents */}
+              <div className="rounded-2xl border border-gray-200/80 bg-white p-3 sm:p-4 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                    Occupancy
+                  </span>
+                  <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
+                    <Users className="h-3 w-3" />
+                  </div>
+                </div>
+                <div className="mt-1 text-base sm:text-lg font-black text-blue-900">
+                  {propertyStats?.total_residents ?? 0} Residents
+                </div>
+                <span className="text-[10px] text-blue-600 font-bold block mt-0.5">
+                  {propertyStats?.total_beds ? Math.round(((propertyStats.total_residents || 0) / propertyStats.total_beds) * 100) : 0}% Occupancy
+                </span>
+              </div>
+
+              {/* Vacant / Available Beds */}
+              <div className="rounded-2xl border border-gray-200/80 bg-white p-3 sm:p-4 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                    Vacant Beds
+                  </span>
+                  <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
+                    <Bed className="h-3 w-3" />
+                  </div>
+                </div>
+                <div className="mt-1 text-base sm:text-lg font-black text-amber-900">
+                  {propertyStats?.available_beds ?? 0} Available
+                </div>
+                <span className="text-[10px] text-amber-600 font-bold block mt-0.5">
+                  Ready to book
+                </span>
+              </div>
+
+              {/* Monthly Expected Revenue */}
+              <div className="rounded-2xl border border-gray-200/80 bg-white p-3 sm:p-4 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                    Expected Rent
+                  </span>
+                  <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-purple-50 text-purple-700">
+                    <TrendingUp className="h-3 w-3" />
+                  </div>
+                </div>
+                <div className="mt-1 text-base sm:text-lg font-black text-[#14532D]">
+                  ₹{((propertyStats?.expected_revenue_paise ?? 0) / 100).toLocaleString('en-IN')}
+                </div>
+                <span className="text-[10px] text-emerald-600 font-bold block mt-0.5">
+                  Monthly Run Rate
+                </span>
+              </div>
+            </div>
+
+            {/* Properties List Header */}
+            <div className="flex items-center justify-between pt-1">
+              <div>
+                <h2 className="text-sm sm:text-base font-black text-gray-900 flex items-center gap-1.5">
+                  <span>Hosted Properties</span>
+                  <span className="rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-[#14532D]">
+                    {hostedProperties.length} Listed
+                  </span>
+                </h2>
+                <p className="text-[11px] sm:text-xs text-gray-500">
+                  Manage live listing details, house rules, rent tariffs, and security deposit terms.
+                </p>
+              </div>
+
+              <button
+                onClick={() => handleOpenPropertyModal(hostedProperties[0])}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#166534] transition active:scale-95"
+              >
+                <Edit className="h-3.5 w-3.5" />
+                <span>Edit Property</span>
+              </button>
+            </div>
+
+            {/* Hosted Properties Cards */}
+            <div className="space-y-4">
+              {hostedProperties.map((prop, idx) => {
+                const s = prop.settings || {}
+                const rentFormatted = s.starting_rent_paise
+                  ? `₹${Math.round(s.starting_rent_paise / 100).toLocaleString('en-IN')}`
+                  : (s.starting_rent ? `₹${Number(s.starting_rent).toLocaleString('en-IN')}` : '₹7,500')
+                const amenitiesList: string[] = Array.isArray(s.amenities) && s.amenities.length > 0
+                  ? s.amenities
+                  : ['High-Speed WiFi', 'Power Backup', 'RO Water', '3 Daily Meals', 'Air Conditioning', 'CCTV Security']
+                const rulesList: string[] = Array.isArray(s.rules) && s.rules.length > 0
+                  ? s.rules
+                  : ['Gate closes at 11:00 PM', 'Visitors in lounge only', 'No smoking inside rooms']
+
+                return (
+                  <div
+                    key={prop.id || idx}
+                    className="rounded-3xl border border-gray-200/80 bg-white p-4 sm:p-6 shadow-xs space-y-4"
+                  >
+                    {/* Header: Title + Status + Action Buttons */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-base sm:text-lg font-black text-gray-900">
+                            {prop.name || 'PG-Setu Residence'}
+                          </h3>
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-[#14532D] flex items-center gap-1">
+                            <CheckCircle2 className="h-3 w-3" />
+                            Live & Verified
+                          </span>
+                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-800">
+                            Auto-Sync Supabase
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 flex items-center gap-1.5 flex-wrap">
+                          <MapPin className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                          <span>
+                            {prop.address || 'Sector 62'}, {prop.city || 'Noida'}, {prop.state || 'UP'} {prop.pincode ? `- ${prop.pincode}` : ''}
+                          </span>
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleOpenPropertyModal(prop)}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-600 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-[#14532D] hover:bg-emerald-100 transition active:scale-95"
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                          <span>Edit Details</span>
+                        </button>
+                        <a
+                          href="/dashboard"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#166534] transition active:scale-95 shadow-xs"
+                        >
+                          <Building2 className="h-3.5 w-3.5" />
+                          <span>Open ERP ↗</span>
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    {prop.description && (
+                      <p className="text-xs text-gray-600 leading-relaxed bg-gray-50/80 p-3 rounded-2xl border border-gray-100">
+                        {prop.description}
+                      </p>
+                    )}
+
+                    {/* Key Property Specs Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 text-xs">
+                      <div className="p-2.5 rounded-xl bg-[#F7FAF7] border border-emerald-100/60">
+                        <span className="text-[10px] font-bold uppercase text-gray-400 block">Starting Rent</span>
+                        <span className="text-sm font-black text-[#14532D]">{rentFormatted} /mo</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-[#F7FAF7] border border-emerald-100/60">
+                        <span className="text-[10px] font-bold uppercase text-gray-400 block">Notice Period</span>
+                        <span className="text-sm font-black text-gray-800">{s.notice_period_days || 30} Days</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-[#F7FAF7] border border-emerald-100/60">
+                        <span className="text-[10px] font-bold uppercase text-gray-400 block">Lock-In Period</span>
+                        <span className="text-sm font-black text-gray-800">{s.lock_in_months || 3} Months</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-[#F7FAF7] border border-emerald-100/60">
+                        <span className="text-[10px] font-bold uppercase text-gray-400 block">Gate Closing</span>
+                        <span className="text-sm font-black text-gray-800">{s.gate_closing_time || '11:00 PM'}</span>
+                      </div>
+                    </div>
+
+                    {/* UPI Auto Collection Details */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-2xl bg-emerald-50/70 border border-emerald-200/70 p-3 text-xs">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600 text-white">
+                          <Zap className="h-3.5 w-3.5" />
+                        </div>
+                        <div>
+                          <span className="font-bold text-[#14532D] block text-xs">Direct UPI Collection ID</span>
+                          <span className="text-[11px] font-mono text-emerald-800 font-semibold">
+                            {s.upi_id || prop.upi_id || 'Configured via Owner ERP Settings'}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-emerald-700 bg-white/80 px-2 py-0.5 rounded-md border border-emerald-200 w-fit">
+                        0% Commission Direct Settlement
+                      </span>
+                    </div>
+
+                    {/* Amenities Chips */}
+                    <div>
+                      <span className="text-[11px] font-bold text-gray-600 block uppercase tracking-wider mb-2">
+                        Verified Amenities ({amenitiesList.length})
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {amenitiesList.map((amenity, i) => (
+                          <span
+                            key={i}
+                            className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-700"
+                          >
+                            <Check className="h-3 w-3 text-emerald-600" />
+                            {amenity}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* House Rules */}
+                    <div>
+                      <span className="text-[11px] font-bold text-gray-600 block uppercase tracking-wider mb-2">
+                        House Rules & Code of Conduct
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {rulesList.map((rule, i) => (
+                          <span
+                            key={i}
+                            className="inline-flex items-center gap-1 rounded-lg bg-amber-50 border border-amber-200/60 px-2.5 py-1 text-[11px] font-semibold text-amber-900"
+                          >
+                            <Shield className="h-3 w-3 text-amber-600" />
+                            {rule}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Management Quick Sub-Routes (All Open in New Tab) */}
+                    <div className="pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs text-gray-500 font-medium">
+                        Quick ERP Access:
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href="/dashboard/rooms"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 rounded-xl bg-gray-100 px-2.5 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-200 transition"
+                        >
+                          <BedDouble className="h-3 w-3" />
+                          <span>Rooms & Tariffs ↗</span>
+                        </a>
+                        <a
+                          href="/dashboard/residents"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 rounded-xl bg-gray-100 px-2.5 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-200 transition"
+                        >
+                          <Users className="h-3 w-3" />
+                          <span>Tenants CRM ↗</span>
+                        </a>
+                        <a
+                          href="/dashboard/billing"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 rounded-xl bg-gray-100 px-2.5 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-200 transition"
+                        >
+                          <Receipt className="h-3 w-3" />
+                          <span>Billing & Rent ↗</span>
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* ────────────────────────────────────────────────────────── */}
         {/* TAB 1: OVERVIEW & SMART PASSBOOK METRICS */}
@@ -1708,6 +2330,330 @@ function MyProfileContent() {
                 </button>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* 10. MODAL 6: EDIT HOSTED PROPERTY DETAILS & TERMS          */}
+      {/* ────────────────────────────────────────────────────────── */}
+      {isPropertyModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4 backdrop-blur-xs">
+          <div className="relative w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-white p-5 sm:p-6 shadow-2xl">
+            <div className="sm:hidden w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-3" />
+
+            <button
+              onClick={() => setIsPropertyModalOpen(false)}
+              className="absolute right-4 top-4 text-gray-400 hover:text-gray-700"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            {/* Modal Header */}
+            <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-100">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-[#14532D]">
+                <Building2 className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-gray-900">
+                  Edit Property & Listing Terms
+                </h3>
+                <p className="text-xs text-gray-500">
+                  Updates sync instantly to Supabase and marketplace search
+                </p>
+              </div>
+            </div>
+
+            {propSaveSuccess && (
+              <div className="mb-4 flex items-center gap-2 rounded-2xl bg-emerald-50 p-3 text-xs font-bold text-[#14532D] border border-emerald-200">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                <span>{propSaveSuccess}</span>
+              </div>
+            )}
+
+            {propSaveError && (
+              <div className="mb-4 flex items-center gap-2 rounded-2xl bg-red-50 p-3 text-xs font-bold text-red-700 border border-red-200">
+                <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
+                <span>{propSaveError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveProperty} className="space-y-4">
+              {/* Basic Details */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                  Property Information
+                </h4>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                    Property Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={propName}
+                    onChange={(e) => setPropName(e.target.value)}
+                    placeholder="e.g. PG-SETU Executive Co-Living"
+                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-300 outline-none focus:border-[#16A34A]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                      Manager Phone *
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      value={propPhone}
+                      onChange={(e) => setPropPhone(e.target.value)}
+                      placeholder="e.g. 9876543210"
+                      className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-300 outline-none focus:border-[#16A34A]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                      Contact Email
+                    </label>
+                    <input
+                      type="email"
+                      value={propEmail}
+                      onChange={(e) => setPropEmail(e.target.value)}
+                      placeholder="e.g. contact@pgsetu.com"
+                      className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-300 outline-none focus:border-[#16A34A]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                    Street Address *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={propAddress}
+                    onChange={(e) => setPropAddress(e.target.value)}
+                    placeholder="e.g. Sector 62, Block B, Near Metro Station"
+                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-300 outline-none focus:border-[#16A34A]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                      City *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={propCity}
+                      onChange={(e) => setPropCity(e.target.value)}
+                      placeholder="Noida"
+                      className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-gray-300 outline-none focus:border-[#16A34A]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                      State *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={propState}
+                      onChange={(e) => setPropState(e.target.value)}
+                      placeholder="Uttar Pradesh"
+                      className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-gray-300 outline-none focus:border-[#16A34A]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                      Pincode *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={propPincode}
+                      onChange={(e) => setPropPincode(e.target.value)}
+                      placeholder="201309"
+                      className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-gray-300 outline-none focus:border-[#16A34A]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                    Listing Description
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={propDescription}
+                    onChange={(e) => setPropDescription(e.target.value)}
+                    placeholder="Brief highlights for prospective residents..."
+                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border border-gray-300 outline-none focus:border-[#16A34A]"
+                  />
+                </div>
+              </div>
+
+              {/* Pricing & Terms */}
+              <div className="space-y-3 pt-2 border-t border-gray-100">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                  Tariffs & Terms
+                </h4>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                      Starting Rent (₹)
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      value={propRent}
+                      onChange={(e) => setPropRent(e.target.value)}
+                      placeholder="7500"
+                      className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-gray-300 outline-none focus:border-[#16A34A]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                      Notice (Days)
+                    </label>
+                    <input
+                      type="number"
+                      value={propNoticePeriod}
+                      onChange={(e) => setPropNoticePeriod(e.target.value)}
+                      placeholder="30"
+                      className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-gray-300 outline-none focus:border-[#16A34A]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                      Lock-In (Mo)
+                    </label>
+                    <input
+                      type="number"
+                      value={propLockIn}
+                      onChange={(e) => setPropLockIn(e.target.value)}
+                      placeholder="3"
+                      className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-gray-300 outline-none focus:border-[#16A34A]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                      Gate Closes
+                    </label>
+                    <input
+                      type="text"
+                      value={propGateClosing}
+                      onChange={(e) => setPropGateClosing(e.target.value)}
+                      placeholder="11:00 PM"
+                      className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-gray-300 outline-none focus:border-[#16A34A]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                    Direct UPI ID for Auto Rent Collection
+                  </label>
+                  <input
+                    type="text"
+                    value={propUpiId}
+                    onChange={(e) => setPropUpiId(e.target.value)}
+                    placeholder="e.g. vikram@okhdfcbank or 9876543210@upi"
+                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-300 outline-none focus:border-[#16A34A]"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    Residents scanning the QR on profile or invoice will transfer directly to this UPI handle.
+                  </p>
+                </div>
+              </div>
+
+              {/* Amenities Selector */}
+              <div className="space-y-2 pt-2 border-t border-gray-100">
+                <label className="block text-[11px] font-bold text-gray-700 uppercase">
+                  Included Amenities (Click to toggle)
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {ALL_AMENITIES.map((amenity) => {
+                    const selected = propAmenities.includes(amenity)
+                    return (
+                      <button
+                        type="button"
+                        key={amenity}
+                        onClick={() => toggleAmenity(amenity)}
+                        className={`inline-flex items-center gap-1 rounded-xl px-2.5 py-1 text-xs font-semibold transition ${
+                          selected
+                            ? 'bg-[#14532D] text-white shadow-xs'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {selected && <Check className="h-3 w-3" />}
+                        <span>{amenity}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* House Rules Selector */}
+              <div className="space-y-2 pt-2 border-t border-gray-100">
+                <label className="block text-[11px] font-bold text-gray-700 uppercase">
+                  House Rules (Click to toggle)
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {ALL_RULES.map((rule) => {
+                    const selected = propRules.includes(rule)
+                    return (
+                      <button
+                        type="button"
+                        key={rule}
+                        onClick={() => toggleRule(rule)}
+                        className={`inline-flex items-center gap-1 rounded-xl px-2.5 py-1 text-xs font-semibold transition ${
+                          selected
+                            ? 'bg-amber-600 text-white shadow-xs'
+                            : 'bg-amber-50 text-amber-900 border border-amber-200/60 hover:bg-amber-100'
+                        }`}
+                      >
+                        {selected && <Check className="h-3 w-3" />}
+                        <span>{rule}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Save Button */}
+              <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsPropertyModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-gray-300 text-xs font-bold text-gray-700 hover:bg-gray-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingProperty}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#14532D] text-white text-xs font-bold hover:bg-[#166534] transition active:scale-95 disabled:opacity-50"
+                >
+                  {savingProperty ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Saving Live to Supabase...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-4 w-4" />
+                      <span>Save Property Changes</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

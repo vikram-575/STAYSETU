@@ -64,7 +64,7 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
       })
       const data = await res.json()
       if (data.success) {
-        window.location.href = '/dashboard'
+        window.open('/dashboard', '_blank')
       } else {
         alert(data.error || 'Failed to switch context')
       }
