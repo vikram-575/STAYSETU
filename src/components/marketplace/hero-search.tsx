@@ -178,12 +178,12 @@ export function HeroSearch({ onSearch, selectedCity, onCityChange }: HeroSearchP
                       window.dispatchEvent(new CustomEvent('open-instant-pg'))
                     }
                   }}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] via-emerald-700 to-[#16A34A] px-4 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md shadow-emerald-950/20 hover:brightness-110 active:scale-95 transition shrink-0 cursor-pointer"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-50/80 border border-emerald-600/40 text-[#14532D] hover:bg-emerald-100/90 px-4 py-2.5 text-xs sm:text-sm font-bold shadow-2xs active:scale-95 transition shrink-0 cursor-pointer"
                   title="Open Instant PG Booking Form"
                 >
-                  <Zap className="h-4 w-4 fill-amber-300 text-amber-300" />
+                  <Zap className="h-4 w-4 text-emerald-700" />
                   <span>Get Instant PG</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
+                  <ArrowRight className="h-3.5 w-3.5 text-emerald-700" />
                 </button>
               </div>
             </div>
@@ -321,8 +321,8 @@ export function HeroSearch({ onSearch, selectedCity, onCityChange }: HeroSearchP
             </form>
           </div>
 
-          {/* Quick Search Chips - Horizontal swipeable on mobile */}
-          <div className="mt-4 flex items-center sm:flex-wrap sm:justify-center gap-1.5 overflow-x-auto no-scrollbar -mx-2 px-2 sm:mx-0 sm:px-0 py-1">
+          {/* Quick Search Chips - Horizontal swipeable on mobile, left-aligned on desktop */}
+          <div className="mt-4 flex items-center sm:flex-wrap sm:justify-start gap-1.5 overflow-x-auto no-scrollbar -mx-2 px-2 sm:mx-0 sm:px-0 py-1">
             <span className="text-xs font-semibold text-[#647067] mr-1 shrink-0 hidden sm:inline">Quick Filters:</span>
             {(hero?.quickChips || []).map((chip) => {
               const isSelected = activeChip === chip.filterKey

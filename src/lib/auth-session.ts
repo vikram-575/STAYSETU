@@ -124,7 +124,9 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
       if (authUserId || authEmail || authMobile || residentId) {
         let fallbackProfile: any = null
 
-        // Try lookup by ID first if present
+        const cleanMob = authMobile ? authMobile.replace(/\D/g, '').slice(-10) : ''
+
+        // Look up by ID first if present
         if (authUserId) {
           const { data } = await serviceClient
             .from('users')
@@ -157,6 +159,38 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
           }
         }
 
+        // If not found yet, lookup in users table by phone/mobile (Crucial for mobile OTP & PG owner logins)
+        if (!fallbackProfile && cleanMob) {
+          const { data: byPhone } = await serviceClient
+            .from('users')
+            .select('*, organizations(*)')
+            .or(`phone.eq.${cleanMob},phone.ilike.%${cleanMob}%`)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+          fallbackProfile = byPhone
+
+          // Heal session cookies if found by phone
+          if (fallbackProfile?.id) {
+            try {
+              cookieStore.set('auth_user_id', fallbackProfile.id, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 60 * 60 * 24 * 30,
+                path: '/',
+              })
+              cookieStore.set('auth_role', fallbackProfile.role || 'owner', {
+                httpOnly: false,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 60 * 60 * 24 * 30,
+                path: '/',
+              })
+            } catch {}
+          }
+        }
+
         if (fallbackProfile) {
           let orgId = fallbackProfile.organization_id
           let orgObj = fallbackProfile.organizations
@@ -165,7 +199,7 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
             const { data: matchedOrg } = await serviceClient
               .from('organizations')
               .select('id, name, slug, gst_enabled')
-              .or(`email.ilike.${fallbackProfile.email},phone.eq.${fallbackProfile.phone || 'none'}`)
+              .or(`email.ilike.${fallbackProfile.email},phone.eq.${fallbackProfile.phone || 'none'},phone.ilike.%${cleanMob || 'none'}%`)
               .maybeSingle()
 
             const { data: defaultOrg } = !matchedOrg
@@ -187,10 +221,18 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
             }
           }
 
+          const rawName = fallbackProfile.full_name
+          const isPhoneAsName = !rawName || rawName === fallbackProfile.phone || (cleanMob && rawName.trim() === cleanMob)
+          const displayName = !isPhoneAsName
+            ? rawName
+            : (fallbackProfile.organizations?.name && fallbackProfile.organizations.name !== cleanMob
+                ? fallbackProfile.organizations.name
+                : (fallbackProfile.role === 'owner' ? 'PG Owner & Host' : 'PG-Setu Member'))
+
           return {
             id: fallbackProfile.id,
             email: fallbackProfile.email,
-            full_name: fallbackProfile.full_name || fallbackProfile.email?.split('@')[0] || 'User',
+            full_name: displayName,
             role: fallbackProfile.role || 'owner',
             organization_id: orgId,
             phone: fallbackProfile.phone || authMobile,
@@ -201,7 +243,6 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
 
         // Check if this user is in 'residents' table (Tenant / Resident login)
         const targetResidentId = residentId || authUserId
-        const cleanMob = authMobile ? authMobile.replace(/\D/g, '').slice(-10) : ''
         
         let residentQuery = serviceClient
           .from('residents')
@@ -229,11 +270,13 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
 
         // Fallback for newly verified mobile profile without DB records yet
         if (authMobile) {
+          const cookieRole = cookieStore.get('auth_role')?.value
+          const isOwnerCookie = cookieRole === 'owner' || cookieRole === 'manager' || cookieRole === 'superadmin'
           return {
             id: authUserId || `user_${cleanMob}`,
-            email: authEmail || `${cleanMob}@user.pgsetu.com`,
-            full_name: cookieStore.get('auth_name')?.value || 'PG-Setu Member',
-            role: (cookieStore.get('auth_role')?.value as any) || 'resident',
+            email: authEmail || `${cleanMob}@${isOwnerCookie ? 'owner' : 'user'}.pgsetu.com`,
+            full_name: cookieStore.get('auth_name')?.value || (isOwnerCookie ? 'PG Owner & Host' : 'PG-Setu Member'),
+            role: (cookieRole as any) || 'resident',
             organization_id: null,
             phone: authMobile,
             organizations: null,

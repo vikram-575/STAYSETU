@@ -130,48 +130,29 @@ export default function InstantPgFloatingWidget() {
         {/* Mobile Compact Circular FAB (44px) - never blocks property cards */}
         <button
           onClick={() => setIsOpen(true)}
-          className="flex sm:hidden relative items-center justify-center w-11 h-11 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white rounded-full shadow-xl shadow-emerald-950/40 active:scale-95 transition-all duration-200 border-2 border-white/30 cursor-pointer"
+          className="flex sm:hidden relative items-center justify-center w-11 h-11 bg-[#14532D] text-white rounded-full shadow-lg shadow-emerald-950/30 active:scale-95 transition-all duration-200 border border-white/30 cursor-pointer"
           title="Instant Verified PG Support"
           aria-label="Get Instant PG"
         >
-          {/* Beacon Pulse Ring */}
-          <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-amber-500 border-2 border-white shadow-xs" />
-          </span>
-          <div className="w-6 h-6 rounded-full bg-amber-400 text-emerald-950 flex items-center justify-center shadow-inner">
+          <div className="w-6 h-6 rounded-full bg-amber-400 text-emerald-950 flex items-center justify-center shadow-xs">
             <Zap className="w-3.5 h-3.5 fill-emerald-950" />
           </div>
         </button>
 
-        {/* Desktop / Tablet Rich Button */}
+        {/* Desktop / Tablet Sleek Pill Button (Issues 8, 9, 15: Streamlined, accessible & non-distracting) */}
         <button
           onClick={() => setIsOpen(true)}
-          className="hidden sm:flex group relative items-center gap-3 px-4 py-3 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:via-teal-500 hover:to-emerald-600 text-white font-black text-sm rounded-full shadow-2xl shadow-emerald-950/30 hover:shadow-emerald-600/50 active:scale-95 transition-all duration-300 border-2 border-white/25 backdrop-blur-sm cursor-pointer"
+          className="hidden sm:flex group items-center gap-2.5 px-3.5 py-2.5 bg-[#14532D] hover:bg-[#166534] text-white font-semibold text-xs rounded-full shadow-lg shadow-emerald-950/20 hover:shadow-emerald-900/30 active:scale-95 transition-all cursor-pointer border border-emerald-400/25 backdrop-blur-sm"
           title="Book Instant Verified PG"
-          aria-label="Get Instant PG"
+          aria-label="Get Instant Verified PG"
         >
-          {/* Beacon Pulse Ring */}
-          <span className="absolute -top-1 -right-1 flex h-4 w-4">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-4 w-4 bg-amber-500 border-2 border-white shadow-xs" />
+          <div className="w-6 h-6 rounded-full bg-emerald-700 flex items-center justify-center text-amber-300 shrink-0">
+            <Zap className="w-3.5 h-3.5 fill-amber-300" />
+          </div>
+          <span className="font-bold tracking-tight">Instant PG</span>
+          <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/25 text-emerald-100 border border-emerald-400/20">
+            Direct Allotment
           </span>
-
-          <div className="w-7 h-7 rounded-full bg-amber-400 text-emerald-950 flex items-center justify-center shadow-inner group-hover:rotate-12 transition-transform shrink-0">
-            <Zap className="w-4 h-4 fill-emerald-950" />
-          </div>
-
-          <div className="text-left leading-tight pr-1">
-            <div className="flex items-center gap-1.5">
-              <span className="font-extrabold tracking-tight">⚡ Instant PG</span>
-              <span className="inline-block px-1.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-300/25 text-amber-200 border border-amber-300/30">
-                DIRECT ALLOTMENT
-              </span>
-            </div>
-            <p className="text-[10px] text-emerald-100 font-normal">
-              Zero Brokerage • Verified Stays
-            </p>
-          </div>
         </button>
       </div>
 

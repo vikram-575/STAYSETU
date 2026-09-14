@@ -40,7 +40,36 @@ export async function POST(request: NextRequest) {
     }
 
     const serviceClient = await createServiceClient()
-    const targetOrgId = organization_id || user.organization_id
+    let targetOrgId = organization_id || user.organization_id
+
+    // If user has no organization yet, auto-create one for this owner
+    if (!targetOrgId) {
+      try {
+        const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 20) + '-' + Math.random().toString(36).substring(2, 6)
+        const { data: newOrg } = await serviceClient
+          .from('organizations')
+          .insert({
+            name: name.trim(),
+            slug,
+            phone: phone?.trim() || user.phone || null,
+            email: email?.trim() || user.email || null,
+            city: city?.trim() || null,
+            address: address?.trim() || null,
+            owner_user_id: user.id,
+          })
+          .select('id')
+          .single()
+
+        if (newOrg) {
+          targetOrgId = newOrg.id
+          try {
+            await serviceClient.from('users').update({ organization_id: targetOrgId }).eq('id', user.id)
+          } catch {}
+        }
+      } catch (orgCreateErr: any) {
+        console.warn('[Auto-create Org Warning]:', orgCreateErr?.message)
+      }
+    }
 
     // 1. Update Organization Table if orgId exists
     if (targetOrgId) {
@@ -98,15 +127,19 @@ export async function POST(request: NextRequest) {
 
     let updatedProp: any = null
     try {
-      // Look for existing property by property_id or organization_id
-      let propQuery = serviceClient.from('properties').select('id')
-      if (property_id && !property_id.startsWith('prop_') && !property_id.startsWith('org_prop_')) {
-        propQuery = propQuery.eq('id', property_id)
-      } else if (targetOrgId) {
-        propQuery = propQuery.eq('organization_id', targetOrgId)
-      }
+      const isExplicitNew = body.is_new === true || property_id === 'new' || !property_id
+      let existingProp: any = null
 
-      const { data: existingProp } = await propQuery.maybeSingle()
+      if (!isExplicitNew) {
+        let propQuery = serviceClient.from('properties').select('id')
+        if (property_id && !property_id.startsWith('prop_') && !property_id.startsWith('org_prop_')) {
+          propQuery = propQuery.eq('id', property_id)
+        } else if (targetOrgId) {
+          propQuery = propQuery.eq('organization_id', targetOrgId)
+        }
+        const { data } = await propQuery.maybeSingle()
+        existingProp = data
+      }
 
       if (existingProp?.id) {
         const { data: saved } = await serviceClient
@@ -147,6 +180,27 @@ export async function POST(request: NextRequest) {
           .maybeSingle()
 
         updatedProp = saved
+
+        // Seed default building and ground floor for the newly created property
+        if (saved?.id) {
+          try {
+            const { data: bldg } = await serviceClient.from('buildings').insert({
+              organization_id: targetOrgId,
+              property_id: saved.id,
+              name: 'Main Building',
+              total_floors: 1,
+            }).select('id').single()
+
+            if (bldg?.id) {
+              await serviceClient.from('floors').insert({
+                organization_id: targetOrgId,
+                building_id: bldg.id,
+                floor_number: 0,
+                name: 'Ground Floor',
+              })
+            }
+          } catch {}
+        }
       }
     } catch (propErr: any) {
       console.warn('[Property Update Table Warning]:', propErr?.message)

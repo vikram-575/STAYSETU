@@ -86,14 +86,14 @@ export function MarketplaceNavbar({
   }
 
   return (
-    <>
-      {/* Top Announcement Bar */}
+    <div className="sticky top-0 z-40 w-full">
+      {/* Top Announcement Bar (Issue 11: Seamlessly attached to navigation without dead whitespace) */}
       {announcement?.enabled && announcement?.text && (
         <aside aria-label="Announcement" className="relative z-50 bg-gradient-to-r from-[#14532D] via-[#166534] to-[#14532D] text-white text-xs px-4 py-2 border-b border-[#16A34A]/30">
           <div className="mx-auto max-w-7xl flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 truncate">
               {announcement.badge && (
-                <span className="rounded-full bg-[#FEF3C7] text-[#14532D] font-black text-[10px] px-2 py-0.5 uppercase tracking-wider shrink-0">
+                <span className="rounded-full bg-[#FEF3C7] text-[#14532D] font-bold text-xs px-2 py-0.5 shrink-0">
                   {announcement.badge}
                 </span>
               )}
@@ -116,7 +116,7 @@ export function MarketplaceNavbar({
         </aside>
       )}
 
-      <header className="sticky top-0 z-40 w-full border-b border-gray-200/80 bg-white/95 backdrop-blur-md shadow-xs transition-all">
+      <header className="w-full border-b border-gray-200/80 bg-white/95 backdrop-blur-md shadow-xs transition-all">
       <div className="mx-auto flex h-18 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Brand Logo */}
         <Link href="/" className="group flex items-center gap-2.5">
@@ -126,11 +126,12 @@ export function MarketplaceNavbar({
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
               <span className="text-xl font-bold tracking-tight text-[#14532D]">PGSetu</span>
-              <span className="inline-flex items-center rounded-full bg-[#DCFCE7] px-1.5 py-0.5 text-[10px] font-semibold text-[#14532D]">
+              <span className="inline-flex items-center rounded-full bg-[#DCFCE7] px-2 py-0.5 text-xs font-semibold text-[#14532D]">
                 Verified
               </span>
             </div>
-            <span className="text-[11px] font-medium text-[#647067]">PG & Flat Rental Marketplace</span>
+            {/* Issue 5: Standardized text-xs (12px) */}
+            <span className="text-xs font-medium text-[#647067] leading-tight">PG & Flat Rental Marketplace</span>
           </div>
         </Link>
 
@@ -153,7 +154,7 @@ export function MarketplaceNavbar({
             className="text-sm font-medium text-[#14532D] font-bold transition hover:text-[#16A34A] flex items-center gap-1"
           >
             <span>ERP Software</span>
-            <span className="rounded-sm bg-[#FEF3C7] px-1 py-0.2 text-[9px] font-black text-[#F59E0B]">PRO</span>
+            <span className="rounded-full bg-[#FEF3C7] px-1.5 py-0.5 text-xs font-bold text-[#F59E0B]">PRO</span>
           </Link>
           <button
             onClick={() => handleNavClick('trust-section')}
@@ -329,7 +330,7 @@ export function MarketplaceNavbar({
             >
               <div className="flex items-center gap-1.5">
                 <span>PG Management ERP</span>
-                <span className="rounded-sm bg-[#FEF3C7] px-1 py-0.2 text-[9px] font-black text-[#F59E0B]">PRO</span>
+                <span className="rounded-full bg-[#FEF3C7] px-1.5 py-0.5 text-xs font-bold text-[#F59E0B]">PRO</span>
               </div>
               <Sparkles className="h-4 w-4 text-[#16A34A]" />
             </Link>
@@ -360,73 +361,76 @@ export function MarketplaceNavbar({
                   <Heart className={`h-4 w-4 ${savedCount > 0 ? 'fill-rose-500 text-rose-500' : 'text-gray-500'}`} />
                   <span>Saved Properties</span>
                 </div>
-                {savedCount > 0 && (
-                  <span className="rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white">
-                    {savedCount}
-                  </span>
-                )}
+                <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-700">
+                  {savedCount}
+                </span>
               </button>
             )}
 
-            <div className="my-2 border-t border-gray-200" />
+            {compareCount > 0 && onOpenCompare && (
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false)
+                  onOpenCompare()
+                }}
+                className="flex items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-[#17211B] hover:bg-emerald-50"
+              >
+                <div className="flex items-center gap-2">
+                  <GitCompare className="h-4 w-4 text-[#16A34A]" />
+                  <span>Compare ({compareCount})</span>
+                </div>
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-[#14532D]">
+                  Compare
+                </span>
+              </button>
+            )}
+          </div>
 
+          <div className="border-t border-gray-100 p-4 space-y-2.5">
             {currentUser ? (
-              <div className="flex flex-col gap-2">
+              <div className="space-y-2">
                 <Link
                   href="/my-profile"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-2 rounded-xl bg-[#F7FAF7] p-3 border border-gray-200"
+                  className="flex items-center justify-between rounded-xl bg-gray-50 px-3.5 py-2.5 text-xs font-bold text-gray-800"
                 >
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#14532D] text-xs font-bold text-white">
-                    {(currentUser.full_name || 'U')[0].toUpperCase()}
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#14532D] text-white text-[10px]">
+                      {(currentUser.full_name || 'U')[0].toUpperCase()}
+                    </div>
+                    <span>{currentUser.full_name || 'My Profile'}</span>
                   </div>
-                  <div>
-                    <div className="text-xs font-bold text-gray-900">{currentUser.full_name || 'My Profile'}</div>
-                    <div className="text-[10px] text-[#16A34A] font-medium">Manage Profile & Stays →</div>
-                  </div>
+                  <span className="text-[10px] text-emerald-700 font-semibold uppercase">View ID Pass →</span>
                 </Link>
 
-                {currentUser.role === 'owner' || currentUser.role === 'superadmin' || currentUser.role === 'manager' ? (
-                  <Link
-                    href="/dashboard"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#14532D] py-3 text-sm font-bold text-white shadow-sm"
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false)
+                      onOpenListModal()
+                    }}
+                    className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-[#14532D] py-2 text-xs font-bold text-white shadow-xs"
                   >
-                    <Building2 className="h-4 w-4" />
-                    <span>Go to Owner Dashboard</span>
-                  </Link>
-                ) : (
-                  <Link
-                    href="/portal"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#DCFCE7] py-3 text-sm font-bold text-[#14532D] shadow-sm"
+                    <PlusCircle className="h-3.5 w-3.5" />
+                    <span>+ List PG</span>
+                  </button>
+                  <button
+                    onClick={handleSignOut}
+                    className="flex items-center justify-center gap-1 rounded-xl border border-gray-200 py-2 px-3 text-xs font-semibold text-gray-600 hover:text-red-600 hover:bg-red-50"
                   >
-                    <KeyRound className="h-4 w-4 text-[#16A34A]" />
-                    <span>Open Tenant Passbook</span>
-                  </Link>
-                )}
-
-                <button
-                  onClick={() => {
-                    setMobileMenuOpen(false)
-                    handleSignOut()
-                  }}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-red-200 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50"
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span>Sign Out</span>
-                </button>
+                    <LogOut className="h-3.5 w-3.5" />
+                    <span>Exit</span>
+                  </button>
+                </div>
               </div>
             ) : (
-              <div className="flex flex-col gap-2">
+              <div className="space-y-2">
                 <Link
                   href="/login"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white py-3 text-sm font-bold text-[#17211B] shadow-2xs hover:bg-[#F7FAF7]"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white py-2.5 text-xs font-bold text-gray-800 shadow-xs"
                 >
-                  <LogIn className="h-4 w-4 text-[#16A34A]" />
+                  <LogIn className="h-3.5 w-3.5 text-[#16A34A]" />
                   <span>Sign In / Join</span>
                 </Link>
 
@@ -446,6 +450,6 @@ export function MarketplaceNavbar({
         </div>
       )}
     </header>
-    </>
+    </div>
   )
 }

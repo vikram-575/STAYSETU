@@ -201,81 +201,79 @@ export function FeaturedListings({
           </div>
         </div>
 
-        {/* Filter Navigation Bar */}
-        <div className="mt-6 sm:mt-8 rounded-2xl border border-gray-200/90 bg-white p-2.5 sm:p-4 shadow-xs">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            {/* Category Pills - Horizontal swipe on mobile, wrap on desktop */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 sm:pb-0 -mx-1 px-1 sm:mx-0 sm:px-0 sm:flex-wrap">
-              {[
-                { id: 'all', label: 'All Spaces' },
-                { id: 'pg', label: 'Verified PGs' },
-                { id: 'flat', label: '1 & 2 BHK Flats' },
-                { id: 'room', label: 'Private Rooms' },
-                { id: 'girls', label: 'Girls Only' },
-                { id: 'boys', label: 'Boys Only' },
-              ].map((tab) => (
+        {/* Filter Navigation Bar - 2-Tier Structured Layout */}
+        <div className="mt-6 sm:mt-8 rounded-2xl border border-gray-200/90 bg-white p-3 sm:p-4 shadow-xs space-y-3">
+          {/* Tier 1: Category Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 sm:pb-0 -mx-1 px-1 sm:mx-0 sm:px-0">
+            {[
+              { id: 'all', label: 'All Spaces' },
+              { id: 'pg', label: 'Verified PGs' },
+              { id: 'flat', label: '1 & 2 BHK Flats' },
+              { id: 'room', label: 'Private Rooms' },
+              { id: 'girls', label: 'Girls Only' },
+              { id: 'boys', label: 'Boys Only' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as TabCategory)}
+                className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition shrink-0 whitespace-nowrap active:scale-95 cursor-pointer ${
+                  activeTab === tab.id
+                    ? 'bg-[#14532D] text-white shadow-xs'
+                    : 'bg-gray-100/80 text-[#647067] hover:bg-gray-200/70 hover:text-[#17211B]'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tier 2: Search, City Filter & Sort By Controls */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-3 border-t border-gray-100">
+            {/* Search text input */}
+            <div className="relative flex-1 max-w-md w-full">
+              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-gray-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Filter by metro, locality, landmark..."
+                className="w-full rounded-xl border border-gray-200 bg-[#F7FAF7] py-1.5 pl-9 pr-7 text-xs font-medium focus:border-[#16A34A] focus:bg-white focus:outline-hidden transition"
+              />
+              {searchQuery && (
                 <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as TabCategory)}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-bold transition shrink-0 whitespace-nowrap active:scale-95 ${
-                    activeTab === tab.id
-                      ? 'bg-[#14532D] text-white shadow-xs'
-                      : 'bg-gray-100/80 text-[#647067] hover:bg-gray-200/70 hover:text-[#17211B]'
-                  }`}
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-2 text-gray-400 hover:text-gray-600 cursor-pointer"
                 >
-                  {tab.label}
+                  <X className="h-3 w-3" />
                 </button>
-              ))}
+              )}
             </div>
 
-            {/* Controls Right: Search + City & Sort */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-              {/* Search text */}
-              <div className="relative w-full sm:w-56">
-                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-gray-400" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Filter by metro, locality..."
-                  className="w-full rounded-xl border border-gray-200 bg-[#F7FAF7] py-1.5 pl-8 pr-7 text-xs font-medium focus:border-[#16A34A] focus:bg-white focus:outline-hidden"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                )}
-              </div>
+            {/* City filter & Sort By Controls */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <select
+                value={activeCity}
+                onChange={(e) => onCityChange(e.target.value)}
+                className="flex-1 sm:flex-none rounded-xl border border-gray-200 bg-[#F7FAF7] py-1.5 px-3 text-xs font-semibold text-[#17211B] focus:border-[#16A34A] focus:outline-hidden"
+              >
+                <option value="all">All Cities ({properties.length})</option>
+                {availableCities.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
 
-              {/* City filter & Sort By in a 2-col flex on mobile */}
-              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2">
+              <div className="flex-1 sm:flex-none flex items-center gap-1.5 rounded-xl border border-gray-200 bg-[#F7FAF7] px-2.5 py-1">
+                <ArrowUpDown className="h-3 w-3 text-gray-400 shrink-0" />
                 <select
-                  value={activeCity}
-                  onChange={(e) => onCityChange(e.target.value)}
-                  className="w-full sm:w-auto rounded-xl border border-gray-200 bg-[#F7FAF7] py-1.5 px-2.5 text-xs font-semibold text-[#17211B] focus:border-[#16A34A] focus:outline-hidden"
+                  value={sortBy}
+                  onChange={(e: any) => setSortBy(e.target.value)}
+                  className="w-full bg-transparent text-xs font-semibold text-[#17211B] focus:outline-hidden"
                 >
-                  <option value="all">All Cities ({properties.length})</option>
-                  {availableCities.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
+                  <option value="recommended">Recommended</option>
+                  <option value="price_low">Price: Low to High</option>
+                  <option value="price_high">Price: High to Low</option>
+                  <option value="rating">Highest Rated</option>
                 </select>
-
-                <div className="flex items-center gap-1 rounded-xl border border-gray-200 bg-[#F7FAF7] px-2 py-1">
-                  <ArrowUpDown className="h-3 w-3 text-gray-400 shrink-0" />
-                  <select
-                    value={sortBy}
-                    onChange={(e: any) => setSortBy(e.target.value)}
-                    className="w-full bg-transparent text-xs font-semibold text-[#17211B] focus:outline-hidden"
-                  >
-                    <option value="recommended">Recommended</option>
-                    <option value="price_low">Price: Low to High</option>
-                    <option value="price_high">Price: High to Low</option>
-                    <option value="rating">Highest Rated</option>
-                  </select>
-                </div>
               </div>
             </div>
           </div>

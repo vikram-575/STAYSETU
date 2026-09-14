@@ -189,11 +189,15 @@ function MyProfileContent() {
   const handleOpenPropertyModal = (prop?: any) => {
     const target = prop || null
     setEditingProperty(target)
-    setPropName(target?.name || currentUser?.organizations?.name || '')
+    // For editing, use existing prop name; for new property, do not prefill phone number as name
+    const orgName = currentUser?.organizations?.name
+    const isPhoneOrgName = orgName && (orgName === currentUser?.phone || orgName.replace(/\D/g, '') === currentUser?.phone)
+    const defaultName = target?.name || (!target && !isPhoneOrgName ? orgName : '') || ''
+    setPropName(defaultName)
     setPropPhone(target?.phone || currentUser?.phone || '')
     setPropEmail(target?.email || currentUser?.email || '')
     setPropAddress(target?.address || '')
-    setPropCity(target?.city || '')
+    setPropCity(target?.city || currentUser?.organizations?.city || '')
     setPropState(target?.state || '')
     setPropPincode(target?.pincode || '')
     setPropDescription(target?.description || '')
@@ -207,7 +211,7 @@ function MyProfileContent() {
       setPropAmenities(s.amenities)
     } else {
       setPropAmenities([
-        'High-Speed WiFi', 'Power Backup', 'RO Water', '3 Daily Meals', 'Air Conditioning', 'CCTV Security'
+        'High-Speed WiFi', 'Power Backup', 'RO Water', '3 Daily Meals', 'Air Conditioning', 'CCTV Security', 'Housekeeping', 'Washing Machine'
       ])
     }
     if (Array.isArray(s.rules) && s.rules.length > 0) {
@@ -228,13 +232,16 @@ function MyProfileContent() {
     setPropSaveError('')
     setPropSaveSuccess('')
 
+    const isNew = !editingProperty?.id || editingProperty?.id === 'new'
+
     try {
       const res = await fetch('/api/properties/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          property_id: editingProperty?.id,
+          property_id: isNew ? undefined : editingProperty?.id,
           organization_id: editingProperty?.organization_id || currentUser?.organization_id,
+          is_new: isNew,
           name: propName,
           phone: propPhone,
           email: propEmail,
@@ -258,8 +265,11 @@ function MyProfileContent() {
         throw new Error(resData.error || 'Failed to update property details.')
       }
 
+      const returnedProp = resData.property
       const updated = {
         ...(editingProperty || {}),
+        id: returnedProp?.id || editingProperty?.id || `prop-${Date.now()}`,
+        organization_id: returnedProp?.organization_id || currentUser?.organization_id,
         name: propName,
         phone: propPhone,
         email: propEmail,
@@ -281,10 +291,14 @@ function MyProfileContent() {
       }
 
       setHostedProperties((prev) => {
+        if (isNew) {
+          return [updated, ...(prev || [])]
+        }
         if (!prev || prev.length === 0) return [updated]
-        return prev.map((p) => (p.id === editingProperty?.id ? { ...p, ...updated } : p))
+        return prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p))
       })
-      setPropSaveSuccess('Property details & terms updated live!')
+
+      setPropSaveSuccess(isNew ? 'New PG Property listed and published live!' : 'Property details & terms updated live!')
       setTimeout(() => {
         setIsPropertyModalOpen(false)
         setPropSaveSuccess('')
@@ -296,15 +310,15 @@ function MyProfileContent() {
     }
   }
 
-  const uniqueId =
-    currentUser?.registration_number ||
-    profileData?.id ||
-    `TN-${currentUser?.phone?.slice(-4) || '2026'}-7AB`
+  const isOwner = currentUser?.role === 'owner' || currentUser?.role === 'superadmin' || currentUser?.role === 'manager'
+
+  const uniqueId = isOwner
+    ? (currentUser?.organization_id ? `HOST-${currentUser.organization_id.slice(-4).toUpperCase()}` : `HO-${currentUser?.phone?.slice(-4) || '001'}`)
+    : (currentUser?.registration_number || profileData?.id || `TN-${currentUser?.phone?.slice(-4) || '2026'}-7AB`)
 
   const isAadhaarVerified = Boolean(profileData?.aadhaar_verified)
   const aadhaarLast4 = profileData?.aadhaar_last4 || ''
   const activeStay = stays.find((s) => s.status === 'active') || stays[0]
-  const isOwner = currentUser?.role === 'owner' || currentUser?.role === 'superadmin' || currentUser?.role === 'manager'
 
   const totalRentFormatted = passbookSummary
     ? `₹${(passbookSummary.total_rent_paid_paise / 100).toLocaleString('en-IN')}`
@@ -325,14 +339,21 @@ function MyProfileContent() {
   }
 
   const handleShareIdCard = async () => {
-    const roomInfo = activeStay?.room_number
-      ? `${activeStay.room_number}${activeStay.bed_label ? ` (${activeStay.bed_label})` : ''}`
-      : 'Pending Room Allotment'
-    const shareText = `PG-Setu Digital Tenant Pass\nName: ${currentUser?.full_name || 'Tenant'}\nUniversal ID: ${uniqueId}\nStay: ${activeStay?.property_name || 'PG-Setu Network'}\nRoom: ${roomInfo}\nStatus: Verified Resident`
+    let shareText = ''
+    if (isOwner) {
+      const primaryProp = hostedProperties[0]?.name || 'PG-Setu Co-Living'
+      shareText = `PG-Setu Certified Host Pass\nOwner / Host: ${currentUser?.full_name || 'PG Host'}\nHost ID: ${uniqueId}\nPrimary Property: ${primaryProp}\nListed Properties: ${hostedProperties.length}\nContact: +91 ${currentUser.phone || ''}\nVerification: Verified PG Owner`
+    } else {
+      const roomInfo = activeStay?.room_number
+        ? `${activeStay.room_number}${activeStay.bed_label ? ` (${activeStay.bed_label})` : ''}`
+        : 'Pending Room Allotment'
+      shareText = `PG-Setu Digital Tenant Pass\nName: ${currentUser?.full_name || 'Tenant'}\nUniversal ID: ${uniqueId}\nStay: ${activeStay?.property_name || 'PG-Setu Network'}\nRoom: ${roomInfo}\nStatus: Verified Resident`
+    }
+
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `${currentUser?.full_name || 'Member'} - PG-Setu Tenant Pass`,
+          title: isOwner ? `${currentUser?.full_name || 'Host'} - PG-Setu Owner Pass` : `${currentUser?.full_name || 'Member'} - PG-Setu Tenant Pass`,
           text: shareText,
           url: window.location.href,
         })
@@ -527,9 +548,9 @@ function MyProfileContent() {
 
   return (
     <div className="min-h-screen bg-[#F7FAF7] pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))]">
-      {/* ────────────────────────────────────────────────────────── */}
+      {/* ---------------------------------------------------------- */}
       {/* 1. MOBILE-FIRST TOP APP BAR */}
-      {/* ────────────────────────────────────────────────────────── */}
+      {/* ---------------------------------------------------------- */}
       <header className="sticky top-0 z-30 border-b border-gray-200/80 bg-white/95 backdrop-blur-md">
         <div className="mx-auto flex h-14 sm:h-16 max-w-5xl items-center justify-between px-3.5 sm:px-6">
           <div className="flex items-center gap-2.5">
@@ -542,26 +563,35 @@ function MyProfileContent() {
             </Link>
             <div>
               <span className="text-sm sm:text-base font-black text-[#14532D] tracking-tight block">
-                PG-Setu Member
+                {isOwner ? 'PG Owner & Host Portal' : 'PG-Setu Member'}
               </span>
               <span className="text-[10px] text-gray-400 font-semibold block sm:hidden">
-                Universal ID: {uniqueId.slice(0, 10)}...
+                {isOwner ? `Host ID: ${uniqueId.slice(0, 12)}` : `Universal ID: ${uniqueId.slice(0, 10)}...`}
               </span>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             {isOwner ? (
-              <a
-                href="/dashboard"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-2.5 sm:px-3.5 py-1.5 text-[11px] sm:text-xs font-bold text-white shadow-xs hover:bg-[#166534] transition"
-              >
-                <Building2 className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Owner ERP</span>
-                <ExternalLink className="h-3 w-3 opacity-80" />
-              </a>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => handleOpenPropertyModal(null)}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-2.5 sm:px-3 py-1.5 text-[11px] sm:text-xs font-bold text-white shadow-xs hover:bg-emerald-700 active:scale-95 transition cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Add Property</span>
+                </button>
+                <a
+                  href="/dashboard"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-2.5 sm:px-3.5 py-1.5 text-[11px] sm:text-xs font-bold text-white shadow-xs hover:bg-[#166534] transition"
+                >
+                  <Building2 className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Owner ERP</span>
+                  <ExternalLink className="h-3 w-3 opacity-80" />
+                </a>
+              </div>
             ) : (
               <Link
                 href="/portal"
@@ -574,7 +604,7 @@ function MyProfileContent() {
 
             <button
               onClick={handleSignOut}
-              className="inline-flex items-center gap-1 rounded-xl border border-gray-200 p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 text-xs font-semibold transition"
+              className="inline-flex items-center gap-1 rounded-xl border border-gray-200 p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 text-xs font-semibold transition cursor-pointer"
               title="Sign Out"
             >
               <LogOut className="h-3.5 w-3.5" />
@@ -585,9 +615,9 @@ function MyProfileContent() {
 
       {/* Main Content Area */}
       <main className="mx-auto max-w-5xl px-3 sm:px-6 pt-4 sm:pt-6 space-y-4 sm:space-y-6">
-        {/* ────────────────────────────────────────────────────────── */}
-        {/* 2. DIGITAL TENANT ID CARD (SMART MOBILE PASS) */}
-        {/* ────────────────────────────────────────────────────────── */}
+        {/* ---------------------------------------------------------- */}
+        {/* 2. DIGITAL TENANT / HOST ID CARD (SMART PASS)             */}
+        {/* ---------------------------------------------------------- */}
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0D3B1E] via-[#14532D] to-[#1E3A8A] p-4 sm:p-6 text-white shadow-lg shadow-emerald-950/20">
           {/* Background Decorative Rings */}
           <div className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-white/10 blur-2xl" />
@@ -599,7 +629,7 @@ function MyProfileContent() {
               {isOwner ? (
                 <>
                   <Building2 className="h-3.5 w-3.5" />
-                  <span>Verified Property Host Identity Pass</span>
+                  <span>Verified Property Host & PG Owner Pass</span>
                 </>
               ) : (
                 <>
@@ -609,7 +639,7 @@ function MyProfileContent() {
               )}
             </div>
             <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[10px] font-bold backdrop-blur-xs text-white">
-              {isOwner ? 'Property Host & Owner' : 'Verified Resident'}
+              {isOwner ? 'PG Owner & Certified Host' : 'Verified Resident'}
             </span>
           </div>
 
@@ -619,7 +649,7 @@ function MyProfileContent() {
               {/* Avatar with Verified Badge */}
               <div className="relative shrink-0">
                 <div className="flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-2xl bg-white text-[#14532D] text-xl sm:text-2xl font-black shadow-md ring-2 ring-emerald-300/40">
-                  {(currentUser.full_name || 'U')[0].toUpperCase()}
+                  {((currentUser.full_name || currentUser.name || (hostedProperties[0]?.name ? hostedProperties[0].name : 'H')))[0].toUpperCase()}
                 </div>
                 {isAadhaarVerified && (
                   <div
@@ -634,17 +664,19 @@ function MyProfileContent() {
               {/* User/Host Details */}
               <div className="space-y-0.5">
                 <h1 className="text-base sm:text-xl font-black tracking-tight text-white flex items-center gap-2">
-                  <span>{currentUser.full_name || (isOwner ? 'PG Host & Owner' : 'PG-Setu Member')}</span>
-                  {isAadhaarVerified && (
-                    <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded-md">
-                      <ShieldCheck className="h-3 w-3" />
-                      KYC Verified
-                    </span>
-                  )}
+                  <span>
+                    {isOwner
+                      ? (currentUser.full_name || (hostedProperties[0]?.name && hostedProperties[0].name !== currentUser.phone ? hostedProperties[0].name : 'PG Owner & Certified Host'))
+                      : (currentUser.full_name || 'PG-Setu Member')}
+                  </span>
+                  <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded-md">
+                    <ShieldCheck className="h-3 w-3" />
+                    {isOwner ? 'Verified Host' : 'KYC Verified'}
+                  </span>
                 </h1>
                 <p className="text-xs text-emerald-200/90 font-medium">
                   {isOwner
-                    ? `${currentUser?.organizations?.name || hostedProperties[0]?.name || 'PG-Setu Certified Host'} • Host Profile`
+                    ? `${hostedProperties.length} Listed ${hostedProperties.length === 1 ? 'Property' : 'Properties'} • ${hostedProperties[0]?.city || currentUser?.organizations?.city || 'Verified PG Host'}`
                     : `${profileData?.profession || 'Verified Member'} • ${activeStay?.city || 'PG-Setu Resident'}`}
                 </p>
                 <p className="text-[11px] text-white/70 font-mono">
@@ -657,7 +689,7 @@ function MyProfileContent() {
             <div className="w-full sm:w-auto rounded-2xl bg-black/25 backdrop-blur-md p-3 border border-white/10 flex items-center justify-between sm:justify-end gap-3">
               <div>
                 <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-300/80 block">
-                  {isOwner ? 'Host Account ID' : 'Unique Tenant ID'}
+                  {isOwner ? 'PG Owner Host ID' : 'Unique Tenant ID'}
                 </span>
                 <span className="font-mono text-xs sm:text-sm font-black tracking-wide text-white block">
                   {uniqueId}
@@ -665,7 +697,7 @@ function MyProfileContent() {
               </div>
               <button
                 onClick={() => handleCopyId(uniqueId)}
-                className="flex items-center gap-1 rounded-xl bg-white/15 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-white/25 active:scale-95 transition"
+                className="flex items-center gap-1 rounded-xl bg-white/15 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-white/25 active:scale-95 transition cursor-pointer"
                 title="Copy ID"
               >
                 {copied ? (
@@ -690,7 +722,7 @@ function MyProfileContent() {
                 <>
                   <Building2 className="h-3.5 w-3.5 text-emerald-300 shrink-0" />
                   <span className="font-semibold text-white">
-                    {hostedProperties[0]?.name || currentUser?.organizations?.name || 'Hosted Property'}
+                    {hostedProperties[0]?.name || currentUser?.organizations?.name || 'Hosted Properties'}
                   </span>
                   <span className="text-white/40">•</span>
                   <span className="font-bold text-emerald-300">
@@ -715,78 +747,75 @@ function MyProfileContent() {
 
             {/* Quick Card Actions */}
             <div className="flex items-center gap-2 w-full sm:w-auto justify-end pt-1 sm:pt-0">
-              {isOwner && (
+              {isOwner ? (
                 <>
                   <button
-                    onClick={() => handleOpenPropertyModal()}
-                    className="inline-flex items-center gap-1 rounded-xl bg-white/20 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-white/30 active:scale-95 transition"
+                    onClick={() => handleOpenPropertyModal(null)}
+                    className="inline-flex items-center gap-1 rounded-xl bg-emerald-400 text-emerald-950 px-2.5 py-1 text-[11px] font-bold hover:bg-emerald-300 active:scale-95 transition shadow-xs cursor-pointer"
                   >
-                    <Edit className="h-3 w-3" />
-                    <span>Edit Property</span>
+                    <Plus className="h-3 w-3" />
+                    <span>+ Add Property</span>
                   </button>
-                  <a
-                    href="/dashboard"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 rounded-xl bg-emerald-400 text-emerald-950 px-2.5 py-1 text-[11px] font-bold hover:bg-emerald-300 active:scale-95 transition shadow-xs"
-                  >
-                    <Building2 className="h-3 w-3" />
-                    <span>Open ERP ↗</span>
-                  </a>
+                  {hostedProperties.length > 0 && (
+                    <button
+                      onClick={() => handleOpenPropertyModal(hostedProperties[0])}
+                      className="inline-flex items-center gap-1 rounded-xl bg-white/20 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-white/30 active:scale-95 transition cursor-pointer"
+                    >
+                      <Edit className="h-3 w-3" />
+                      <span>Edit Property</span>
+                    </button>
+                  )}
                 </>
+              ) : (
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="inline-flex items-center gap-1 rounded-xl bg-white/20 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-white/30 active:scale-95 transition cursor-pointer"
+                >
+                  <Edit className="h-3 w-3" />
+                  <span>Edit</span>
+                </button>
               )}
               <button
                 onClick={() => setIsQrModalOpen(true)}
-                className="inline-flex items-center gap-1 rounded-xl bg-white/15 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-white/25 active:scale-95 transition"
+                className="inline-flex items-center gap-1 rounded-xl bg-white/15 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-white/25 active:scale-95 transition cursor-pointer"
               >
                 <QrCode className="h-3 w-3 text-emerald-300" />
                 <span>Show QR</span>
               </button>
               <button
                 onClick={handleShareIdCard}
-                className="inline-flex items-center gap-1 rounded-xl bg-emerald-500/30 border border-emerald-400/30 px-2.5 py-1 text-[11px] font-bold text-emerald-200 hover:bg-emerald-500/40 active:scale-95 transition"
+                className="inline-flex items-center gap-1 rounded-xl bg-emerald-500/30 border border-emerald-400/30 px-2.5 py-1 text-[11px] font-bold text-emerald-200 hover:bg-emerald-500/40 active:scale-95 transition cursor-pointer"
               >
                 <Share2 className="h-3 w-3" />
                 <span>Share ID</span>
               </button>
-              {!isOwner && (
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="inline-flex items-center gap-1 rounded-xl bg-white/20 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-white/30 active:scale-95 transition"
-                >
-                  <Edit className="h-3 w-3" />
-                  <span>Edit</span>
-                </button>
-              )}
             </div>
           </div>
         </div>
 
-        {/* ────────────────────────────────────────────────────────── */}
+        {/* ---------------------------------------------------------- */}
         {/* 3. MOBILE QUICK ACTION DOCK (ROLE-ADAPTIVE 4 TOUCH PILLS) */}
-        {/* ────────────────────────────────────────────────────────── */}
+        {/* ---------------------------------------------------------- */}
         {isOwner ? (
           <div className="grid grid-cols-4 gap-2 sm:gap-3">
-            {/* Owner ERP Dashboard (Opens in New Tab) */}
-            <a
-              href="/dashboard"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-gray-200/80 shadow-xs hover:border-emerald-300 active:scale-95 transition text-center group"
+            {/* 1. Add Property Modal */}
+            <button
+              onClick={() => handleOpenPropertyModal(null)}
+              className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-emerald-200 shadow-xs hover:border-emerald-400 active:scale-95 transition text-center group cursor-pointer"
             >
               <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 group-hover:bg-[#14532D] group-hover:text-white transition">
-                <Building2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                <PlusCircle className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
-              <span className="mt-1.5 text-[10px] sm:text-xs font-bold text-gray-800 line-clamp-1 flex items-center justify-center gap-0.5">
-                Owner ERP <ExternalLink className="h-2.5 w-2.5 opacity-60" />
+              <span className="mt-1.5 text-[10px] sm:text-xs font-bold text-gray-800 line-clamp-1">
+                + Add Property
               </span>
-              <span className="text-[9px] text-gray-400 hidden sm:block">Full Dashboard</span>
-            </a>
+              <span className="text-[9px] text-gray-400 hidden sm:block">List New PG</span>
+            </button>
 
-            {/* Quick Edit Property Modal */}
+            {/* 2. Quick Edit Property Modal */}
             <button
-              onClick={() => handleOpenPropertyModal()}
-              className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-gray-200/80 shadow-xs hover:border-emerald-300 active:scale-95 transition text-center group"
+              onClick={() => handleOpenPropertyModal(hostedProperties[0] || null)}
+              className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-gray-200/80 shadow-xs hover:border-emerald-300 active:scale-95 transition text-center group cursor-pointer"
             >
               <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700 group-hover:bg-blue-600 group-hover:text-white transition">
                 <Edit className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -797,36 +826,36 @@ function MyProfileContent() {
               <span className="text-[9px] text-gray-400 hidden sm:block">Rates & Rules</span>
             </button>
 
-            {/* Residents CRM (Opens in New Tab) */}
+            {/* 3. Owner ERP Dashboard */}
+            <a
+              href="/dashboard"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-gray-200/80 shadow-xs hover:border-emerald-300 active:scale-95 transition text-center group"
+            >
+              <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-700 group-hover:bg-amber-600 group-hover:text-white transition">
+                <Building2 className="h-4 w-4 sm:h-5 sm:w-5" />
+              </div>
+              <span className="mt-1.5 text-[10px] sm:text-xs font-bold text-gray-800 line-clamp-1 flex items-center justify-center gap-0.5">
+                Owner ERP <ExternalLink className="h-2.5 w-2.5 opacity-60" />
+              </span>
+              <span className="text-[9px] text-gray-400 hidden sm:block">Full Dashboard</span>
+            </a>
+
+            {/* 4. Residents CRM */}
             <a
               href="/dashboard/residents"
               target="_blank"
               rel="noopener noreferrer"
               className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-gray-200/80 shadow-xs hover:border-emerald-300 active:scale-95 transition text-center group"
             >
-              <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-700 group-hover:bg-amber-600 group-hover:text-white transition">
+              <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-700 group-hover:bg-purple-600 group-hover:text-white transition">
                 <Users className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
               <span className="mt-1.5 text-[10px] sm:text-xs font-bold text-gray-800 line-clamp-1 flex items-center justify-center gap-0.5">
-                Residents <ExternalLink className="h-2.5 w-2.5 opacity-60" />
+                Residents CRM <ExternalLink className="h-2.5 w-2.5 opacity-60" />
               </span>
-              <span className="text-[9px] text-gray-400 hidden sm:block">CRM & Check-in</span>
-            </a>
-
-            {/* Rooms & Beds (Opens in New Tab) */}
-            <a
-              href="/dashboard/rooms"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-gray-200/80 shadow-xs hover:border-emerald-300 active:scale-95 transition text-center group"
-            >
-              <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-700 group-hover:bg-purple-600 group-hover:text-white transition">
-                <BedDouble className="h-4 w-4 sm:h-5 sm:w-5" />
-              </div>
-              <span className="mt-1.5 text-[10px] sm:text-xs font-bold text-gray-800 line-clamp-1 flex items-center justify-center gap-0.5">
-                Rooms & Beds <ExternalLink className="h-2.5 w-2.5 opacity-60" />
-              </span>
-              <span className="text-[9px] text-gray-400 hidden sm:block">Tariff Matrix</span>
+              <span className="text-[9px] text-gray-400 hidden sm:block">Check-in & KYC</span>
             </a>
           </div>
         ) : (
@@ -834,7 +863,7 @@ function MyProfileContent() {
             {/* Quick Pay Rent */}
             <button
               onClick={() => setIsUpiPayModalOpen(true)}
-              className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-gray-200/80 shadow-xs hover:border-emerald-300 active:scale-95 transition text-center group"
+              className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-gray-200/80 shadow-xs hover:border-emerald-300 active:scale-95 transition text-center group cursor-pointer"
             >
               <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white transition">
                 <Zap className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -848,7 +877,7 @@ function MyProfileContent() {
             {/* Quick Gate Pass */}
             <button
               onClick={() => setIsGatePassModalOpen(true)}
-              className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-gray-200/80 shadow-xs hover:border-emerald-300 active:scale-95 transition text-center group"
+              className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-gray-200/80 shadow-xs hover:border-emerald-300 active:scale-95 transition text-center group cursor-pointer"
             >
               <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700 group-hover:bg-blue-600 group-hover:text-white transition">
                 <KeyRound className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -891,78 +920,118 @@ function MyProfileContent() {
           </div>
         )}
 
-        {/* ────────────────────────────────────────────────────────── */}
+        {/* ---------------------------------------------------------- */}
         {/* 4. MOBILE-FIRST SEGMENTED TABS BAR */}
-        {/* ────────────────────────────────────────────────────────── */}
+        {/* ---------------------------------------------------------- */}
         <div className="flex rounded-2xl bg-gray-200/70 p-1 gap-1 overflow-x-auto no-scrollbar">
-          {isOwner && (
-            <button
-              onClick={() => setActiveTab('properties')}
-              className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap ${
-                activeTab === 'properties'
-                  ? 'bg-white text-[#14532D] shadow-xs'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <Building2 className="h-3.5 w-3.5" />
-              <span>Hosted Properties ({hostedProperties.length})</span>
-            </button>
+          {isOwner ? (
+            <>
+              <button
+                onClick={() => setActiveTab('properties')}
+                className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                  activeTab === 'properties'
+                    ? 'bg-white text-[#14532D] shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Building2 className="h-3.5 w-3.5" />
+                <span>My Properties ({hostedProperties.length})</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('overview')}
+                className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                  activeTab === 'overview'
+                    ? 'bg-white text-[#14532D] shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <TrendingUp className="h-3.5 w-3.5" />
+                <span>Business Overview</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('kyc')}
+                className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                  activeTab === 'kyc'
+                    ? 'bg-white text-[#14532D] shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <ShieldCheck className="h-3.5 w-3.5" />
+                <span>KYC & Payout Details</span>
+              </button>
+
+              {stays.length > 0 && (
+                <button
+                  onClick={() => setActiveTab('stays')}
+                  className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                    activeTab === 'stays'
+                      ? 'bg-white text-[#14532D] shadow-xs'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Home className="h-3.5 w-3.5" />
+                  <span>Personal Stays ({stays.length})</span>
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => setActiveTab('overview')}
+                className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                  activeTab === 'overview'
+                    ? 'bg-white text-[#14532D] shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Wallet className="h-3.5 w-3.5" />
+                <span>Overview</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('passbook')}
+                className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                  activeTab === 'passbook'
+                    ? 'bg-white text-[#14532D] shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Receipt className="h-3.5 w-3.5" />
+                <span>Passbook</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('stays')}
+                className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                  activeTab === 'stays'
+                    ? 'bg-white text-[#14532D] shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Building2 className="h-3.5 w-3.5" />
+                <span>Stays ({stays.length})</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('kyc')}
+                className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                  activeTab === 'kyc'
+                    ? 'bg-white text-[#14532D] shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <ShieldCheck className="h-3.5 w-3.5" />
+                <span>KYC & Info</span>
+              </button>
+            </>
           )}
-
-          <button
-            onClick={() => setActiveTab('overview')}
-            className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'overview'
-                ? 'bg-white text-[#14532D] shadow-xs'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <Wallet className="h-3.5 w-3.5" />
-            <span>Overview</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('passbook')}
-            className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'passbook'
-                ? 'bg-white text-[#14532D] shadow-xs'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <Receipt className="h-3.5 w-3.5" />
-            <span>Passbook</span>
-          </button>
-
-          {(!isOwner || stays.length > 0) && (
-            <button
-              onClick={() => setActiveTab('stays')}
-              className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap ${
-                activeTab === 'stays'
-                  ? 'bg-white text-[#14532D] shadow-xs'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <Building2 className="h-3.5 w-3.5" />
-              <span>Stays ({stays.length})</span>
-            </button>
-          )}
-
-          <button
-            onClick={() => setActiveTab('kyc')}
-            className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'kyc'
-                ? 'bg-white text-[#14532D] shadow-xs'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <ShieldCheck className="h-3.5 w-3.5" />
-            <span>{isOwner ? 'KYC & Host Info' : 'KYC & Info'}</span>
-          </button>
         </div>
 
-        {/* ────────────────────────────────────────────────────────── */}
+        {/* ---------------------------------------------------------- */}
         {/* TAB 0: HOSTED PROPERTIES & LIVE PROPERTY EDITOR (OWNERS)   */}
-        {/* ────────────────────────────────────────────────────────── */}
+        {/* ---------------------------------------------------------- */}
         {activeTab === 'properties' && (
           <div className="space-y-4">
             {/* Host KPI Micro-Dashboard */}
@@ -1055,20 +1124,11 @@ function MyProfileContent() {
               </div>
 
               <button
-                onClick={() => handleOpenPropertyModal(hostedProperties[0] || null)}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#166534] transition active:scale-95"
+                onClick={() => handleOpenPropertyModal(null)}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#166534] transition active:scale-95 cursor-pointer"
               >
-                {hostedProperties.length > 0 ? (
-                  <>
-                    <Edit className="h-3.5 w-3.5" />
-                    <span>Edit Property</span>
-                  </>
-                ) : (
-                  <>
-                    <Plus className="h-3.5 w-3.5" />
-                    <span>List New Property</span>
-                  </>
-                )}
+                <Plus className="h-3.5 w-3.5" />
+                <span>+ List New Property</span>
               </button>
             </div>
 
@@ -1273,199 +1333,432 @@ function MyProfileContent() {
                   </div>
                 )
               })}
+
+                {/* Add Another PG Property Dashed Card */}
+                <button
+                  type="button"
+                  onClick={() => handleOpenPropertyModal(null)}
+                  className="w-full rounded-3xl border-2 border-dashed border-emerald-300 hover:border-emerald-500 bg-emerald-50/40 hover:bg-emerald-50/80 p-5 sm:p-6 flex flex-col items-center justify-center gap-2 transition group cursor-pointer"
+                >
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[#14532D] shadow-xs group-hover:scale-110 transition">
+                    <Plus className="h-6 w-6" />
+                  </div>
+                  <span className="text-sm font-black text-[#14532D]">
+                    + List Another PG / Hostel Property
+                  </span>
+                  <span className="text-xs text-emerald-800 text-center max-w-md">
+                    Add new buildings, boys/girls wings, or co-living flats under your owner account with dedicated room tariffs and live search sync.
+                  </span>
+                </button>
               </div>
             )}
           </div>
         )}
 
-        {/* ────────────────────────────────────────────────────────── */}
-        {/* TAB 1: OVERVIEW & SMART PASSBOOK METRICS */}
-        {/* ────────────────────────────────────────────────────────── */}
+        {/* ---------------------------------------------------------- */}
+        {/* TAB 1: OVERVIEW & SMART PASSBOOK METRICS                   */}
+        {/* ---------------------------------------------------------- */}
         {activeTab === 'overview' && (
-          <div className="space-y-4">
-            {/* KPI Metric Micro-Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-              {/* Lifetime Rent */}
-              <div className="rounded-2xl border border-gray-200/80 bg-white p-3 sm:p-4 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                    Rent Paid
-                  </span>
-                  <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
-                    <Receipt className="h-3 w-3" />
+          isOwner ? (
+            <div className="space-y-4">
+              {/* Host Portfolio KPI Summary */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+                <div className="rounded-2xl border border-gray-200/80 bg-white p-3 sm:p-4 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      Hosted Properties
+                    </span>
+                    <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                      <Building2 className="h-3 w-3" />
+                    </div>
                   </div>
+                  <div className="mt-1 text-base sm:text-lg font-black text-gray-900">
+                    {hostedProperties.length} Listed
+                  </div>
+                  <span className="text-[10px] text-emerald-600 font-bold block mt-0.5">
+                    Live on Marketplace
+                  </span>
                 </div>
-                <div className="mt-1 text-base sm:text-lg font-black text-gray-900">
-                  {totalRentFormatted}
+
+                <div className="rounded-2xl border border-gray-200/80 bg-white p-3 sm:p-4 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      Total Capacity
+                    </span>
+                    <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
+                      <BedDouble className="h-3 w-3" />
+                    </div>
+                  </div>
+                  <div className="mt-1 text-base sm:text-lg font-black text-blue-900">
+                    {propertyStats?.total_beds ?? 0} Beds
+                  </div>
+                  <span className="text-[10px] text-blue-600 font-bold block mt-0.5">
+                    Across {propertyStats?.total_rooms ?? 0} Rooms
+                  </span>
                 </div>
-                <span className="text-[10px] text-gray-400 block mt-0.5">
-                  Across {stays.length} stays
-                </span>
+
+                <div className="rounded-2xl border border-gray-200/80 bg-white p-3 sm:p-4 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      Active Occupancy
+                    </span>
+                    <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
+                      <Users className="h-3 w-3" />
+                    </div>
+                  </div>
+                  <div className="mt-1 text-base sm:text-lg font-black text-amber-900">
+                    {propertyStats?.total_residents ?? 0} Residents
+                  </div>
+                  <span className="text-[10px] text-amber-600 font-bold block mt-0.5">
+                    {propertyStats?.available_beds ?? 0} Beds Available
+                  </span>
+                </div>
+
+                <div className="rounded-2xl border border-gray-200/80 bg-white p-3 sm:p-4 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      Monthly Run Rate
+                    </span>
+                    <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-purple-50 text-purple-700">
+                      <TrendingUp className="h-3 w-3" />
+                    </div>
+                  </div>
+                  <div className="mt-1 text-base sm:text-lg font-black text-[#14532D]">
+                    ₹{((propertyStats?.expected_revenue_paise ?? 0) / 100).toLocaleString('en-IN')}
+                  </div>
+                  <span className="text-[10px] text-emerald-600 font-bold block mt-0.5">
+                    Expected Rent
+                  </span>
+                </div>
               </div>
 
-              {/* Escrow Deposit */}
-              <div className="rounded-2xl border border-gray-200/80 bg-white p-3 sm:p-4 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                    Deposit
-                  </span>
-                  <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
-                    <Shield className="h-3 w-3" />
-                  </div>
-                </div>
-                <div className="mt-1 text-base sm:text-lg font-black text-[#14532D]">
-                  {activeDepositFormatted}
-                </div>
-                <span className="text-[10px] text-emerald-600 font-bold block mt-0.5">
-                  100% Escrow
-                </span>
-              </div>
-
-              {/* Pending Bills */}
-              <div className="rounded-2xl border border-gray-200/80 bg-white p-3 sm:p-4 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                    Pending
-                  </span>
-                  <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
-                    <CheckCircle2 className="h-3 w-3" />
-                  </div>
-                </div>
-                <div className="mt-1 text-base sm:text-lg font-black text-emerald-600">
-                  {outstandingDueFormatted}
-                </div>
-                <span className="text-[10px] text-gray-400 block mt-0.5">
-                  All dues cleared
-                </span>
-              </div>
-
-              {/* Renter Credit Score */}
-              <div className="rounded-2xl border border-gray-200/80 bg-white p-3 sm:p-4 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                    Credit Score
-                  </span>
-                  <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-purple-50 text-purple-700">
-                    <Award className="h-3 w-3" />
-                  </div>
-                </div>
-                <div className="mt-1 text-base sm:text-lg font-black text-purple-900">
-                  {passbookSummary?.renter_credit_score && passbookSummary.renter_credit_score !== 'N/A'
-                    ? passbookSummary.renter_credit_score
-                    : (stays.length > 0 ? '790 / 850' : 'N/A')}
-                </div>
-                <span className="text-[10px] font-bold text-purple-700 block mt-0.5">
-                  {passbookSummary?.renter_tier || (stays.length > 0 ? 'Tier 1 Tenant' : 'Member')}
-                </span>
-              </div>
-            </div>
-
-            {/* Active Stay Detailed Highlight */}
-            {activeStay && (
-              <div className="rounded-3xl border border-emerald-200 bg-emerald-50/40 p-4 sm:p-5">
-                <div className="flex items-center justify-between pb-3 border-b border-emerald-100">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-600 animate-pulse" />
-                    <span className="text-xs font-black text-[#14532D] uppercase tracking-wide">
-                      Currently Active Stay
+              {/* Primary Property Quick Card */}
+              {hostedProperties.length > 0 ? (
+                <div className="rounded-3xl border border-emerald-200 bg-emerald-50/40 p-4 sm:p-5 space-y-3">
+                  <div className="flex items-center justify-between pb-3 border-b border-emerald-100">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-600 animate-pulse" />
+                      <span className="text-xs font-black text-[#14532D] uppercase tracking-wide">
+                        Primary Hosted Property
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-mono text-emerald-800 font-bold">
+                      ID: {hostedProperties[0]?.id ? String(hostedProperties[0].id).slice(0, 8) : 'PRO-001'}
                     </span>
                   </div>
-                  <span className="text-[11px] font-mono text-emerald-800 font-bold">
-                    Ref: {activeStay.registration_number || uniqueId}
-                  </span>
-                </div>
 
-                <div className="mt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-base font-black text-gray-900">{activeStay.property_name}</h3>
-                    <p className="text-xs text-gray-600 flex items-center gap-1 mt-0.5">
-                      <MapPin className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-                      <span>{activeStay.address || activeStay.city}</span>
-                    </p>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-base font-black text-gray-900">{hostedProperties[0]?.name || 'PG-Setu Residence'}</h3>
+                      <p className="text-xs text-gray-600 flex items-center gap-1 mt-0.5">
+                        <MapPin className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                        <span>{hostedProperties[0]?.address ? `${hostedProperties[0].address}, ` : ''}{hostedProperties[0]?.city || ''}</span>
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleOpenPropertyModal(hostedProperties[0])}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-600 bg-white px-3 py-2 text-xs font-bold text-[#14532D] hover:bg-emerald-50 transition cursor-pointer"
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                        <span>Edit Details</span>
+                      </button>
+                      <button
+                        onClick={() => handleOpenPropertyModal(null)}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#166534] active:scale-95 transition cursor-pointer"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>+ Add Property</span>
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-emerald-100/80 text-xs">
+                    <div className="rounded-xl bg-white/80 p-2 border border-emerald-100">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Starting Rent</span>
+                      <span className="font-bold text-gray-800 text-xs mt-0.5 block">
+                        ₹{(hostedProperties[0]?.settings?.starting_rent_paise ? hostedProperties[0].settings.starting_rent_paise / 100 : (hostedProperties[0]?.settings?.starting_rent || 7500)).toLocaleString('en-IN')}/mo
+                      </span>
+                    </div>
+                    <div className="rounded-xl bg-white/80 p-2 border border-emerald-100">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Notice Period</span>
+                      <span className="font-bold text-gray-800 text-xs mt-0.5 block">
+                        {hostedProperties[0]?.settings?.notice_period_days || 30} Days
+                      </span>
+                    </div>
+                    <div className="rounded-xl bg-white/80 p-2 border border-emerald-100">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Lock-In</span>
+                      <span className="font-bold text-gray-800 text-xs mt-0.5 block">
+                        {hostedProperties[0]?.settings?.lock_in_months || 3} Months
+                      </span>
+                    </div>
+                    <div className="rounded-xl bg-white/80 p-2 border border-emerald-100">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Direct UPI VPA</span>
+                      <span className="font-bold text-[#14532D] text-xs mt-0.5 block truncate">
+                        {hostedProperties[0]?.settings?.upi_id || currentUser?.organizations?.settings?.upi_id || 'Configured in ERP'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50/60 p-6 text-center">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+                    <Building2 className="h-6 w-6" />
+                  </div>
+                  <h3 className="mt-3 text-sm font-bold text-gray-900">No Properties Listed Yet</h3>
+                  <p className="mt-1 text-xs text-gray-500 max-w-sm mx-auto">
+                    List your PG or hostel to manage rooms, beds, check-ins, and direct rent collections.
+                  </p>
+                  <div className="mt-4">
                     <button
-                      onClick={() => setIsUpiPayModalOpen(true)}
-                      className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#14532D] px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#166534] active:scale-95 transition"
+                      onClick={() => handleOpenPropertyModal(null)}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#166534] transition cursor-pointer"
                     >
-                      <CreditCard className="h-3.5 w-3.5" />
-                      <span>Pay Due</span>
+                      <Plus className="h-4 w-4" />
+                      <span>List First Property</span>
                     </button>
-                    <Link
-                      href="/portal?tab=gatepass"
-                      className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50 active:scale-95 transition"
-                    >
-                      <KeyRound className="h-3.5 w-3.5 text-emerald-600" />
-                      <span>Gate Pass</span>
-                    </Link>
                   </div>
                 </div>
+              )}
 
-                <div className="mt-3.5 grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-emerald-100/80 text-xs">
-                  <div className="rounded-xl bg-white/80 p-2 border border-emerald-100">
-                    <span className="text-[10px] text-gray-400 uppercase font-bold block">Room & Bed</span>
-                    <span className="font-bold text-gray-800 text-xs mt-0.5 block">
-                      {activeStay.room_number ? `${activeStay.room_number} • ${activeStay.bed_label || 'Bed A'}` : 'Pending Allotment'}
-                    </span>
-                  </div>
-                  <div className="rounded-xl bg-white/80 p-2 border border-emerald-100">
-                    <span className="text-[10px] text-gray-400 uppercase font-bold block">Monthly Rent</span>
-                    <span className="font-bold text-gray-800 text-xs mt-0.5 block">
-                      {activeStay.monthly_rent_paise ? `₹${((activeStay.monthly_rent_paise) / 100).toLocaleString('en-IN')}` : '₹0'}
-                    </span>
-                  </div>
-                  <div className="rounded-xl bg-white/80 p-2 border border-emerald-100">
-                    <span className="text-[10px] text-gray-400 uppercase font-bold block">Check-In</span>
-                    <span className="font-bold text-gray-800 text-xs mt-0.5 block">
-                      {activeStay.check_in_date || 'Pending'}
-                    </span>
-                  </div>
-                  <div className="rounded-xl bg-white/80 p-2 border border-emerald-100">
-                    <span className="text-[10px] text-gray-400 uppercase font-bold block">Escrow Deposit</span>
-                    <span className="font-bold text-[#14532D] text-xs mt-0.5 block">
-                      {activeStay.deposit_held_paise ? `₹${((activeStay.deposit_held_paise) / 100).toLocaleString('en-IN')}` : '₹0'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Empty State when no stays registered */}
-            {stays.length === 0 && (
-              <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50/60 p-6 text-center">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
-                  <Building2 className="h-6 w-6" />
-                </div>
-                <h3 className="mt-3 text-sm font-bold text-gray-900">No Active Stay Allotted</h3>
-                <p className="mt-1 text-xs text-gray-500 max-w-sm mx-auto">
-                  You are registered as a verified PG-Setu Member. Once your PG manager assigns your room and bed, your stay pass and rent ledger will appear here.
-                </p>
-                <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-                  <Link
-                    href="/"
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#166534] transition"
-                  >
-                    <span>Explore Verified PGs</span>
-                  </Link>
+              {/* Owner ERP Quick Access Grid */}
+              <div className="rounded-3xl border border-gray-200/80 bg-white p-4 sm:p-5 space-y-3">
+                <h3 className="text-xs sm:text-sm font-black text-gray-900 uppercase tracking-wider">
+                  Owner ERP Command Center
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   <a
-                    href="https://wa.me/919453522757?text=Hi%20PG-Setu,%20please%20help%20me%20with%20my%20stay%20allotment"
+                    href="/dashboard/rooms"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50 transition"
+                    className="flex flex-col items-center justify-center rounded-2xl bg-gray-50 hover:bg-emerald-50 border border-gray-200/80 hover:border-emerald-300 p-3 text-center transition group"
                   >
-                    <span>Contact Support</span>
+                    <BedDouble className="h-5 w-5 text-emerald-700 mb-1 group-hover:scale-110 transition" />
+                    <span className="text-xs font-bold text-gray-800">Rooms & Tariffs</span>
+                    <span className="text-[10px] text-gray-400">Bed Allocation ↗</span>
+                  </a>
+
+                  <a
+                    href="/dashboard/residents"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex flex-col items-center justify-center rounded-2xl bg-gray-50 hover:bg-emerald-50 border border-gray-200/80 hover:border-emerald-300 p-3 text-center transition group"
+                  >
+                    <Users className="h-5 w-5 text-purple-700 mb-1 group-hover:scale-110 transition" />
+                    <span className="text-xs font-bold text-gray-800">Residents CRM</span>
+                    <span className="text-[10px] text-gray-400">Check-in & KYC ↗</span>
+                  </a>
+
+                  <a
+                    href="/dashboard/billing"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex flex-col items-center justify-center rounded-2xl bg-gray-50 hover:bg-emerald-50 border border-gray-200/80 hover:border-emerald-300 p-3 text-center transition group"
+                  >
+                    <Receipt className="h-5 w-5 text-blue-700 mb-1 group-hover:scale-110 transition" />
+                    <span className="text-xs font-bold text-gray-800">Billing & Rent</span>
+                    <span className="text-[10px] text-gray-400">Auto Invoicing ↗</span>
+                  </a>
+
+                  <a
+                    href="/dashboard/electricity"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex flex-col items-center justify-center rounded-2xl bg-gray-50 hover:bg-emerald-50 border border-gray-200/80 hover:border-emerald-300 p-3 text-center transition group"
+                  >
+                    <Zap className="h-5 w-5 text-amber-600 mb-1 group-hover:scale-110 transition" />
+                    <span className="text-xs font-bold text-gray-800">Smart Meters</span>
+                    <span className="text-[10px] text-gray-400">EB Readings ↗</span>
                   </a>
                 </div>
               </div>
-            )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* KPI Metric Micro-Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+                {/* Lifetime Rent */}
+                <div className="rounded-2xl border border-gray-200/80 bg-white p-3 sm:p-4 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      Rent Paid
+                    </span>
+                    <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                      <Receipt className="h-3 w-3" />
+                    </div>
+                  </div>
+                  <div className="mt-1 text-base sm:text-lg font-black text-gray-900">
+                    {totalRentFormatted}
+                  </div>
+                  <span className="text-[10px] text-gray-400 block mt-0.5">
+                    Across {stays.length} stays
+                  </span>
+                </div>
 
-          </div>
+                {/* Escrow Deposit */}
+                <div className="rounded-2xl border border-gray-200/80 bg-white p-3 sm:p-4 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      Deposit
+                    </span>
+                    <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                      <Shield className="h-3 w-3" />
+                    </div>
+                  </div>
+                  <div className="mt-1 text-base sm:text-lg font-black text-[#14532D]">
+                    {activeDepositFormatted}
+                  </div>
+                  <span className="text-[10px] text-emerald-600 font-bold block mt-0.5">
+                    100% Escrow
+                  </span>
+                </div>
+
+                {/* Pending Bills */}
+                <div className="rounded-2xl border border-gray-200/80 bg-white p-3 sm:p-4 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      Pending
+                    </span>
+                    <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                      <CheckCircle2 className="h-3 w-3" />
+                    </div>
+                  </div>
+                  <div className="mt-1 text-base sm:text-lg font-black text-emerald-600">
+                    {outstandingDueFormatted}
+                  </div>
+                  <span className="text-[10px] text-gray-400 block mt-0.5">
+                    All dues cleared
+                  </span>
+                </div>
+
+                {/* Renter Credit Score */}
+                <div className="rounded-2xl border border-gray-200/80 bg-white p-3 sm:p-4 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      Credit Score
+                    </span>
+                    <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-purple-50 text-purple-700">
+                      <Award className="h-3 w-3" />
+                    </div>
+                  </div>
+                  <div className="mt-1 text-base sm:text-lg font-black text-purple-900">
+                    {passbookSummary?.renter_credit_score && passbookSummary.renter_credit_score !== 'N/A'
+                      ? passbookSummary.renter_credit_score
+                      : (stays.length > 0 ? '790 / 850' : 'N/A')}
+                  </div>
+                  <span className="text-[10px] font-bold text-purple-700 block mt-0.5">
+                    {passbookSummary?.renter_tier || (stays.length > 0 ? 'Tier 1 Tenant' : 'Member')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Active Stay Detailed Highlight */}
+              {activeStay && (
+                <div className="rounded-3xl border border-emerald-200 bg-emerald-50/40 p-4 sm:p-5">
+                  <div className="flex items-center justify-between pb-3 border-b border-emerald-100">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-600 animate-pulse" />
+                      <span className="text-xs font-black text-[#14532D] uppercase tracking-wide">
+                        Currently Active Stay
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-mono text-emerald-800 font-bold">
+                      Ref: {activeStay.registration_number || uniqueId}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-base font-black text-gray-900">{activeStay.property_name}</h3>
+                      <p className="text-xs text-gray-600 flex items-center gap-1 mt-0.5">
+                        <MapPin className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                        <span>{activeStay.address || activeStay.city}</span>
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setIsUpiPayModalOpen(true)}
+                        className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#14532D] px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#166534] active:scale-95 transition"
+                      >
+                        <CreditCard className="h-3.5 w-3.5" />
+                        <span>Pay Due</span>
+                      </button>
+                      <Link
+                        href="/portal?tab=gatepass"
+                        className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50 active:scale-95 transition"
+                      >
+                        <KeyRound className="h-3.5 w-3.5 text-emerald-600" />
+                        <span>Gate Pass</span>
+                      </Link>
+                    </div>
+                  </div>
+
+                  <div className="mt-3.5 grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-emerald-100/80 text-xs">
+                    <div className="rounded-xl bg-white/80 p-2 border border-emerald-100">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Room & Bed</span>
+                      <span className="font-bold text-gray-800 text-xs mt-0.5 block">
+                        {activeStay.room_number ? `${activeStay.room_number} • ${activeStay.bed_label || 'Bed A'}` : 'Pending Allotment'}
+                      </span>
+                    </div>
+                    <div className="rounded-xl bg-white/80 p-2 border border-emerald-100">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Monthly Rent</span>
+                      <span className="font-bold text-gray-800 text-xs mt-0.5 block">
+                        {activeStay.monthly_rent_paise ? `₹${((activeStay.monthly_rent_paise) / 100).toLocaleString('en-IN')}` : '₹0'}
+                      </span>
+                    </div>
+                    <div className="rounded-xl bg-white/80 p-2 border border-emerald-100">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Check-In</span>
+                      <span className="font-bold text-gray-800 text-xs mt-0.5 block">
+                        {activeStay.check_in_date || 'Pending'}
+                      </span>
+                    </div>
+                    <div className="rounded-xl bg-white/80 p-2 border border-emerald-100">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Escrow Deposit</span>
+                      <span className="font-bold text-[#14532D] text-xs mt-0.5 block">
+                        {activeStay.deposit_held_paise ? `₹${((activeStay.deposit_held_paise) / 100).toLocaleString('en-IN')}` : '₹0'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Empty State when no stays registered */}
+              {stays.length === 0 && (
+                <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50/60 p-6 text-center">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+                    <Building2 className="h-6 w-6" />
+                  </div>
+                  <h3 className="mt-3 text-sm font-bold text-gray-900">No Active Stay Allotted</h3>
+                  <p className="mt-1 text-xs text-gray-500 max-w-sm mx-auto">
+                    You are registered as a verified PG-Setu Member. Once your PG manager assigns your room and bed, your stay pass and rent ledger will appear here.
+                  </p>
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                    <Link
+                      href="/"
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#166534] transition"
+                    >
+                      <span>Explore Verified PGs</span>
+                    </Link>
+                    <a
+                      href="https://wa.me/919453522757?text=Hi%20PG-Setu,%20please%20help%20me%20with%20my%20stay%20allotment"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50 transition"
+                    >
+                      <span>Contact Support</span>
+                    </a>
+                  </div>
+                </div>
+              )}
+            </div>
+          )
         )}
 
-        {/* ────────────────────────────────────────────────────────── */}
+        {/* ---------------------------------------------------------- */}
         {/* TAB 2: PASSBOOK TRANSACTIONS (NATIVE MOBILE CARDS) */}
-        {/* ────────────────────────────────────────────────────────── */}
+        {/* ---------------------------------------------------------- */}
         {activeTab === 'passbook' && (
           <div className="space-y-3">
             {/* Filter Pills */}
@@ -1572,9 +1865,9 @@ function MyProfileContent() {
           </div>
         )}
 
-        {/* ────────────────────────────────────────────────────────── */}
+        {/* ---------------------------------------------------------- */}
         {/* TAB 3: STAYS HISTORY */}
-        {/* ────────────────────────────────────────────────────────── */}
+        {/* ---------------------------------------------------------- */}
         {activeTab === 'stays' && (
           <div className="space-y-3">
             {stays.length === 0 ? (
@@ -1683,11 +1976,80 @@ function MyProfileContent() {
           </div>
         )}
 
-        {/* ────────────────────────────────────────────────────────── */}
+        {/* ---------------------------------------------------------- */}
         {/* TAB 4: KYC & DETAILED PERSONAL INFO */}
-        {/* ────────────────────────────────────────────────────────── */}
+        {/* ---------------------------------------------------------- */}
         {activeTab === 'kyc' && (
           <div className="space-y-4">
+            {/* Host Business & Payout Credentials Card for Owners */}
+            {isOwner && (
+              <div className="rounded-3xl border border-emerald-200 bg-emerald-50/40 p-4 sm:p-6 shadow-xs space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-emerald-100">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white">
+                      <Building2 className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs sm:text-sm font-black text-gray-900">
+                        Host & Organization Registration
+                      </h3>
+                      <p className="text-[10px] text-gray-500">Commercial PG & Property Management Identity</p>
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-700" />
+                    <span>Verified Host</span>
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="rounded-2xl bg-white p-3 space-y-1 border border-emerald-100">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                      Organization / Host Business
+                    </span>
+                    <p className="font-bold text-gray-900 text-sm">
+                      {currentUser?.organizations?.name && currentUser.organizations.name !== currentUser?.phone
+                        ? currentUser.organizations.name
+                        : (hostedProperties[0]?.name || 'PG-Setu Certified Host')}
+                    </p>
+                    <span className="text-[10px] text-gray-400 block font-mono">
+                      Org ID: {currentUser?.organization_id || 'Auto-Linked'}
+                    </span>
+                  </div>
+
+                  <div className="rounded-2xl bg-white p-3 space-y-1 border border-emerald-100">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                      Direct Rent Payout UPI ID
+                    </span>
+                    <p className="font-mono font-bold text-[#14532D] text-sm truncate">
+                      {hostedProperties[0]?.settings?.upi_id || currentUser?.organizations?.settings?.upi_id || 'Not Set — Click Below to Add'}
+                    </p>
+                    <span className="text-[10px] text-emerald-600 font-semibold block">
+                      0% Commission Direct Settlement
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    onClick={() => handleOpenPropertyModal(hostedProperties[0] || null)}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-600 bg-white px-3.5 py-2 text-xs font-bold text-[#14532D] hover:bg-emerald-50 transition cursor-pointer"
+                  >
+                    <Edit className="h-3.5 w-3.5" />
+                    <span>Update UPI Payout & Tariffs</span>
+                  </button>
+                  <a
+                    href="/dashboard/settings"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-3.5 py-2 text-xs font-bold text-white hover:bg-[#166534] transition shadow-xs"
+                  >
+                    <span>ERP Settings ↗</span>
+                  </a>
+                </div>
+              </div>
+            )}
+
             {/* Government KYC Card */}
             <div className="rounded-3xl border border-gray-200/80 bg-white p-4 sm:p-6 shadow-xs space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-gray-100">
@@ -1855,9 +2217,9 @@ function MyProfileContent() {
         )}
       </main>
 
-      {/* ────────────────────────────────────────────────────────── */}
+      {/* ---------------------------------------------------------- */}
       {/* 5. MODAL 1: EDIT DETAILS (MOBILE BOTTOM-SHEET DRAWER) */}
-      {/* ────────────────────────────────────────────────────────── */}
+      {/* ---------------------------------------------------------- */}
       {isEditing && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4 backdrop-blur-xs">
           <div className="relative w-full max-w-lg rounded-t-3xl sm:rounded-3xl bg-white p-5 sm:p-6 shadow-2xl max-h-[90dvh] overflow-y-auto overscroll-contain">
@@ -2042,9 +2404,9 @@ function MyProfileContent() {
         </div>
       )}
 
-      {/* ────────────────────────────────────────────────────────── */}
+      {/* ---------------------------------------------------------- */}
       {/* 6. MODAL 2: AADHAAR VERIFICATION (BOTTOM SHEET) */}
-      {/* ────────────────────────────────────────────────────────── */}
+      {/* ---------------------------------------------------------- */}
       {isAadhaarModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4 backdrop-blur-xs">
           <div className="relative w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-white p-5 sm:p-6 shadow-2xl">
@@ -2129,9 +2491,9 @@ function MyProfileContent() {
         </div>
       )}
 
-      {/* ────────────────────────────────────────────────────────── */}
+      {/* ---------------------------------------------------------- */}
       {/* 7. MODAL 3: SHOW QR CODE MODAL */}
-      {/* ────────────────────────────────────────────────────────── */}
+      {/* ---------------------------------------------------------- */}
       {isQrModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
           <div className="relative w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl text-center">
@@ -2180,9 +2542,9 @@ function MyProfileContent() {
         </div>
       )}
 
-      {/* ────────────────────────────────────────────────────────── */}
+      {/* ---------------------------------------------------------- */}
       {/* 8. MODAL 4: QUICK UPI PAY BOTTOM SHEET */}
-      {/* ────────────────────────────────────────────────────────── */}
+      {/* ---------------------------------------------------------- */}
       {isUpiPayModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4 backdrop-blur-xs">
           <div className="relative w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-white p-5 sm:p-6 shadow-2xl">
@@ -2238,9 +2600,9 @@ function MyProfileContent() {
         </div>
       )}
 
-      {/* ────────────────────────────────────────────────────────── */}
+      {/* ---------------------------------------------------------- */}
       {/* 9. MODAL 5: INSTANT GUEST GATE PASS */}
-      {/* ────────────────────────────────────────────────────────── */}
+      {/* ---------------------------------------------------------- */}
       {isGatePassModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4 backdrop-blur-xs">
           <div className="relative w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-white p-5 sm:p-6 shadow-2xl">
@@ -2331,9 +2693,9 @@ function MyProfileContent() {
         </div>
       )}
 
-      {/* ────────────────────────────────────────────────────────── */}
+      {/* ---------------------------------------------------------- */}
       {/* 10. MODAL 6: EDIT HOSTED PROPERTY DETAILS & TERMS          */}
-      {/* ────────────────────────────────────────────────────────── */}
+      {/* ---------------------------------------------------------- */}
       {isPropertyModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4 backdrop-blur-xs">
           <div className="relative w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-white p-5 sm:p-6 shadow-2xl">
@@ -2353,10 +2715,12 @@ function MyProfileContent() {
               </div>
               <div>
                 <h3 className="text-base sm:text-lg font-black text-gray-900">
-                  Edit Property & Listing Terms
+                  {editingProperty?.id ? 'Edit Property & Listing Terms' : 'List New PG / Hostel Property'}
                 </h3>
                 <p className="text-xs text-gray-500">
-                  Updates sync instantly to Supabase and marketplace search
+                  {editingProperty?.id
+                    ? 'Updates sync instantly to Supabase and marketplace search'
+                    : 'Set up your PG details, monthly rent, and rules to start taking bookings'}
                 </p>
               </div>
             </div>
@@ -2645,7 +3009,7 @@ function MyProfileContent() {
                   ) : (
                     <>
                       <Check className="h-4 w-4" />
-                      <span>Save Property Changes</span>
+                      <span>{editingProperty?.id ? 'Save Property Changes' : 'Create & Publish Property'}</span>
                     </>
                   )}
                 </button>
