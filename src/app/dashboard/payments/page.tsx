@@ -5,7 +5,7 @@ import { formatCurrency } from '@/lib/money'
 import { cn, formatDate, formatDateTime } from '@/lib/utils'
 import {
   CreditCard, Plus, Smartphone, Building2, Banknote,
-  MoreHorizontal, Calendar, CheckCircle2, ShieldCheck, Scale
+  MoreHorizontal, Calendar, CheckCircle2, ShieldCheck
 } from 'lucide-react'
 
 interface Props {
@@ -91,12 +91,6 @@ export default async function PaymentsPage({ searchParams }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Link
-            href="/dashboard/payments/daily-closing"
-            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-gray-100 hover:bg-gray-200 active:scale-95 text-gray-800 text-xs font-bold px-3.5 py-2.5 rounded-xl transition"
-          >
-            <Scale className="w-4 h-4" /> Daily Closing
-          </Link>
           <Link
             href="/dashboard/payments/new"
             className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition shadow-xs"

@@ -6,7 +6,7 @@ import Link from 'next/link'
 import {
   Search, Bell, Plus, Menu, X, LogOut,
   LayoutDashboard, Users, BedDouble, FileText, CreditCard,
-  Zap, ArrowLeftRight, TrendingUp, DollarSign, MessageSquare,
+  Zap, TrendingUp, DollarSign, MessageSquare,
   FileBarChart, Settings, Building2, Sparkles, ChevronDown, ShieldCheck, Compass
 } from 'lucide-react'
 import { User as UserType } from '@/lib/types'
@@ -44,7 +44,6 @@ export default function AppHeader({ user }: Props) {
     { label: 'Rooms & Beds', href: '/dashboard/rooms', icon: BedDouble },
     { label: 'Billing & Invoices', href: '/dashboard/billing', icon: FileText },
     { label: 'Payment Register', href: '/dashboard/payments', icon: CreditCard },
-    { label: 'Daily Cash Closing', href: '/dashboard/payments/daily-closing', icon: ArrowLeftRight },
     { label: 'Resident Ledger', href: '/dashboard/ledger', icon: FileText },
     { label: 'Electricity Sub-Meters', href: '/dashboard/electricity', icon: Zap },
     { label: 'Expenses Tracking', href: '/dashboard/expenses', icon: TrendingUp },
