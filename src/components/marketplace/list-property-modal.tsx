@@ -17,6 +17,14 @@ import {
   ChevronRight,
   ChevronLeft,
   ArrowRight,
+  UploadCloud,
+  Trash2,
+  Plus,
+  Star,
+  AlertCircle,
+  Loader2,
+  Image as ImageIcon,
+  AlertTriangle,
 } from 'lucide-react'
 import { PropertyType, GenderPreference, SharingType, NewListingFormData } from '@/types/marketplace'
 
@@ -55,6 +63,70 @@ const ALL_AMENITIES = [
   'Refrigerator in Room / Floor',
   'Microwave & Induction',
 ]
+
+const SAMPLE_PG_PHOTOS = [
+  {
+    url: 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=1200&q=80',
+    title: 'Private Bedroom & Study Area',
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?auto=format&fit=crop&w=1200&q=80',
+    title: 'Double Sharing Twin Beds',
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=1200&q=80',
+    title: 'Clean Attached Washroom',
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=1200&q=80',
+    title: 'Hygienic Dining & Kitchen',
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80',
+    title: 'Building Entrance & Security Gate',
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=1200&q=80',
+    title: 'Common Balcony / Study Lounge',
+  },
+]
+
+// Compress and optimize local photo via client-side HTML5 canvas
+const optimizeImageFile = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const img = new (window as any).Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        let { width, height } = img
+        const MAX_DIM = 1280
+        if (width > MAX_DIM || height > MAX_DIM) {
+          if (width > height) {
+            height = Math.round((height * MAX_DIM) / width)
+            width = MAX_DIM
+          } else {
+            width = Math.round((width * MAX_DIM) / height)
+            height = MAX_DIM
+          }
+        }
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          resolve(event.target?.result as string)
+          return
+        }
+        ctx.drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL('image/jpeg', 0.82))
+      }
+      img.onerror = () => resolve(event.target?.result as string)
+      img.src = event.target?.result as string
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
 
 export function ListPropertyModal({ isOpen, onClose, onListingCreated }: ListPropertyModalProps) {
   const [currentStep, setCurrentStep] = useState(1)
@@ -133,13 +205,110 @@ export function ListPropertyModal({ isOpen, onClose, onListingCreated }: ListPro
     ownerWhatsapp: '',
     ownerEmail: '',
     imageUrls: [
-      'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=1000&q=80',
+      'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80',
     ],
   })
+
+  // Photo management states for Step 8
+  const [isUploadingPhotos, setIsUploadingPhotos] = useState(false)
+  const [newImageUrl, setNewImageUrl] = useState('')
+  const [photoError, setPhotoError] = useState('')
+  const [photoNotice, setPhotoNotice] = useState('')
+  const [hasConfirmedPhotoNotice, setHasConfirmedPhotoNotice] = useState(false)
+
+  // 1. Local multi-file upload from device
+  const handleLocalPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    setIsUploadingPhotos(true)
+    setPhotoError('')
+    setPhotoNotice('')
+    try {
+      const fileList = Array.from(files)
+      const compressedPhotos = await Promise.all(
+        fileList.map((f) => optimizeImageFile(f))
+      )
+      setFormData((prev) => {
+        const existing = prev.imageUrls || []
+        return { ...prev, imageUrls: [...existing, ...compressedPhotos] }
+      })
+      setPhotoNotice(`Added ${files.length} photo${files.length > 1 ? 's' : ''} from device!`)
+      setTimeout(() => setPhotoNotice(''), 3500)
+    } catch (err: any) {
+      console.error('Error processing photos:', err)
+      setPhotoError('Failed to process some images. Please upload standard JPG or PNG images.')
+    } finally {
+      setIsUploadingPhotos(false)
+      e.target.value = ''
+    }
+  }
+
+  // 2. Add photo by URL
+  const handleAddPhotoByUrl = (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    const trimmed = newImageUrl.trim()
+    if (!trimmed) return
+    if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://') && !trimmed.startsWith('data:image')) {
+      setPhotoError('Please enter a valid image link starting with http:// or https://')
+      return
+    }
+    setFormData((prev) => ({
+      ...prev,
+      imageUrls: [...prev.imageUrls, trimmed],
+    }))
+    setNewImageUrl('')
+    setPhotoError('')
+    setPhotoNotice('Photo added to gallery!')
+    setTimeout(() => setPhotoNotice(''), 3000)
+  }
+
+  // 3. Remove photo
+  const handleRemovePhoto = (indexToRemove: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      imageUrls: prev.imageUrls.filter((_, idx) => idx !== indexToRemove),
+    }))
+  }
+
+  // 4. Make Cover Photo (move to index 0)
+  const handleMakeCoverPhoto = (indexToCover: number) => {
+    setFormData((prev) => {
+      const coverItem = prev.imageUrls[indexToCover]
+      const rest = prev.imageUrls.filter((_, idx) => idx !== indexToCover)
+      return { ...prev, imageUrls: [coverItem, ...rest] }
+    })
+    setPhotoNotice('Cover photo updated!')
+    setTimeout(() => setPhotoNotice(''), 2500)
+  }
+
+  // 5. 1-Click "Add 5 Verified Sample Photos"
+  const handleAddSamplePhotos = () => {
+    setFormData((prev) => {
+      const existing = prev.imageUrls || []
+      const toAdd = SAMPLE_PG_PHOTOS.map((p) => p.url).filter((u) => !existing.includes(u))
+      return {
+        ...prev,
+        imageUrls: [...existing, ...toAdd],
+      }
+    })
+    setPhotoNotice('Added verified PG sample photos! You can reorder or replace them anytime.')
+    setTimeout(() => setPhotoNotice(''), 3500)
+  }
 
   if (!isOpen) return null
 
   const handleNext = () => {
+    if (currentStep === 8 && formData.imageUrls.length < 5 && !hasConfirmedPhotoNotice) {
+      setPhotoError(`Notice: Minimum 5 photos recommended (Currently ${formData.imageUrls.length}/5). Click "+ Add 5 Sample Photos" or click "Next Step" again to proceed.`)
+      setHasConfirmedPhotoNotice(true)
+      return
+    }
+    setPhotoError('')
     if (currentStep < 10) {
       setCurrentStep((prev) => prev + 1)
     } else {
@@ -668,35 +837,229 @@ export function ListPropertyModal({ isOpen, onClose, onListingCreated }: ListPro
                 </div>
               )}
 
-              {/* Step 8: Photos & Media */}
+              {/* Step 8: Photos & Media (Minimum 5 Photos Recommended) */}
               {currentStep === 8 && (
                 <div className="space-y-4 animate-in fade-in">
-                  <h4 className="text-lg font-bold text-[#17211B]">Photos & Media</h4>
-                  <p className="text-xs text-[#647067]">
-                    High quality photos get up to 4x more direct booking enquiries.
-                  </p>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#17211B]">
-                      Cover Image URL
-                    </label>
-                    <input
-                      type="url"
-                      value={formData.imageUrls[0] || ''}
-                      onChange={(e) => setFormData({ ...formData, imageUrls: [e.target.value] })}
-                      placeholder="https://images.unsplash.com/..."
-                      className="mt-1 w-full rounded-xl border border-gray-200 p-2.5 text-sm focus:border-[#16A34A] focus:outline-hidden"
-                    />
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-gray-100 pb-3">
+                    <div>
+                      <h4 className="text-lg font-bold text-[#17211B] flex items-center gap-2">
+                        <span>Property Photos & Media Gallery</span>
+                        <span className="text-xs font-normal text-gray-500">(Min. 5 recommended)</span>
+                      </h4>
+                      <p className="text-xs text-[#647067]">
+                        Upload room photos, washroom, dining, and entrance. Listings with 5+ photos get 4x more direct enquiries.
+                      </p>
+                    </div>
+
+                    {/* Progress Badge */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
+                          formData.imageUrls.length >= 5
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                            : 'bg-amber-100 text-amber-800 border border-amber-300'
+                        }`}
+                      >
+                        {formData.imageUrls.length >= 5 ? (
+                          <>
+                            <Check className="h-3.5 w-3.5 text-emerald-600" />
+                            <span>{formData.imageUrls.length} Photos Added (Min 5 Met)</span>
+                          </>
+                        ) : (
+                          <>
+                            <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                            <span>{formData.imageUrls.length} / 5 Photos (Add {5 - formData.imageUrls.length} more)</span>
+                          </>
+                        )}
+                      </span>
+                    </div>
                   </div>
 
-                  {formData.imageUrls[0] && (
-                    <div className="aspect-16/9 w-full max-w-sm overflow-hidden rounded-xl bg-gray-100 border">
-                      <img
-                        src={formData.imageUrls[0]}
-                        alt="Listing Preview"
-                        className="h-full w-full object-cover"
-                      />
+                  {/* Feedback notices & errors */}
+                  {photoNotice && (
+                    <div className="flex items-center gap-2 rounded-xl bg-emerald-50 p-2.5 text-xs font-bold text-emerald-800 border border-emerald-200 animate-in fade-in">
+                      <Check className="h-4 w-4 text-emerald-600 shrink-0" />
+                      <span>{photoNotice}</span>
                     </div>
                   )}
+                  {photoError && (
+                    <div className="flex items-center gap-2 rounded-xl bg-amber-50 p-2.5 text-xs font-bold text-amber-800 border border-amber-200 animate-in fade-in">
+                      <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                      <span>{photoError}</span>
+                    </div>
+                  )}
+
+                  {/* Upload Actions Grid: Local Upload & Add by URL */}
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                    {/* Option 1: Drag & Drop / Click Local Device Upload */}
+                    <div className="md:col-span-7">
+                      <label
+                        htmlFor="wizard-photo-file-input"
+                        className={`relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-4 text-center cursor-pointer transition ${
+                          isUploadingPhotos
+                            ? 'border-emerald-500 bg-emerald-50/50'
+                            : 'border-emerald-300 hover:border-emerald-500 bg-emerald-50/30 hover:bg-emerald-50/70'
+                        }`}
+                      >
+                        <input
+                          id="wizard-photo-file-input"
+                          type="file"
+                          multiple
+                          accept="image/*"
+                          onChange={handleLocalPhotoUpload}
+                          disabled={isUploadingPhotos}
+                          className="sr-only"
+                        />
+                        {isUploadingPhotos ? (
+                          <div className="flex flex-col items-center py-2 gap-2">
+                            <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+                            <span className="text-xs font-bold text-emerald-900">Optimizing & Uploading Photos...</span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center gap-1.5 py-1">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-emerald-700 shadow-xs">
+                              <UploadCloud className="h-5 w-5" />
+                            </div>
+                            <div className="text-xs font-bold text-gray-900">
+                              <span className="text-emerald-700 underline">Click to upload from device</span> or drag & drop
+                            </div>
+                            <span className="text-[11px] text-gray-500">
+                              Upload multiple photos at once (JPG, PNG, WEBP)
+                            </span>
+                          </div>
+                        )}
+                      </label>
+                    </div>
+
+                    {/* Option 2: Add by Web URL + 1-Click Sample Pack */}
+                    <div className="md:col-span-5 flex flex-col justify-between gap-2.5 rounded-2xl border border-gray-200 bg-gray-50/70 p-3">
+                      <div>
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-600 mb-1">
+                          Add Photo via Web URL
+                        </label>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="url"
+                            value={newImageUrl}
+                            onChange={(e) => setNewImageUrl(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                handleAddPhotoByUrl()
+                              }
+                            }}
+                            placeholder="Paste image link https://..."
+                            className="flex-1 rounded-xl border border-gray-200 bg-white px-2.5 py-2 text-xs focus:border-emerald-600 focus:outline-hidden"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleAddPhotoByUrl()}
+                            className="rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-2 text-xs font-bold shrink-0 transition"
+                          >
+                            + Add
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 1-Click Quick Fill Button */}
+                      <button
+                        type="button"
+                        onClick={handleAddSamplePhotos}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-white px-3 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-50 transition shadow-2xs cursor-pointer"
+                      >
+                        <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                        <span>+ Add 5 Verified Sample Photos</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Photo Gallery Grid */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-gray-800">
+                        Uploaded Photos ({formData.imageUrls.length})
+                      </span>
+                      <span className="text-[11px] text-gray-400">
+                        ★ First photo is your listing&apos;s Cover Photo
+                      </span>
+                    </div>
+
+                    {formData.imageUrls.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-gray-300 p-6 text-center text-xs text-gray-500">
+                        No photos added yet. Click &quot;Upload from device&quot; or &quot;Add 5 Verified Sample Photos&quot; above.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 max-h-[290px] overflow-y-auto pr-1">
+                        {formData.imageUrls.map((imgUrl, idx) => {
+                          const isCover = idx === 0
+                          return (
+                            <div
+                              key={idx}
+                              className={`relative group rounded-xl overflow-hidden border bg-gray-100 shadow-2xs transition ${
+                                isCover ? 'ring-2 ring-emerald-500 border-emerald-500' : 'border-gray-200 hover:border-gray-400'
+                              }`}
+                            >
+                              <div className="aspect-4/3 w-full overflow-hidden">
+                                <img
+                                  src={imgUrl}
+                                  alt={`Property Photo ${idx + 1}`}
+                                  className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                                />
+                              </div>
+
+                              {/* Index / Cover Badge */}
+                              <div className="absolute top-1.5 left-1.5">
+                                {isCover ? (
+                                  <span className="inline-flex items-center gap-1 rounded-md bg-emerald-700/90 text-white px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider backdrop-blur-xs">
+                                    ★ Cover
+                                  </span>
+                                ) : (
+                                  <span className="rounded-md bg-black/60 text-white px-1.5 py-0.5 text-[9px] font-bold backdrop-blur-xs">
+                                    #{idx + 1}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Delete Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleRemovePhoto(idx)}
+                                title="Remove photo"
+                                className="absolute top-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-lg bg-black/60 text-white hover:bg-red-600 transition cursor-pointer"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+
+                              {/* Set as Cover Button */}
+                              {!isCover && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleMakeCoverPhoto(idx)}
+                                  className="absolute bottom-1.5 inset-x-1.5 rounded-lg bg-white/95 py-1 text-[10px] font-bold text-gray-800 opacity-90 sm:opacity-0 group-hover:opacity-100 transition shadow-sm hover:bg-emerald-600 hover:text-white cursor-pointer"
+                                >
+                                  Make Cover
+                                </button>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Recommendation Checklist Pill */}
+                  <div className="rounded-xl bg-gray-50 p-2.5 border border-gray-200/80 text-[11px] text-gray-600 flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span className="font-bold text-gray-800">5 Recommended Angles:</span>
+                    <span>1. Private / Sharing Bedroom</span>
+                    <span>•</span>
+                    <span>2. Attached Washroom</span>
+                    <span>•</span>
+                    <span>3. Dining & Kitchen</span>
+                    <span>•</span>
+                    <span>4. Building Facade & Gate</span>
+                    <span>•</span>
+                    <span>5. Balcony / Lounge</span>
+                  </div>
                 </div>
               )}
 
@@ -789,7 +1152,39 @@ export function ListPropertyModal({ isOpen, onClose, onListingCreated }: ListPro
                         {formData.foodProvided ? 'Yes' : 'No'}
                       </span>
                     </div>
+                    <div className="flex justify-between items-center pt-1 border-t border-gray-200/60">
+                      <span className="font-semibold text-gray-500">Photos Uploaded:</span>
+                      <span className="font-bold text-emerald-800">
+                        {formData.imageUrls.length} Photos (Cover + Gallery)
+                      </span>
+                    </div>
                   </div>
+
+                  {formData.imageUrls.length > 0 && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px] font-bold text-gray-600">
+                        <span>PHOTO GALLERY PREVIEW ({formData.imageUrls.length})</span>
+                        <span className="text-emerald-700">★ First is Cover</span>
+                      </div>
+                      <div className="flex gap-2 overflow-x-auto pb-1.5 pt-0.5">
+                        {formData.imageUrls.map((url, idx) => (
+                          <div
+                            key={idx}
+                            className={`relative h-16 w-20 shrink-0 rounded-xl overflow-hidden border bg-gray-100 ${
+                              idx === 0 ? 'ring-2 ring-emerald-500 border-emerald-500 shadow-xs' : 'border-gray-200'
+                            }`}
+                          >
+                            <img src={url} alt={`Preview ${idx + 1}`} className="h-full w-full object-cover" />
+                            {idx === 0 && (
+                              <span className="absolute bottom-0 inset-x-0 bg-emerald-700 text-white text-[8px] font-black uppercase text-center py-0.5">
+                                Cover
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="rounded-xl bg-[#DCFCE7]/70 p-3 text-xs text-[#14532D] font-medium">
                     ✓ By publishing, you agree to PGSetu&apos;s Zero Brokerage Direct Guarantee and honest pricing pledge.

@@ -237,7 +237,7 @@ function UnifiedLoginForm() {
         throw new Error(data.error || 'Failed to create PG account.')
       }
 
-      window.location.href = data.redirect || '/dashboard'
+      window.location.href = data.redirect || '/my-profile'
     } catch (err: any) {
       setError(err.message || 'Failed to create PG account. Please try again.')
       setLoading(false)
@@ -804,7 +804,7 @@ function UnifiedLoginForm() {
             ) : (
               <>
                 <Building2 className="h-4 w-4" />
-                <span>Create PG Account & Launch Dashboard</span>
+                <span>Create PG Account & View Profile</span>
                 <ArrowRight className="h-4 w-4" />
               </>
             )}

@@ -512,8 +512,8 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      const isOwnerOrStaff = ['superadmin', 'owner', 'manager', 'accountant', 'staff'].includes(effectiveRole)
-      const destination = isOwnerOrStaff ? '/dashboard' : '/my-profile'
+      // When owner or resident logs in, direct them to website profile page (/my-profile)
+      const destination = '/my-profile'
 
       return NextResponse.json({
         success: true,
@@ -1074,7 +1074,7 @@ export async function POST(request: NextRequest) {
         {
           success: true,
           message: 'PG Account created and logged in successfully.',
-          redirect: '/dashboard',
+          redirect: '/my-profile',
           user: savedUser || {
             id: targetUserId,
             full_name: owner_name.trim(),

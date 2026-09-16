@@ -98,9 +98,7 @@ export async function middleware(request: NextRequest) {
       ? '/set-password'
       : isSuperAdminUser
       ? '/superman'
-      : isResident
-      ? '/my-profile'
-      : '/dashboard'
+      : '/my-profile'
     return NextResponse.redirect(targetUrl)
   }
 

@@ -249,10 +249,8 @@ export async function POST(request: NextRequest) {
           destination = '/superman'
         } else if (mustChangePassword) {
           destination = '/set-password'
-        } else if (isResidentRole) {
-          destination = '/my-profile'
         } else {
-          destination = '/dashboard'
+          destination = '/my-profile'
         }
 
         return NextResponse.json({
@@ -356,9 +354,7 @@ export async function POST(request: NextRequest) {
             ? '/superman'
             : mustChangePassword
             ? '/set-password'
-            : isResidentRole
-            ? '/my-profile'
-            : '/dashboard'
+            : '/my-profile'
 
           return NextResponse.json({
             success: true,
