@@ -78,13 +78,16 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Create new assignment
+    const newAssignmentId = crypto.randomUUID()
     const { data: newAssignment, error: assignError } = await serviceClient
       .from('resident_assignments')
       .insert({
+        id: newAssignmentId,
         organization_id: orgId,
         resident_id,
         bed_id: new_bed_id,
         check_in_date: transfer_date,
+        check_out_date: '9999-12-31',
         monthly_rent_paise: new_rent_paise,
         transfer_from_assignment_id: currentAssignment ? currentAssignment.id : null,
         transfer_reason: reason || 'other',
@@ -97,6 +100,12 @@ export async function POST(request: NextRequest) {
     if (assignError || !newAssignment) {
       return NextResponse.json({ error: assignError?.message || 'Failed to create new assignment' }, { status: 500 })
     }
+
+    // Clear check_out_date to NULL so it becomes the active assignment
+    await serviceClient
+      .from('resident_assignments')
+      .update({ check_out_date: null })
+      .eq('id', newAssignmentId)
 
     // 4. Mark new bed occupied
     await serviceClient

@@ -149,10 +149,10 @@ function AdminContent() {
           )}
 
           {/* Marketplace & Renting Specific Views */}
-          {currentTab === 'marketplace' && <MarketplaceTab />}
-          {currentTab === 'enquiries' && <MarketplaceTab />}
-          {currentTab === 'visits' && <MarketplaceTab />}
-          {currentTab === 'promotions' && <MarketplaceTab />}
+          {currentTab === 'marketplace' && <MarketplaceTab initialSubTab="listings" />}
+          {currentTab === 'enquiries' && <MarketplaceTab initialSubTab="enquiries" />}
+          {currentTab === 'visits' && <MarketplaceTab initialSubTab="visits" />}
+          {currentTab === 'promotions' && <MarketplaceTab initialSubTab="listings" />}
 
           {/* ERP Specific Views */}
           {currentTab === 'structure' && <StructureTab />}

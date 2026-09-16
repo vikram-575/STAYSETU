@@ -66,6 +66,13 @@ export default function AdminSidebar({
       items: [
         { id: 'dashboard', label: 'ERP Dashboard', icon: LayoutDashboard },
         { id: 'structure', label: 'Property & Bed Matrix', icon: Network },
+        {
+          id: 'marketplace',
+          label: 'Property Renting & Listings',
+          icon: Store,
+          badge: badges.pendingListings ? `${badges.pendingListings} pending` : undefined,
+          badgeVariant: 'amber',
+        },
         { id: 'residents', label: 'Tenants & Passbooks', icon: Users2 },
         { id: 'money-center', label: 'Money Center & Reversals', icon: Landmark },
       ],
@@ -156,7 +163,7 @@ export default function AdminSidebar({
         { id: 'dashboard', label: 'Marketplace Dashboard', icon: LayoutDashboard },
         {
           id: 'marketplace',
-          label: 'Listings Moderation',
+          label: 'Manage Listed Properties',
           icon: Store,
           badge: badges.pendingListings ? `${badges.pendingListings} pending` : undefined,
           badgeVariant: 'amber',

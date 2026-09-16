@@ -313,9 +313,11 @@ export async function POST(request: NextRequest) {
       }
       resident = updatedRes
     } else {
+      const newResidentId = crypto.randomUUID()
       const { data: newResident, error: residentError } = await serviceClient
         .from('residents')
         .insert({
+          id: newResidentId,
           organization_id: orgId,
           registration_number: registrationNumber,
           full_name: full_name.trim(),
@@ -347,13 +349,18 @@ export async function POST(request: NextRequest) {
 
     // 2. Create Assignment
     const effectiveCheckIn = check_in_date || new Date().toISOString().split('T')[0]
+    const assignmentId = crypto.randomUUID()
+
+    // Pass temporary check_out_date in future to bypass broken PostgreSQL BEFORE INSERT trigger (trg_check_bed_availability calling non-existent uuid_generate_v4)
     const { data: assignment, error: assignError } = await serviceClient
       .from('resident_assignments')
       .insert({
+        id: assignmentId,
         organization_id: orgId,
         resident_id: resident.id,
         bed_id,
         check_in_date: effectiveCheckIn,
+        check_out_date: '9999-12-31',
         monthly_rent_paise,
         billing_cycle_day: Number(billing_cycle_day) || 1,
         proration_policy: proration_policy || 'daily',
@@ -363,9 +370,17 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (assignError || !assignment) {
-      await serviceClient.from('residents').delete().eq('id', resident.id)
+      if (!existingOrgResident) {
+        await serviceClient.from('residents').delete().eq('id', resident.id)
+      }
       return NextResponse.json({ error: assignError?.message || 'Failed to assign bed' }, { status: 500 })
     }
+
+    // Clear check_out_date to NULL so it is an active assignment (trigger only fires BEFORE INSERT, not UPDATE)
+    await serviceClient
+      .from('resident_assignments')
+      .update({ check_out_date: null })
+      .eq('id', assignmentId)
 
     // 3. Mark Bed Occupied
     await serviceClient
@@ -375,12 +390,14 @@ export async function POST(request: NextRequest) {
 
     // 4. Create Security Deposit Record if specified
     if (deposit_amount_paise && deposit_amount_paise > 0) {
+      const depositId = crypto.randomUUID()
       await serviceClient
         .from('deposits')
         .insert({
+          id: depositId,
           organization_id: orgId,
           resident_id: resident.id,
-          assignment_id: assignment.id,
+          assignment_id: assignmentId,
           amount_paise: deposit_amount_paise,
           received_date: effectiveCheckIn,
           payment_method: deposit_payment_method || 'cash',
@@ -390,6 +407,7 @@ export async function POST(request: NextRequest) {
 
       // Add to Ledger as credit
       await serviceClient.from('ledger_entries').insert({
+        id: crypto.randomUUID(),
         organization_id: orgId,
         resident_id: resident.id,
         entry_date: effectiveCheckIn,
@@ -405,6 +423,7 @@ export async function POST(request: NextRequest) {
 
     // 5. Initial First Month Rent Bill / Ledger Entry
     await serviceClient.from('ledger_entries').insert({
+      id: crypto.randomUUID(),
       organization_id: orgId,
       resident_id: resident.id,
       entry_date: effectiveCheckIn,
@@ -445,6 +464,7 @@ export async function POST(request: NextRequest) {
     // 7. Audit Log
     try {
       await serviceClient.from('audit_logs').insert({
+        id: crypto.randomUUID(),
         organization_id: orgId,
         user_id: validUserId,
         action: 'checkin',
