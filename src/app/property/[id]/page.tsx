@@ -48,6 +48,12 @@ import { MobileBottomNav } from '@/components/marketplace/mobile-bottom-nav'
 import { SavedPropertiesModal } from '@/components/marketplace/saved-properties-modal'
 import { PropertyCard } from '@/components/marketplace/property-card'
 
+const WhatsAppIcon = ({ className = 'h-4 w-4' }: { className?: string }) => (
+  <svg className={`${className} fill-current shrink-0`} viewBox="0 0 24 24">
+    <path d="M17.472 14.382c-.301-.15-1.78-.878-2.056-.978-.275-.1-.476-.15-.676.15-.2.301-.776.978-.952 1.179-.175.2-.351.226-.652.075-.301-.15-1.27-.468-2.42-1.493-.895-.798-1.5-1.784-1.675-2.085-.176-.3-.019-.463.132-.613.135-.135.301-.351.451-.527.151-.175.201-.3.301-.501.1-.2.05-.376-.025-.526-.075-.15-.676-1.63-.927-2.232-.244-.588-.492-.508-.676-.517-.175-.009-.376-.01-.577-.01-.2 0-.526.075-.802.376-.275.301-1.052 1.028-1.052 2.508 0 1.48 1.077 2.909 1.228 3.11.15.2 2.12 3.238 5.136 4.542.717.31 1.277.496 1.714.635.72.228 1.375.196 1.893.118.577-.087 1.78-.727 2.03-1.43.25-.702.25-1.303.176-1.43-.076-.126-.276-.201-.577-.351zM12.04 21.785c-1.767 0-3.5-.472-5.02-1.365l-.36-.21-3.73.978.995-3.636-.23-.367a9.78 9.78 0 0 1-1.503-5.215c0-5.414 4.405-9.82 9.825-9.82 2.624 0 5.09 1.022 6.945 2.879a9.774 9.774 0 0 1 2.872 6.944c0 5.415-4.407 9.82-9.789 9.82zM12.04 0C5.394 0 0 5.394 0 12.04c0 2.12.553 4.19 1.603 6.014L.103 24l6.103-1.602A12.003 12.003 0 0 0 12.04 24c6.647 0 12.04-5.394 12.04-12.04S18.687 0 12.04 0z" />
+  </svg>
+)
+
 interface PropertyPageProps {
   params: Promise<{ id: string }>
 }
@@ -63,6 +69,7 @@ export default function PropertyDetailPage({ params }: PropertyPageProps) {
   const [selectedImageIdx, setSelectedImageIdx] = useState(0)
   const [savedIds, setSavedIds] = useState<string[]>([])
   const [isSavedDrawerOpen, setIsSavedDrawerOpen] = useState(false)
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
   const [selectedAmenityModal, setSelectedAmenityModal] = useState<number | null>(null)
 
@@ -795,16 +802,16 @@ export default function PropertyDetailPage({ params }: PropertyPageProps) {
                   href={whatsappUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#25D366] px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-[#20bd5a] transition active:scale-95"
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] px-4 py-2.5 text-xs font-bold text-white shadow-xs transition active:scale-95 cursor-pointer"
                 >
-                  <MessageSquare className="h-4 w-4" />
+                  <WhatsAppIcon className="h-4 w-4" />
                   <span>Chat on WhatsApp</span>
                 </a>
 
                 {property.owner.phone && (
                   <a
                     href={`tel:${property.owner.phone}`}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs font-bold text-[#17211B] hover:bg-gray-50 transition active:scale-95 shadow-2xs"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs font-bold text-[#17211B] hover:bg-gray-50 transition active:scale-95 shadow-2xs cursor-pointer"
                   >
                     <PhoneCall className="h-4 w-4 text-[#16A34A]" />
                     <span>Call</span>
@@ -815,7 +822,7 @@ export default function PropertyDetailPage({ params }: PropertyPageProps) {
           </div>
 
           {/* Right Column: Sticky Schedule Visit / Instant Booking Form (4 cols) */}
-          <div className="lg:col-span-4 space-y-4 lg:sticky lg:top-20">
+          <div id="booking-section" className="lg:col-span-4 space-y-4 lg:sticky lg:top-20">
             <div className="rounded-3xl border border-gray-200/90 bg-white p-5 shadow-lg space-y-4">
               <div className="border-b border-gray-100 pb-3">
                 <div className="flex items-baseline justify-between">
@@ -848,9 +855,9 @@ export default function PropertyDetailPage({ params }: PropertyPageProps) {
                       href={whatsappUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 rounded-xl bg-[#25D366] px-4 py-2 text-xs font-bold text-white shadow-xs"
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] px-4 py-2.5 text-xs font-bold text-white shadow-xs transition active:scale-95 cursor-pointer"
                     >
-                      <MessageSquare className="h-3.5 w-3.5" />
+                      <WhatsAppIcon className="h-4 w-4" />
                       <span>Confirm on WhatsApp</span>
                     </a>
                   </div>
@@ -967,9 +974,9 @@ export default function PropertyDetailPage({ params }: PropertyPageProps) {
                 href={whatsappUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-1.5 w-full rounded-xl bg-[#25D366] py-2.5 text-xs font-bold text-white shadow-xs hover:bg-[#20bd5a] transition"
+                className="inline-flex items-center justify-center gap-2 w-full rounded-xl bg-[#25D366] hover:bg-[#20bd5a] py-2.5 text-xs font-bold text-white shadow-xs transition active:scale-95 cursor-pointer"
               >
-                <MessageSquare className="h-3.5 w-3.5" />
+                <WhatsAppIcon className="h-4 w-4" />
                 <span>Chat with Owner on WhatsApp</span>
               </a>
             </div>
@@ -1021,38 +1028,60 @@ export default function PropertyDetailPage({ params }: PropertyPageProps) {
         </div>
       </main>
 
-      {/* Sticky Mobile Bottom Booking Bar */}
-      <div className="fixed bottom-14 inset-x-0 z-30 border-t border-gray-200 bg-white/95 px-4 py-2.5 backdrop-blur-md md:hidden shadow-lg flex items-center justify-between gap-3">
-        <div className="min-w-0">
+      {/* Sticky Mobile Bottom Booking & Contact Bar */}
+      <div className="fixed bottom-0 inset-x-0 z-40 border-t border-gray-200/90 bg-white/95 px-4 pt-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-xl md:hidden shadow-[0_-8px_30px_rgba(0,0,0,0.08)] flex items-center justify-between gap-3">
+        {/* Price & Deposit Details */}
+        <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-1">
-            <span className="text-base font-black text-[#14532D]">
+            <span className="text-lg sm:text-xl font-black text-[#14532D] tracking-tight">
               ₹{property.price.toLocaleString('en-IN')}
             </span>
-            <span className="text-[10px] text-[#647067]">/mo</span>
+            <span className="text-xs font-semibold text-gray-500">/mo</span>
           </div>
-          <span className="text-[9px] text-gray-400 truncate block">
-            Deposit: ₹{property.deposit.toLocaleString('en-IN')}
-          </span>
+          <div className="flex items-center gap-1.5 text-[11px] text-gray-500 mt-0.5">
+            <span className="truncate font-medium">
+              Deposit: ₹{property.deposit.toLocaleString('en-IN')}
+            </span>
+            <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/70 shrink-0">
+              Refundable
+            </span>
+          </div>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        {/* Action Buttons: Save, WhatsApp & Schedule Visit */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Wishlist / Save Button */}
+          <button
+            type="button"
+            onClick={() => handleToggleSave(property.id)}
+            className={`flex h-10 w-10 items-center justify-center rounded-2xl border transition active:scale-95 shadow-2xs cursor-pointer ${
+              savedIds.includes(property.id)
+                ? 'border-rose-200 bg-rose-50 text-rose-600'
+                : 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
+            title={savedIds.includes(property.id) ? 'Saved' : 'Save Property'}
+          >
+            <Heart className={`h-4 w-4 ${savedIds.includes(property.id) ? 'fill-rose-600' : ''}`} />
+          </button>
+
+          {/* WhatsApp Direct Chat */}
           <a
             href={whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 rounded-xl bg-[#25D366] px-3 py-2 text-xs font-bold text-white shadow-xs"
+            className="inline-flex items-center justify-center gap-1.5 rounded-2xl bg-[#25D366] hover:bg-[#20bd5a] px-3.5 py-2.5 text-xs font-bold text-white shadow-sm shadow-[#25D366]/25 active:scale-95 transition cursor-pointer"
           >
-            <MessageSquare className="h-3.5 w-3.5" />
-            <span>Chat</span>
+            <WhatsAppIcon className="h-4 w-4" />
+            <span>WhatsApp</span>
           </a>
 
+          {/* Schedule Visit Modal Trigger */}
           <button
-            onClick={() => {
-              window.scrollTo({ top: 400, behavior: 'smooth' })
-            }}
-            className="inline-flex items-center gap-1 rounded-xl bg-[#14532D] px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#16A34A] transition"
+            type="button"
+            onClick={() => setIsScheduleModalOpen(true)}
+            className="inline-flex items-center justify-center gap-1.5 rounded-2xl bg-[#14532D] hover:bg-[#166534] active:bg-[#0f3e21] px-4 py-2.5 text-xs font-black text-white shadow-md shadow-emerald-950/20 active:scale-95 transition cursor-pointer"
           >
-            <Calendar className="h-3.5 w-3.5" />
+            <Calendar className="h-4 w-4" />
             <span>Schedule Visit</span>
           </button>
         </div>
@@ -1061,11 +1090,159 @@ export default function PropertyDetailPage({ params }: PropertyPageProps) {
       {/* Footer */}
       <MarketplaceFooter />
 
-      {/* Mobile Bottom Navigation */}
-      <MobileBottomNav
-        savedCount={savedIds.length}
-        onShowSaved={() => setIsSavedDrawerOpen(true)}
-      />
+      {/* Mobile Schedule Visit Bottom Sheet / Modal */}
+      {isScheduleModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4 backdrop-blur-xs animate-in fade-in">
+          <div className="relative w-full max-w-lg rounded-t-3xl sm:rounded-3xl bg-white p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            {/* Drag handle on mobile */}
+            <div className="sm:hidden w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-1" />
+
+            <button
+              onClick={() => setIsScheduleModalOpen(false)}
+              className="absolute right-4 top-4 text-gray-400 hover:text-gray-700 p-1 cursor-pointer"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-[#14532D] shrink-0">
+                <Calendar className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-gray-900">
+                  Schedule Free Property Visit
+                </h3>
+                <p className="text-xs text-gray-500">
+                  {property.title} • {property.city}
+                </p>
+              </div>
+            </div>
+
+            {visitSubmitted ? (
+              <div className="rounded-2xl bg-[#DCFCE7]/80 p-5 text-center space-y-3 border border-[#16A34A]/40">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#16A34A] text-white shadow-md">
+                  <CheckCircle2 className="h-6 w-6" />
+                </div>
+                <h4 className="text-sm font-black text-[#14532D]">
+                  Visit Scheduled Successfully!
+                </h4>
+                <p className="text-xs text-[#647067]">
+                  The property manager has received your visit request for <strong>{visitForm.visitDate}</strong> ({visitForm.timeSlot}). They will contact you shortly on <strong>+91 {visitForm.phone}</strong>.
+                </p>
+                <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-2">
+                  <a
+                    href={whatsappUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2 w-full sm:w-auto rounded-xl bg-[#25D366] hover:bg-[#20bd5a] px-4 py-2.5 text-xs font-bold text-white shadow-xs"
+                  >
+                    <WhatsAppIcon className="h-4 w-4" />
+                    <span>Confirm on WhatsApp</span>
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setIsScheduleModalOpen(false)}
+                    className="px-4 py-2.5 rounded-xl border border-gray-300 text-xs font-bold text-gray-700 hover:bg-gray-100 transition w-full sm:w-auto cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleVisitSubmit} className="space-y-3.5 text-xs">
+                {/* Date selection */}
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1.5">
+                    Preferred Visit Date
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {['Today', 'Tomorrow', 'This Weekend'].map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => setVisitForm({ ...visitForm, visitDate: d })}
+                        className={`rounded-xl border py-2 text-center text-xs font-bold transition active:scale-95 cursor-pointer ${
+                          visitForm.visitDate === d
+                            ? 'border-[#16A34A] bg-[#DCFCE7] text-[#14532D] shadow-2xs'
+                            : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Time slot */}
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1.5">
+                    Time Slot
+                  </label>
+                  <select
+                    value={visitForm.timeSlot}
+                    onChange={(e) => setVisitForm({ ...visitForm, timeSlot: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50/80 py-2.5 px-3 text-xs font-bold text-gray-800 focus:border-[#16A34A] focus:bg-white focus:outline-none"
+                  >
+                    <option>Morning (10:00 AM – 1:00 PM)</option>
+                    <option>Afternoon (1:00 PM – 4:00 PM)</option>
+                    <option>Evening (4:00 PM – 7:30 PM)</option>
+                  </select>
+                </div>
+
+                {/* Name */}
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1.5">
+                    Your Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Rahul Sharma"
+                    value={visitForm.fullName}
+                    onChange={(e) => setVisitForm({ ...visitForm, fullName: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50/80 py-2.5 px-3 text-xs text-gray-800 placeholder:text-gray-400 focus:border-[#16A34A] focus:bg-white focus:outline-none font-medium"
+                  />
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1.5">
+                    Phone Number (WhatsApp verified) *
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="+91 98765 43210"
+                    value={visitForm.phone}
+                    onChange={(e) => setVisitForm({ ...visitForm, phone: e.target.value })}
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50/80 py-2.5 px-3 text-xs text-gray-800 placeholder:text-gray-400 focus:border-[#16A34A] focus:bg-white focus:outline-none font-medium"
+                  />
+                </div>
+
+                {/* Submit button */}
+                <button
+                  type="submit"
+                  disabled={submittingVisit}
+                  className="w-full rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] py-3 text-xs font-black text-white shadow-md hover:opacity-95 active:scale-98 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {submittingVisit ? (
+                    <span className="inline-block h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Calendar className="h-4 w-4" />
+                      <span>Confirm Free Property Visit</span>
+                    </>
+                  )}
+                </button>
+
+                <p className="text-center text-[10px] text-gray-400">
+                  Zero visit charges · Free instant confirmation · Connect directly with owner
+                </p>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Saved Properties Drawer / Modal */}
       <SavedPropertiesModal

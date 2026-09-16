@@ -26,6 +26,12 @@ import {
 } from 'lucide-react'
 import { PropertyListing } from '@/types/marketplace'
 
+const WhatsAppIcon = ({ className = 'h-4 w-4' }: { className?: string }) => (
+  <svg className={`${className} fill-current shrink-0`} viewBox="0 0 24 24">
+    <path d="M17.472 14.382c-.301-.15-1.78-.878-2.056-.978-.275-.1-.476-.15-.676.15-.2.301-.776.978-.952 1.179-.175.2-.351.226-.652.075-.301-.15-1.27-.468-2.42-1.493-.895-.798-1.5-1.784-1.675-2.085-.176-.3-.019-.463.132-.613.135-.135.301-.351.451-.527.151-.175.201-.3.301-.501.1-.2.05-.376-.025-.526-.075-.15-.676-1.63-.927-2.232-.244-.588-.492-.508-.676-.517-.175-.009-.376-.01-.577-.01-.2 0-.526.075-.802.376-.275.301-1.052 1.028-1.052 2.508 0 1.48 1.077 2.909 1.228 3.11.15.2 2.12 3.238 5.136 4.542.717.31 1.277.496 1.714.635.72.228 1.375.196 1.893.118.577-.087 1.78-.727 2.03-1.43.25-.702.25-1.303.176-1.43-.076-.126-.276-.201-.577-.351zM12.04 21.785c-1.767 0-3.5-.472-5.02-1.365l-.36-.21-3.73.978.995-3.636-.23-.367a9.78 9.78 0 0 1-1.503-5.215c0-5.414 4.405-9.82 9.825-9.82 2.624 0 5.09 1.022 6.945 2.879a9.774 9.774 0 0 1 2.872 6.944c0 5.415-4.407 9.82-9.789 9.82zM12.04 0C5.394 0 0 5.394 0 12.04c0 2.12.553 4.19 1.603 6.014L.103 24l6.103-1.602A12.003 12.003 0 0 0 12.04 24c6.647 0 12.04-5.394 12.04-12.04S18.687 0 12.04 0z" />
+  </svg>
+)
+
 interface PropertyDetailModalProps {
   property: PropertyListing | null
   onClose: () => void
@@ -385,9 +391,9 @@ export function PropertyDetailModal({
                     href={whatsappUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-1.5 rounded-xl bg-[#25D366] py-2 text-xs font-bold text-white hover:opacity-95"
+                    className="flex items-center justify-center gap-2 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] py-2.5 px-3 text-xs font-bold text-white shadow-xs transition active:scale-95 cursor-pointer"
                   >
-                    <MessageSquare className="h-3.5 w-3.5" />
+                    <WhatsAppIcon className="h-4 w-4" />
                     <span>Chat on WhatsApp</span>
                   </a>
                 </div>
@@ -425,8 +431,9 @@ export function PropertyDetailModal({
                       href={whatsappUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-[#14532D] px-4 py-2 text-xs font-bold text-white"
+                      className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] px-4 py-2.5 text-xs font-bold text-white shadow-xs transition active:scale-95 cursor-pointer"
                     >
+                      <WhatsAppIcon className="h-4 w-4" />
                       <span>Open WhatsApp Now</span>
                     </a>
                   </div>

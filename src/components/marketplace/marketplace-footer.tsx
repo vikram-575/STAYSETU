@@ -142,7 +142,7 @@ export function MarketplaceFooter() {
                 <span className="hover:text-[#16A34A] py-0.5 inline-block cursor-pointer transition">Automated Rent Invoicing</span>
               </li>
               <li>
-                <span className="hover:text-[#16A34A] py-0.5 inline-block cursor-pointer transition">Daily Closing & Ledger</span>
+                <span className="hover:text-[#16A34A] py-0.5 inline-block cursor-pointer transition">Sub-Meter Split & Rent Ledger</span>
               </li>
             </ul>
           </div>
