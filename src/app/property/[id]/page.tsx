@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, use } from 'react'
+import React, { useState, useEffect, use, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -44,7 +44,6 @@ import {
 import { PropertyListing } from '@/types/marketplace'
 import { MarketplaceNavbar } from '@/components/marketplace/marketplace-navbar'
 import { MarketplaceFooter } from '@/components/marketplace/marketplace-footer'
-import { MobileBottomNav } from '@/components/marketplace/mobile-bottom-nav'
 import { SavedPropertiesModal } from '@/components/marketplace/saved-properties-modal'
 import { PropertyCard } from '@/components/marketplace/property-card'
 
@@ -72,6 +71,8 @@ export default function PropertyDetailPage({ params }: PropertyPageProps) {
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
   const [selectedAmenityModal, setSelectedAmenityModal] = useState<number | null>(null)
+  const [isBottomBarVisible, setIsBottomBarVisible] = useState(true)
+  const lastScrollY = useRef(0)
 
   // Visit / Booking Form State
   const [visitForm, setVisitForm] = useState({
@@ -135,6 +136,54 @@ export default function PropertyDetailPage({ params }: PropertyPageProps) {
       isMounted = false
     }
   }, [propertyId])
+
+  // Scroll listener: Hides mobile booking bar on scroll down, shows on scroll up or at page boundaries
+  useEffect(() => {
+    let ticking = false
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const currentScrollY = window.scrollY
+          const scrollHeight = document.documentElement.scrollHeight
+          const clientHeight = window.innerHeight
+
+          // Always show near the top of the page
+          if (currentScrollY < 50) {
+            setIsBottomBarVisible(true)
+            lastScrollY.current = currentScrollY
+            ticking = false
+            return
+          }
+
+          // Always show when reached the bottom of page
+          if (currentScrollY + clientHeight >= scrollHeight - 40) {
+            setIsBottomBarVisible(true)
+            lastScrollY.current = currentScrollY
+            ticking = false
+            return
+          }
+
+          const diff = currentScrollY - lastScrollY.current
+          // Threshold of 10px to ignore minor tap jitter
+          if (Math.abs(diff) > 10) {
+            if (diff > 0) {
+              // Scrolling down -> hide
+              setIsBottomBarVisible(false)
+            } else {
+              // Scrolling up -> show
+              setIsBottomBarVisible(true)
+            }
+            lastScrollY.current = currentScrollY
+          }
+          ticking = false
+        })
+        ticking = true
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   // Toggle Save
   const handleToggleSave = (id: string) => {
@@ -520,42 +569,6 @@ export default function PropertyDetailPage({ params }: PropertyPageProps) {
                   <CheckCircle className="h-3.5 w-3.5 text-[#16A34A]" />
                   <span>Move-in: <strong>{property.availableFrom || 'Immediate'}</strong></span>
                 </span>
-              </div>
-            </div>
-
-            {/* Mobile Quick Action Bar (moves with scrollbar, clean spacing) */}
-            <div className="md:hidden rounded-2xl border border-emerald-200/80 bg-gradient-to-r from-emerald-50/70 via-white to-emerald-50/50 p-3.5 shadow-xs flex items-center justify-between gap-2.5">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-baseline gap-1">
-                  <span className="text-base font-black text-[#14532D] tracking-tight">
-                    ₹{property.price.toLocaleString('en-IN')}
-                  </span>
-                  <span className="text-[10px] font-semibold text-gray-500">/mo</span>
-                </div>
-                <p className="text-[10px] text-gray-500 truncate font-medium">
-                  Deposit: ₹{property.deposit.toLocaleString('en-IN')}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <a
-                  href={whatsappUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] px-3 py-2 text-xs font-bold text-white shadow-xs active:scale-95 transition cursor-pointer whitespace-nowrap"
-                >
-                  <WhatsAppIcon className="h-3.5 w-3.5" />
-                  <span>WhatsApp</span>
-                </a>
-
-                <button
-                  type="button"
-                  onClick={() => setIsScheduleModalOpen(true)}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#14532D] hover:bg-[#166534] active:bg-[#0f3e21] px-3.5 py-2 text-xs font-bold text-white shadow-xs active:scale-95 transition cursor-pointer whitespace-nowrap"
-                >
-                  <Calendar className="h-3.5 w-3.5" />
-                  <span>Schedule Visit</span>
-                </button>
               </div>
             </div>
 
@@ -1061,60 +1074,62 @@ export default function PropertyDetailPage({ params }: PropertyPageProps) {
               Explore more verified listings in <Link href="/search" className="font-bold text-[#14532D] underline">Search PG</Link>.
             </div>
           )}
-
-          {/* Mobile Bottom Booking & Contact Bar (moves with scrollbar) */}
-          <div className="md:hidden rounded-3xl border border-gray-200/90 bg-gradient-to-r from-emerald-50/70 via-white to-emerald-50/50 p-4 shadow-sm flex items-center justify-between gap-3">
-            {/* Price & Deposit Details */}
-            <div className="min-w-0 flex-1">
-              <div className="flex items-baseline gap-1">
-                <span className="text-lg sm:text-xl font-black text-[#14532D] tracking-tight">
-                  ₹{property.price.toLocaleString('en-IN')}
-                </span>
-                <span className="text-xs font-semibold text-gray-500">/mo</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[11px] text-gray-500 mt-0.5">
-                <span className="truncate font-medium">
-                  Deposit: ₹{property.deposit.toLocaleString('en-IN')}
-                </span>
-                <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/70 shrink-0">
-                  Refundable
-                </span>
-              </div>
-            </div>
-
-            {/* Action Buttons: WhatsApp & Schedule Visit (No saved button) */}
-            <div className="flex items-center gap-2 shrink-0">
-              <a
-                href={whatsappUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-1.5 rounded-2xl bg-[#25D366] hover:bg-[#20bd5a] px-3.5 py-2.5 text-xs font-bold text-white shadow-sm shadow-[#25D366]/20 active:scale-95 transition cursor-pointer whitespace-nowrap"
-              >
-                <WhatsAppIcon className="h-4 w-4" />
-                <span>WhatsApp</span>
-              </a>
-
-              <button
-                type="button"
-                onClick={() => setIsScheduleModalOpen(true)}
-                className="inline-flex items-center justify-center gap-1.5 rounded-2xl bg-[#14532D] hover:bg-[#166534] active:bg-[#0f3e21] px-4 py-2.5 text-xs font-black text-white shadow-sm active:scale-95 transition cursor-pointer whitespace-nowrap"
-              >
-                <Calendar className="h-4 w-4" />
-                <span>Schedule Visit</span>
-              </button>
-            </div>
-          </div>
         </div>
       </main>
 
       {/* Footer */}
       <MarketplaceFooter />
 
-      {/* Mobile Bottom Navigation (Home, Search PG, Portal, Saved, Profile) */}
-      <MobileBottomNav
-        savedCount={savedIds.length}
-        onShowSaved={() => setIsSavedDrawerOpen(true)}
-      />
+      {/* Floating Mobile Booking Bar: Hides smoothly on scroll down, comes back on scroll up */}
+      <div
+        className={`fixed bottom-0 inset-x-0 z-40 border-t border-gray-200/90 bg-white/95 px-4 pt-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-xl md:hidden shadow-[0_-8px_30px_rgba(0,0,0,0.1)] transition-transform duration-300 ease-in-out ${
+          isBottomBarVisible
+            ? 'translate-y-0'
+            : 'translate-y-full pointer-events-none'
+        }`}
+      >
+        <div className="flex items-center justify-between gap-3">
+          {/* Price & Deposit Details */}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline gap-1">
+              <span className="text-lg sm:text-xl font-black text-[#14532D] tracking-tight">
+                ₹{property.price.toLocaleString('en-IN')}
+              </span>
+              <span className="text-xs font-semibold text-gray-500">/mo</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-[11px] text-gray-500 mt-0.5">
+              <span className="truncate font-medium">
+                Deposit: ₹{property.deposit.toLocaleString('en-IN')}
+              </span>
+              <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/70 shrink-0">
+                Refundable
+              </span>
+            </div>
+          </div>
+
+          {/* Action Buttons: Only WhatsApp & Schedule Visit */}
+          <div className="flex items-center gap-2 shrink-0">
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-1.5 rounded-2xl bg-[#25D366] hover:bg-[#20bd5a] px-3.5 py-2.5 text-xs font-bold text-white shadow-sm shadow-[#25D366]/20 active:scale-95 transition cursor-pointer whitespace-nowrap"
+            >
+              <WhatsAppIcon className="h-4 w-4" />
+              <span>WhatsApp</span>
+            </a>
+
+            <button
+              type="button"
+              onClick={() => setIsScheduleModalOpen(true)}
+              className="inline-flex items-center justify-center gap-1.5 rounded-2xl bg-[#14532D] hover:bg-[#166534] active:bg-[#0f3e21] px-4 py-2.5 text-xs font-black text-white shadow-sm active:scale-95 transition cursor-pointer whitespace-nowrap"
+            >
+              <Calendar className="h-4 w-4" />
+              <span>Schedule Visit</span>
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* Mobile Schedule Visit Bottom Sheet / Modal */}
       {isScheduleModalOpen && (
