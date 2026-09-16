@@ -2,6 +2,7 @@
 
 import React from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   Building2,
   PlusCircle,
@@ -18,8 +19,23 @@ interface OwnerCtaBannerProps {
 }
 
 export function OwnerCtaBanner({ onOpenListModal }: OwnerCtaBannerProps) {
+  const router = useRouter()
   const { content } = useWebsiteContent()
   const cta = content?.ownerCta
+
+  const handleListClick = async () => {
+    try {
+      const res = await fetch('/api/auth/session')
+      if (res.ok) {
+        const data = await res.json()
+        if (data?.user && ['resident', 'tenant', 'user'].includes(data.user.role)) {
+          router.push('/login?role=owner')
+          return
+        }
+      }
+    } catch {}
+    onOpenListModal()
+  }
 
   return (
     <section className="bg-white py-6 sm:py-16 lg:py-20 relative">
@@ -63,7 +79,7 @@ export function OwnerCtaBanner({ onOpenListModal }: OwnerCtaBannerProps) {
             {/* CTAs */}
             <div className="mt-5 sm:mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3.5">
               <button
-                onClick={onOpenListModal}
+                onClick={handleListClick}
                 className="inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl bg-white px-4 sm:px-6 py-2.5 sm:py-3 text-xs sm:text-sm font-extrabold text-[#14532D] shadow-md hover:bg-gray-100 active:scale-98 transition w-full sm:w-auto"
               >
                 <PlusCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#16A34A]" />

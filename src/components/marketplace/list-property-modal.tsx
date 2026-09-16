@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   X,
   CheckCircle,
@@ -59,6 +59,40 @@ const ALL_AMENITIES = [
 export function ListPropertyModal({ isOpen, onClose, onListingCreated }: ListPropertyModalProps) {
   const [currentStep, setCurrentStep] = useState(1)
   const [isSubmitted, setIsSubmitted] = useState(false)
+
+  // Redirect resident/tenant to login and prefill owner details when modal is opened
+  useEffect(() => {
+    if (!isOpen) return
+    let isMounted = true
+
+    fetch('/api/auth/session')
+      .then((res) => res.json())
+      .then((data) => {
+        if (!isMounted) return
+        if (data?.user) {
+          // If logged in as resident or tenant, redirect to login page immediately
+          if (['resident', 'tenant', 'user'].includes(data.user.role)) {
+            onClose()
+            window.location.href = '/login?role=owner'
+            return
+          }
+          // If owner or staff, prefill owner details in form
+          setFormData((prev) => ({
+            ...prev,
+            ownerName: prev.ownerName || data.user.full_name || '',
+            ownerPhone: prev.ownerPhone || data.user.phone || '',
+            ownerWhatsapp: prev.ownerWhatsapp || data.user.phone || '',
+            ownerEmail: prev.ownerEmail || data.user.email || '',
+            city: prev.city || data.user.organizations?.city || 'Bangalore',
+          }))
+        }
+      })
+      .catch(() => {})
+
+    return () => {
+      isMounted = false
+    }
+  }, [isOpen, onClose])
 
   const [formData, setFormData] = useState<NewListingFormData>({
     propertyType: 'pg',

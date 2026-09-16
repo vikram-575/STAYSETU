@@ -46,6 +46,7 @@ import { MarketplaceNavbar } from '@/components/marketplace/marketplace-navbar'
 import { MarketplaceFooter } from '@/components/marketplace/marketplace-footer'
 import { SavedPropertiesModal } from '@/components/marketplace/saved-properties-modal'
 import { PropertyCard } from '@/components/marketplace/property-card'
+import { ListPropertyModal } from '@/components/marketplace/list-property-modal'
 
 const WhatsAppIcon = ({ className = 'h-4 w-4' }: { className?: string }) => (
   <svg className={`${className} fill-current shrink-0`} viewBox="0 0 24 24">
@@ -69,6 +70,7 @@ export default function PropertyDetailPage({ params }: PropertyPageProps) {
   const [savedIds, setSavedIds] = useState<string[]>([])
   const [isSavedDrawerOpen, setIsSavedDrawerOpen] = useState(false)
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false)
+  const [isListModalOpen, setIsListModalOpen] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
   const [selectedAmenityModal, setSelectedAmenityModal] = useState<number | null>(null)
   const [isBottomBarVisible, setIsBottomBarVisible] = useState(true)
@@ -267,7 +269,7 @@ export default function PropertyDetailPage({ params }: PropertyPageProps) {
   if (!property) {
     return (
       <div className="min-h-screen bg-[#F7FAF7] flex flex-col">
-        <MarketplaceNavbar onOpenListModal={() => {}} savedCount={savedIds.length} />
+        <MarketplaceNavbar onOpenListModal={() => setIsListModalOpen(true)} savedCount={savedIds.length} />
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
           <Building2 className="h-16 w-16 text-gray-300 mb-3" />
           <h2 className="text-xl font-bold text-[#14532D]">Property Not Found</h2>
@@ -277,7 +279,7 @@ export default function PropertyDetailPage({ params }: PropertyPageProps) {
           <div className="mt-4">
             <Link
               href="/search"
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#16A34A] transition"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#166534] transition"
             >
               <Sparkles className="h-3.5 w-3.5" />
               <span>Browse Verified PGs</span>
@@ -295,7 +297,7 @@ export default function PropertyDetailPage({ params }: PropertyPageProps) {
     <div className="min-h-screen bg-[#F7FAF7] flex flex-col pb-20 md:pb-0">
       {/* Top Navbar */}
       <MarketplaceNavbar
-        onOpenListModal={() => {}}
+        onOpenListModal={() => setIsListModalOpen(true)}
         savedCount={savedIds.length}
         compareCount={0}
         onShowSaved={() => setIsSavedDrawerOpen(true)}
@@ -1291,6 +1293,12 @@ export default function PropertyDetailPage({ params }: PropertyPageProps) {
         onClose={() => setIsSavedDrawerOpen(false)}
         savedIds={savedIds}
         onToggleSave={handleToggleSave}
+      />
+
+      {/* List Property Modal */}
+      <ListPropertyModal
+        isOpen={isListModalOpen}
+        onClose={() => setIsListModalOpen(false)}
       />
     </div>
   )

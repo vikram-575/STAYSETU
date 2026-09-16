@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   Building2,
   PlusCircle,
@@ -37,10 +38,20 @@ export function MarketplaceNavbar({
   onScrollToSection,
   onShowSaved,
 }: MarketplaceNavbarProps) {
+  const router = useRouter()
+  const { content } = useWebsiteContent()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [loadingUser, setLoadingUser] = useState(true)
-  const { content } = useWebsiteContent()
+
+  const handleListPropertyClick = () => {
+    if (currentUser && ['resident', 'tenant', 'user'].includes(currentUser.role)) {
+      router.push('/login?role=owner')
+      return
+    }
+    onOpenListModal()
+  }
+
   const announcement = content?.announcement
 
   // Check login state on mount
@@ -244,6 +255,17 @@ export function MarketplaceNavbar({
                 </Link>
               )}
 
+              {/* Owner List PG CTA button */}
+              {(currentUser.role === 'owner' || currentUser.role === 'superadmin') && (
+                <button
+                  onClick={handleListPropertyClick}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:opacity-95 transition"
+                >
+                  <PlusCircle className="h-3.5 w-3.5" />
+                  <span>+ List PG</span>
+                </button>
+              )}
+
               {/* Sign Out Button */}
               <button
                 onClick={handleSignOut}
@@ -266,7 +288,7 @@ export function MarketplaceNavbar({
 
               {/* List Your Property CTA Button */}
               <button
-                onClick={onOpenListModal}
+                onClick={handleListPropertyClick}
                 className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:opacity-95 active:scale-98 transition"
               >
                 <PlusCircle className="h-4 w-4" />
@@ -407,7 +429,7 @@ export function MarketplaceNavbar({
                   <button
                     onClick={() => {
                       setMobileMenuOpen(false)
-                      onOpenListModal()
+                      handleListPropertyClick()
                     }}
                     className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-[#14532D] py-2 text-xs font-bold text-white shadow-xs"
                   >
@@ -437,7 +459,7 @@ export function MarketplaceNavbar({
                 <button
                   onClick={() => {
                     setMobileMenuOpen(false)
-                    onOpenListModal()
+                    handleListPropertyClick()
                   }}
                   className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] py-3 text-sm font-bold text-white shadow-sm"
                 >

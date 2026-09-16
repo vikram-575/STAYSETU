@@ -13,6 +13,7 @@ import {
   HeartHandshake, ChevronDown, Filter, AlertTriangle, BedDouble, TrendingUp, Plus,
   Camera, UploadCloud, Trash2, Image as ImageIcon
 } from 'lucide-react'
+import { ListPropertyModal } from '@/components/marketplace/list-property-modal'
 
 type ProfileTab = 'properties' | 'overview' | 'passbook' | 'stays' | 'kyc'
 
@@ -34,6 +35,7 @@ function MyProfileContent() {
   const [hostedProperties, setHostedProperties] = useState<any[]>([])
   const [propertyStats, setPropertyStats] = useState<any>(null)
   const [isPropertyModalOpen, setIsPropertyModalOpen] = useState(false)
+  const [isListPropertyWizardOpen, setIsListPropertyWizardOpen] = useState(false)
   const [editingProperty, setEditingProperty] = useState<any>(null)
 
   // Property Form State
@@ -313,6 +315,78 @@ function MyProfileContent() {
     }
     loadSession()
   }, [])
+
+  // Open 10-Step List Property Wizard (Modal shown in screenshot media_1789545136103.jpg)
+  const handleOpenAddProperty = () => {
+    // If resident or tenant, redirect them to login page immediately
+    if (currentUser && ['resident', 'tenant', 'user'].includes(currentUser.role)) {
+      router.push('/login?role=owner')
+      return
+    }
+    setIsListPropertyWizardOpen(true)
+  }
+
+  // Handle callback when 10-step wizard completes and creates a listing
+  const handleWizardListingCreated = async (formData: any) => {
+    try {
+      const res = await fetch('/api/properties/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          is_new: true,
+          organization_id: currentUser?.organization_id,
+          name: formData.propertyName,
+          phone: formData.ownerPhone || currentUser?.phone,
+          email: formData.ownerEmail || currentUser?.email,
+          address: formData.fullAddress || formData.locality || '',
+          city: formData.city,
+          state: '',
+          pincode: formData.pincode || '',
+          description: formData.tagline || '',
+          starting_rent_paise: Number(formData.rentMonthly || 0) * 100,
+          notice_period_days: Number(formData.noticePeriodDays || 30),
+          gate_closing_time: formData.gateClosingTime || '11:00 PM',
+          amenities: formData.amenities || [],
+          rules: [
+            `Gate closes at ${formData.gateClosingTime || '11:00 PM'}`,
+            formData.visitorsAllowed ? 'Visitors allowed in common areas' : 'Visitors not allowed',
+            formData.smokingAllowed ? 'Smoking permitted in designated zones' : 'Strictly no smoking',
+            formData.drinkingAllowed ? 'Alcohol permitted' : 'Alcohol prohibited',
+            formData.petFriendly ? 'Pet friendly premises' : 'No pets allowed',
+          ].filter(Boolean),
+          images: formData.imageUrls || [],
+          coverImage: formData.imageUrls?.[0] || '',
+        }),
+      })
+
+      if (res.ok) {
+        const resData = await res.json()
+        const returnedProp = resData.property
+        const newEntry = {
+          id: returnedProp?.id || `prop-${Date.now()}`,
+          organization_id: returnedProp?.organization_id || currentUser?.organization_id,
+          name: formData.propertyName,
+          phone: formData.ownerPhone || currentUser?.phone,
+          email: formData.ownerEmail || currentUser?.email,
+          address: formData.fullAddress || formData.locality || '',
+          city: formData.city,
+          description: formData.tagline || '',
+          settings: {
+            starting_rent_paise: Number(formData.rentMonthly || 0) * 100,
+            notice_period_days: Number(formData.noticePeriodDays || 30),
+            gate_closing_time: formData.gateClosingTime || '11:00 PM',
+            amenities: formData.amenities || [],
+            images: formData.imageUrls || [],
+            coverImage: formData.imageUrls?.[0] || '',
+          },
+        }
+        setHostedProperties((prev) => [newEntry, ...(prev || [])])
+        setActiveTab('properties')
+      }
+    } catch (e) {
+      console.error('Failed to save listing from wizard:', e)
+    }
+  }
 
   const handleOpenPropertyModal = (prop?: any) => {
     const target = prop || null
@@ -708,7 +782,7 @@ function MyProfileContent() {
             {isOwner ? (
               <div className="flex items-center gap-1.5">
                 <button
-                  onClick={() => handleOpenPropertyModal(null)}
+                  onClick={handleOpenAddProperty}
                   className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-2.5 sm:px-3 py-1.5 text-[11px] sm:text-xs font-bold text-white shadow-xs hover:bg-emerald-700 active:scale-95 transition cursor-pointer"
                 >
                   <Plus className="h-3.5 w-3.5" />
@@ -883,7 +957,7 @@ function MyProfileContent() {
               {isOwner ? (
                 <>
                   <button
-                    onClick={() => handleOpenPropertyModal(null)}
+                    onClick={handleOpenAddProperty}
                     className="inline-flex items-center gap-1 rounded-xl bg-emerald-400 text-emerald-950 px-2.5 py-1 text-[11px] font-bold hover:bg-emerald-300 active:scale-95 transition shadow-xs cursor-pointer"
                   >
                     <Plus className="h-3 w-3" />
@@ -933,7 +1007,7 @@ function MyProfileContent() {
           <div className="grid grid-cols-4 gap-2 sm:gap-3">
             {/* 1. Add Property Modal */}
             <button
-              onClick={() => handleOpenPropertyModal(null)}
+              onClick={handleOpenAddProperty}
               className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-emerald-200 shadow-xs hover:border-emerald-400 active:scale-95 transition text-center group cursor-pointer"
             >
               <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 group-hover:bg-[#14532D] group-hover:text-white transition">
@@ -1257,7 +1331,7 @@ function MyProfileContent() {
               </div>
 
               <button
-                onClick={() => handleOpenPropertyModal(null)}
+                onClick={handleOpenAddProperty}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#166534] transition active:scale-95 cursor-pointer"
               >
                 <Plus className="h-3.5 w-3.5" />
@@ -1284,7 +1358,7 @@ function MyProfileContent() {
                 </p>
                 <div className="pt-2">
                   <button
-                    onClick={() => handleOpenPropertyModal(null)}
+                    onClick={handleOpenAddProperty}
                     className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-4 py-2 text-xs font-bold text-white hover:bg-[#166534] transition active:scale-95 shadow-xs cursor-pointer"
                   >
                     <Plus className="h-4 w-4" />
@@ -1522,7 +1596,7 @@ function MyProfileContent() {
                 {/* Add Another PG Property Dashed Card */}
                 <button
                   type="button"
-                  onClick={() => handleOpenPropertyModal(null)}
+                  onClick={handleOpenAddProperty}
                   className="w-full rounded-3xl border-2 border-dashed border-emerald-300 hover:border-emerald-500 bg-emerald-50/40 hover:bg-emerald-50/80 p-5 sm:p-6 flex flex-col items-center justify-center gap-2 transition group cursor-pointer"
                 >
                   <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[#14532D] shadow-xs group-hover:scale-110 transition">
@@ -1650,7 +1724,7 @@ function MyProfileContent() {
                         <span>Edit Details</span>
                       </button>
                       <button
-                        onClick={() => handleOpenPropertyModal(null)}
+                        onClick={handleOpenAddProperty}
                         className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#166534] active:scale-95 transition cursor-pointer"
                       >
                         <Plus className="h-3.5 w-3.5" />
@@ -1697,7 +1771,7 @@ function MyProfileContent() {
                   </p>
                   <div className="mt-4">
                     <button
-                      onClick={() => handleOpenPropertyModal(null)}
+                      onClick={handleOpenAddProperty}
                       className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#166534] transition cursor-pointer"
                     >
                       <Plus className="h-4 w-4" />
@@ -3389,6 +3463,13 @@ function MyProfileContent() {
           </div>
         </div>
       )}
+
+      {/* 12. MODAL 8: 10-STEP LIST PROPERTY WIZARD (Wizard Modal shown in screenshot) */}
+      <ListPropertyModal
+        isOpen={isListPropertyWizardOpen}
+        onClose={() => setIsListPropertyWizardOpen(false)}
+        onListingCreated={handleWizardListingCreated}
+      />
 
       {/* Share Toast */}
       {sharedToast && (
