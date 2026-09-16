@@ -10,7 +10,8 @@ import {
   KeyRound, PlusCircle, ExternalLink, ShieldAlert, AlertCircle, X,
   Download, FileText, Wallet, Receipt, CreditCard, ChevronRight, Award, Shield,
   CheckCircle, MapPin, QrCode, Share2, Sparkles, Zap, Smartphone,
-  HeartHandshake, ChevronDown, Filter, AlertTriangle, BedDouble, TrendingUp, Plus
+  HeartHandshake, ChevronDown, Filter, AlertTriangle, BedDouble, TrendingUp, Plus,
+  Camera, UploadCloud, Trash2, Image as ImageIcon
 } from 'lucide-react'
 
 type ProfileTab = 'properties' | 'overview' | 'passbook' | 'stays' | 'kyc'
@@ -59,6 +60,25 @@ function MyProfileContent() {
   const [propSaveSuccess, setPropSaveSuccess] = useState('')
   const [propSaveError, setPropSaveError] = useState('')
 
+  // Property Photos & Local Upload State (Min 5 recommended)
+  const [propPhotos, setPropPhotos] = useState<string[]>([])
+  const [isUploadingPhotos, setIsUploadingPhotos] = useState(false)
+
+  // Property Deletion State
+  const [deletingProperty, setDeletingProperty] = useState<any>(null)
+  const [isDeletingProperty, setIsDeletingProperty] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const [deleteSuccess, setDeleteSuccess] = useState('')
+
+  const SAMPLE_PG_PHOTOS = [
+    'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80',
+  ]
+
   const ALL_AMENITIES = [
     'High-Speed WiFi',
     'Air Conditioning',
@@ -93,6 +113,114 @@ function MyProfileContent() {
     setPropRules((prev) =>
       prev.includes(item) ? prev.filter((r) => r !== item) : [...prev, item]
     )
+  }
+
+  // Compress and optimize local photo via client-side HTML5 canvas
+  const optimizeImageFile = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const img = new (window as any).Image()
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          let { width, height } = img
+          const MAX_DIM = 1280
+          if (width > MAX_DIM || height > MAX_DIM) {
+            if (width > height) {
+              height = Math.round((height * MAX_DIM) / width)
+              width = MAX_DIM
+            } else {
+              width = Math.round((width * MAX_DIM) / height)
+              height = MAX_DIM
+            }
+          }
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')
+          if (!ctx) {
+            resolve(event.target?.result as string)
+            return
+          }
+          ctx.drawImage(img, 0, 0, width, height)
+          resolve(canvas.toDataURL('image/jpeg', 0.82))
+        }
+        img.onerror = () => resolve(event.target?.result as string)
+        img.src = event.target?.result as string
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  }
+
+  // Multi-photo upload from local files
+  const handleLocalPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    setIsUploadingPhotos(true)
+    setPropSaveError('')
+    try {
+      const fileList = Array.from(files)
+      const compressedPhotos = await Promise.all(
+        fileList.map((f) => optimizeImageFile(f))
+      )
+      setPropPhotos((prev) => [...prev, ...compressedPhotos])
+    } catch (err: any) {
+      console.error('Error processing photos:', err)
+      setPropSaveError('Failed to process some images. Please try standard JPG or PNG files.')
+    } finally {
+      setIsUploadingPhotos(false)
+      e.target.value = ''
+    }
+  }
+
+  const handleRemovePhoto = (indexToRemove: number) => {
+    setPropPhotos((prev) => prev.filter((_, idx) => idx !== indexToRemove))
+  }
+
+  const handleMakeCoverPhoto = (indexToCover: number) => {
+    setPropPhotos((prev) => {
+      const coverItem = prev[indexToCover]
+      const rest = prev.filter((_, idx) => idx !== indexToCover)
+      return [coverItem, ...rest]
+    })
+  }
+
+  const handleAddSamplePhotos = () => {
+    setPropPhotos((prev) => {
+      const combined = [...prev]
+      SAMPLE_PG_PHOTOS.forEach((sample) => {
+        if (!combined.includes(sample)) {
+          combined.push(sample)
+        }
+      })
+      return combined.slice(0, 10)
+    })
+  }
+
+  // Confirm delete property handler
+  const handleConfirmDeleteProperty = async () => {
+    if (!deletingProperty?.id) return
+    setIsDeletingProperty(true)
+    setDeleteError('')
+    try {
+      const res = await fetch('/api/properties/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ property_id: deletingProperty.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to delete property')
+
+      setHostedProperties((prev) => prev.filter((p) => p.id !== deletingProperty.id))
+      setDeleteSuccess(data.message || `Property "${deletingProperty.name}" deleted successfully.`)
+      setDeletingProperty(null)
+      setTimeout(() => setDeleteSuccess(''), 4000)
+    } catch (err: any) {
+      setDeleteError(err.message || 'Failed to delete property')
+    } finally {
+      setIsDeletingProperty(false)
+    }
   }
 
   // Modals state
@@ -202,6 +330,7 @@ function MyProfileContent() {
     setPropPincode(target?.pincode || '')
     setPropDescription(target?.description || '')
     const s = target?.settings || {}
+    setPropPhotos(Array.isArray(s.images) && s.images.length > 0 ? s.images : [])
     setPropRent(s.starting_rent_paise ? String(Math.round(s.starting_rent_paise / 100)) : (s.starting_rent ? String(s.starting_rent) : '7500'))
     setPropNoticePeriod(s.notice_period_days ? String(s.notice_period_days) : '30')
     setPropLockIn(s.lock_in_months ? String(s.lock_in_months) : '3')
@@ -257,6 +386,8 @@ function MyProfileContent() {
           amenities: propAmenities,
           rules: propRules,
           upi_id: propUpiId,
+          images: propPhotos,
+          coverImage: propPhotos[0] || '',
         }),
       })
 
@@ -287,6 +418,8 @@ function MyProfileContent() {
           amenities: propAmenities,
           rules: propRules,
           upi_id: propUpiId,
+          images: propPhotos,
+          coverImage: propPhotos[0] || '',
         },
       }
 
@@ -1132,6 +1265,13 @@ function MyProfileContent() {
               </button>
             </div>
 
+            {deleteSuccess && (
+              <div className="flex items-center gap-2 rounded-2xl bg-emerald-50 p-3.5 text-xs font-bold text-[#14532D] border border-emerald-200">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                <span>{deleteSuccess}</span>
+              </div>
+            )}
+
             {/* Hosted Properties Cards or Empty State */}
             {hostedProperties.length === 0 ? (
               <div className="rounded-3xl border border-dashed border-gray-300 bg-white p-8 text-center space-y-3">
@@ -1145,7 +1285,7 @@ function MyProfileContent() {
                 <div className="pt-2">
                   <button
                     onClick={() => handleOpenPropertyModal(null)}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-4 py-2 text-xs font-bold text-white hover:bg-[#166534] transition active:scale-95 shadow-xs"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-4 py-2 text-xs font-bold text-white hover:bg-[#166534] transition active:scale-95 shadow-xs cursor-pointer"
                   >
                     <Plus className="h-4 w-4" />
                     <span>List New Property</span>
@@ -1194,10 +1334,21 @@ function MyProfileContent() {
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDeletingProperty(prop)
+                            setDeleteError('')
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition active:scale-95 cursor-pointer"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span>Delete Property</span>
+                        </button>
                         <button
                           onClick={() => handleOpenPropertyModal(prop)}
-                          className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-600 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-[#14532D] hover:bg-emerald-100 transition active:scale-95"
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-600 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-[#14532D] hover:bg-emerald-100 transition active:scale-95 cursor-pointer"
                         >
                           <Edit className="h-3.5 w-3.5" />
                           <span>Edit Details</span>
@@ -1213,6 +1364,40 @@ function MyProfileContent() {
                         </a>
                       </div>
                     </div>
+
+                    {/* Photos Gallery Strip if available */}
+                    {Array.isArray(s.images) && s.images.length > 0 && (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="font-bold text-gray-600 flex items-center gap-1">
+                            <ImageIcon className="h-3.5 w-3.5 text-emerald-600" />
+                            <span>Property Photos ({s.images.length})</span>
+                          </span>
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                            {s.images.length >= 5 ? '✓ 5+ Photos Verified' : `${s.images.length}/5 Photos`}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                          {s.images.map((imgUrl: string, pIdx: number) => (
+                            <div
+                              key={pIdx}
+                              className="relative h-20 w-28 shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-gray-100 group shadow-2xs"
+                            >
+                              <img
+                                src={imgUrl}
+                                alt={`Property photo ${pIdx + 1}`}
+                                className="h-full w-full object-cover group-hover:scale-105 transition"
+                              />
+                              {pIdx === 0 && (
+                                <span className="absolute bottom-1 left-1 rounded-md bg-black/70 px-1.5 py-0.5 text-[9px] font-extrabold text-white backdrop-blur-xs">
+                                  Cover
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Description */}
                     {prop.description && (
@@ -2858,6 +3043,121 @@ function MyProfileContent() {
                 </div>
               </div>
 
+              {/* Property Photos & Gallery (Minimum 5 Photos) */}
+              <div className="space-y-3 pt-2 border-t border-gray-100">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <Camera className="h-4 w-4 text-[#14532D]" />
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700">
+                      Property Photos & Gallery
+                    </h4>
+                  </div>
+                  <span
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition ${
+                      propPhotos.length >= 5
+                        ? 'bg-emerald-100 text-[#14532D] border-emerald-300'
+                        : 'bg-amber-100 text-amber-900 border-amber-300'
+                    }`}
+                  >
+                    {propPhotos.length} / 5 Photos {propPhotos.length >= 5 ? '✓ Verified (Recommended)' : '(Min 5 Recommended)'}
+                  </span>
+                </div>
+
+                <p className="text-xs text-gray-500">
+                  Upload photos of rooms, washrooms, dining, and exterior from your device. Listings with at least 5 photos receive 3x more resident bookings.
+                </p>
+
+                {/* Upload Action Area */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <label className="sm:col-span-2 relative flex flex-col items-center justify-center border-2 border-dashed border-emerald-400 hover:border-emerald-600 bg-emerald-50/40 hover:bg-emerald-50 rounded-2xl p-4 cursor-pointer transition text-center group">
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handleLocalPhotoUpload}
+                      className="sr-only"
+                    />
+                    <UploadCloud className="h-7 w-7 text-[#14532D] mb-1 group-hover:scale-110 transition" />
+                    <span className="text-xs font-black text-[#14532D]">
+                      {isUploadingPhotos ? 'Compressing & Adding Photos...' : 'Click to Upload Local Photos'}
+                    </span>
+                    <span className="text-[10px] text-gray-500 mt-0.5">
+                      Select multiple JPG, PNG, WebP from phone/PC (Auto-optimized)
+                    </span>
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={handleAddSamplePhotos}
+                    className="flex flex-col items-center justify-center border border-emerald-200 bg-white hover:bg-emerald-50/60 rounded-2xl p-4 text-center transition cursor-pointer"
+                  >
+                    <Sparkles className="h-5 w-5 text-amber-500 mb-1" />
+                    <span className="text-xs font-bold text-gray-800">
+                      + Add Sample Photos
+                    </span>
+                    <span className="text-[10px] text-gray-500 mt-0.5">
+                      Auto-fill 5 verified sample PG photos
+                    </span>
+                  </button>
+                </div>
+
+                {/* Uploaded Photos Grid */}
+                {propPhotos.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-[11px] text-gray-500">
+                      <span>Click image to set as Cover Photo</span>
+                      <button
+                        type="button"
+                        onClick={() => setPropPhotos([])}
+                        className="text-red-600 hover:underline text-[10px] font-bold cursor-pointer"
+                      >
+                        Clear All Photos
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5">
+                      {propPhotos.map((photoUrl, pIdx) => (
+                        <div
+                          key={pIdx}
+                          className="relative aspect-4/3 rounded-xl overflow-hidden border border-gray-200 bg-gray-100 group shadow-2xs"
+                        >
+                          <img
+                            src={photoUrl}
+                            alt={`Photo ${pIdx + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+
+                          {/* Cover badge / Set as cover */}
+                          {pIdx === 0 ? (
+                            <span className="absolute top-1 left-1 rounded-md bg-[#14532D] text-white px-1.5 py-0.5 text-[9px] font-black shadow-xs">
+                              Cover
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleMakeCoverPhoto(pIdx)}
+                              className="absolute top-1 left-1 rounded-md bg-black/70 hover:bg-black text-white px-1.5 py-0.5 text-[9px] font-bold opacity-0 group-hover:opacity-100 transition shadow-xs cursor-pointer"
+                            >
+                              Make Cover
+                            </button>
+                          )}
+
+                          {/* Remove button */}
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePhoto(pIdx)}
+                            className="absolute top-1 right-1 rounded-full bg-red-600 hover:bg-red-700 text-white p-1 shadow-sm transition cursor-pointer"
+                            title="Remove photo"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Pricing & Terms */}
               <div className="space-y-3 pt-2 border-t border-gray-100">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">
@@ -3015,6 +3315,77 @@ function MyProfileContent() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 11. MODAL 7: CONFIRM DELETE PROPERTY */}
+      {deletingProperty && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-100 text-rose-600 shrink-0">
+                <Trash2 className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-gray-900">
+                  Delete Listed Property?
+                </h3>
+                <p className="text-xs text-gray-500">
+                  Permanent removal from PG-SETU marketplace
+                </p>
+              </div>
+            </div>
+
+            {deleteError && (
+              <div className="flex items-center gap-2 rounded-xl bg-rose-50 p-3 text-xs font-bold text-rose-700 border border-rose-200">
+                <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            <div className="space-y-2 text-xs text-gray-600 bg-gray-50 p-3.5 rounded-2xl border border-gray-200">
+              <p>
+                Are you sure you want to delete <span className="font-black text-gray-900">{deletingProperty.name || 'this property'}</span>?
+              </p>
+              <p className="text-gray-500 text-[11px] leading-relaxed">
+                • Listing and public search URL will be unlinked.
+                <br />• Associated rooms and beds will be unlinked.
+                <br />• This action cannot be undone.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                disabled={isDeletingProperty}
+                onClick={() => {
+                  setDeletingProperty(null)
+                  setDeleteError('')
+                }}
+                className="px-4 py-2.5 rounded-xl border border-gray-300 text-xs font-bold text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingProperty}
+                onClick={handleConfirmDeleteProperty}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition active:scale-95 disabled:opacity-50 cursor-pointer"
+              >
+                {isDeletingProperty ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Deleting Property...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4" />
+                    <span>Yes, Delete Property</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

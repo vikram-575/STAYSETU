@@ -33,6 +33,8 @@ export async function POST(request: NextRequest) {
       amenities,
       rules,
       upi_id,
+      images,
+      coverImage,
     } = body
 
     if (!name || !name.trim()) {
@@ -111,7 +113,11 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Update or Upsert in Properties Table
-    const propSettings = {
+    const propImages = Array.isArray(images) && images.length > 0
+      ? images
+      : (Array.isArray(body.photos) ? body.photos : undefined)
+
+    const propSettings: Record<string, any> = {
       starting_rent_paise: Number(starting_rent_paise) || 600000,
       notice_period_days: Number(notice_period_days) || 30,
       lock_in_months: Number(lock_in_months) || 3,
@@ -125,13 +131,18 @@ export async function POST(request: NextRequest) {
       upi_id: upi_id?.trim() || '',
     }
 
+    if (propImages) {
+      propSettings.images = propImages
+      propSettings.coverImage = coverImage || propImages[0] || ''
+    }
+
     let updatedProp: any = null
     try {
       const isExplicitNew = body.is_new === true || property_id === 'new' || !property_id
       let existingProp: any = null
 
       if (!isExplicitNew) {
-        let propQuery = serviceClient.from('properties').select('id')
+        let propQuery = serviceClient.from('properties').select('id, settings')
         if (property_id && !property_id.startsWith('prop_') && !property_id.startsWith('org_prop_')) {
           propQuery = propQuery.eq('id', property_id)
         } else if (targetOrgId) {
@@ -142,6 +153,14 @@ export async function POST(request: NextRequest) {
       }
 
       if (existingProp?.id) {
+        const currentSettings = existingProp.settings || {}
+        const finalSettings = {
+          ...currentSettings,
+          ...propSettings,
+          images: propImages || currentSettings.images || [],
+          coverImage: coverImage || (propImages && propImages[0]) || currentSettings.coverImage || '',
+        }
+
         const { data: saved } = await serviceClient
           .from('properties')
           .update({
@@ -153,7 +172,7 @@ export async function POST(request: NextRequest) {
             state: state?.trim() || null,
             pincode: pincode?.trim() || null,
             description: description?.trim() || null,
-            settings: propSettings,
+            settings: finalSettings,
           })
           .eq('id', existingProp.id)
           .select()

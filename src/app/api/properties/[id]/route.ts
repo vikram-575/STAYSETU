@@ -19,3 +19,25 @@ export async function GET(
     return NextResponse.json({ success: false, error: err.message || 'Server error' }, { status: 500 })
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const origin = request.nextUrl.origin || 'http://localhost:3000'
+    const res = await fetch(`${origin}/api/properties/delete`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        cookie: request.headers.get('cookie') || '',
+      },
+      body: JSON.stringify({ property_id: id }),
+    })
+    const data = await res.json()
+    return NextResponse.json(data, { status: res.status })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 })
+  }
+}
