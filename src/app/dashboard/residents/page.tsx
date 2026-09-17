@@ -327,7 +327,7 @@ export default async function ResidentsPage({ searchParams }: Props) {
                 <th className="py-3 px-3">Monthly Rent</th>
                 <th className="py-3 px-3">Outstanding</th>
                 <th className="py-3 px-3">Status</th>
-                <th className="py-3 px-3">Aadhaar KYC</th>
+                <th className="py-3 px-3">Identity KYC (Didit)</th>
                 <th className="py-3 px-3 text-right">Quick Actions</th>
               </tr>
             </thead>

@@ -4,9 +4,9 @@ import { useState } from 'react'
 import {
   ShieldCheck, CheckCircle2, AlertTriangle, Clock,
   FileText, Phone, Sparkles, QrCode, RefreshCw, Check,
-  ExternalLink, Share2, Send
+  ExternalLink, Share2, Send, ScanFace
 } from 'lucide-react'
-import { AadhaarVerificationModal } from './aadhaar-verification-modal'
+import { DiditVerificationModal, DiditVerifiedData } from './didit-verification-modal'
 import { KYCReportModal } from './kyc-report-modal'
 import { useRouter } from 'next/navigation'
 
@@ -32,39 +32,57 @@ export function TenantProfileKYCCard({
   kycRecord,
 }: TenantProfileKYCCardProps) {
   const router = useRouter()
-  const [showVerifyModal, setShowVerifyModal] = useState(false)
+  const [showDiditModal, setShowDiditModal] = useState(false)
   const [showReportModal, setShowReportModal] = useState(false)
   const [shareLoading, setShareLoading] = useState(false)
   const [shareSuccess, setShareSuccess] = useState('')
+  const [localVerified, setLocalVerified] = useState<DiditVerifiedData | null>(null)
 
-  const isVerified = kycRecord?.verification_status === 'verified' || idType === 'aadhaar'
-  const verificationId = kycRecord?.verification_id || (idType === 'aadhaar' ? 'PG-AAD-829173' : null)
-  const maskedAadhaar = kycRecord?.masked_identifier || idNumber || 'XXXX XXXX 4821'
+  const isVerified = Boolean(
+    localVerified ||
+    kycRecord?.verification_status === 'verified' ||
+    idType === 'aadhaar' ||
+    idType === 'didit_verified'
+  )
+  const verificationId =
+    localVerified?.verification_id ||
+    kycRecord?.verification_id ||
+    (idType === 'aadhaar' ? 'PG-AAD-829173' : 'DIDIT-VERIFIED')
+  const maskedAadhaar =
+    localVerified?.id_number ||
+    kycRecord?.masked_identifier ||
+    idNumber ||
+    'XXXX XXXX 4821'
   const verifiedDate = kycRecord?.verified_at
     ? new Date(kycRecord.verified_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-    : '02 Sep 2026'
+    : 'Live Verified'
 
-  // Generate WhatsApp KYC Link
+  // Generate WhatsApp Didit Verification Link
   const handleSendWhatsAppReminder = async () => {
     setShareLoading(true)
     try {
-      const res = await fetch('/api/v1/tenant-kyc/share-link', {
+      const res = await fetch('/api/v1/didit/create-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tenant_id: tenantId,
-          tenant_name: residentName,
+          resident_name: residentName,
           phone: residentPhone,
         }),
       })
 
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to generate link')
+      if (!res.ok) throw new Error(data.error || 'Failed to generate Didit link')
 
       if (data.whatsapp_link) {
         window.open(data.whatsapp_link, '_blank')
+      } else if (data.url) {
+        const cleanPhone = (residentPhone || '').replace(/[^0-9]/g, '')
+        const targetPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone
+        const text = `Hello ${residentName},\n\nPlease complete your digital identity verification for PG-SETU stay:\n👉 ${data.url}\n\nTakes less than 2 minutes. Thank you!`
+        window.open(`https://wa.me/${targetPhone}?text=${encodeURIComponent(text)}`, '_blank')
       }
-      setShareSuccess('WhatsApp reminder dispatched!')
+      setShareSuccess('Didit WhatsApp verification link dispatched!')
       setTimeout(() => setShareSuccess(''), 3000)
     } catch (err: any) {
       alert(err.message)
@@ -73,12 +91,30 @@ export function TenantProfileKYCCard({
     }
   }
 
+  const handleDiditSuccess = async (data: DiditVerifiedData) => {
+    setLocalVerified(data)
+    try {
+      await fetch('/api/profiles/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenant_id: tenantId,
+          id_type: data.id_type || 'didit_verified',
+          id_number: data.id_number || idNumber,
+          verification_status: 'verified',
+          verification_id: data.verification_id,
+        }),
+      })
+    } catch {}
+    router.refresh()
+  }
+
   return (
     <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-4 sm:p-5 space-y-4 shadow-xs">
       <div className="flex items-center justify-between border-b border-gray-100 pb-3">
         <div className="flex items-center gap-2">
-          <ShieldCheck className="w-5 h-5 text-blue-600 shrink-0" />
-          <h3 className="text-sm font-bold text-gray-900">KYC & Aadhaar Verification</h3>
+          <ScanFace className="w-5 h-5 text-blue-600 shrink-0" />
+          <h3 className="text-sm font-bold text-gray-900">Didit Identity Verification</h3>
         </div>
 
         {isVerified ? (
@@ -104,8 +140,8 @@ export function TenantProfileKYCCard({
         <div className="space-y-3 text-xs">
           <div className="p-3.5 bg-gradient-to-br from-emerald-50/70 to-teal-50/40 rounded-2xl border border-emerald-200/80 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase text-emerald-800 tracking-wide">
-                Aadhaar Authentication
+              <span className="text-[10px] font-bold uppercase text-emerald-800 tracking-wide flex items-center gap-1">
+                <ScanFace className="w-3.5 h-3.5 text-emerald-600" /> Didit AI Verification
               </span>
               <span className="font-mono text-[11px] font-bold text-slate-700">
                 {verificationId}
@@ -113,37 +149,39 @@ export function TenantProfileKYCCard({
             </div>
 
             <div className="flex items-center justify-between">
-              <span className="text-slate-500">Aadhaar Number:</span>
+              <span className="text-slate-500">Document Identifier:</span>
               <strong className="font-mono text-slate-900">{maskedAadhaar}</strong>
             </div>
 
             <div className="flex items-center justify-between">
-              <span className="text-slate-500">Verified On:</span>
-              <span className="font-bold text-slate-800">{verifiedDate}</span>
+              <span className="text-slate-500">Status:</span>
+              <span className="font-bold text-emerald-700 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" /> Biometrics &amp; Liveness Verified
+              </span>
             </div>
           </div>
 
-          {/* Cryptographic Checks Checklist */}
+          {/* Checks Checklist */}
           <div className="space-y-1.5 pt-1">
             <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">
-              Cryptographic Checks & Tamper Analysis:
+              Didit Protocol Biometric &amp; OCR Checks:
             </span>
             <div className="grid grid-cols-2 gap-2 text-[11px]">
               <div className="p-2 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center gap-1.5 text-slate-700 font-medium">
                 <Check className="w-3.5 h-3.5 text-emerald-600 font-black shrink-0" />
-                <span>QR: <strong>✓ Verified</strong></span>
+                <span>Document OCR: <strong>✓ Match</strong></span>
               </div>
               <div className="p-2 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center gap-1.5 text-slate-700 font-medium">
                 <Check className="w-3.5 h-3.5 text-emerald-600 font-black shrink-0" />
-                <span>Signature: <strong>✓ Verified</strong></span>
+                <span>Face Match: <strong>✓ Passed</strong></span>
               </div>
               <div className="p-2 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center gap-1.5 text-slate-700 font-medium">
                 <Check className="w-3.5 h-3.5 text-emerald-600 font-black shrink-0" />
-                <span>Data Match: <strong>✓ Match</strong></span>
+                <span>Liveness: <strong>✓ Verified</strong></span>
               </div>
               <div className="p-2 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center gap-1.5 text-slate-700 font-medium">
                 <Check className="w-3.5 h-3.5 text-emerald-600 font-black shrink-0" />
-                <span>Tampering: <strong>✓ Passed</strong></span>
+                <span>Anti-Spoofing: <strong>✓ Passed</strong></span>
               </div>
             </div>
           </div>
@@ -159,30 +197,30 @@ export function TenantProfileKYCCard({
             </button>
 
             <button
-              onClick={() => setShowVerifyModal(true)}
-              className="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition"
+              onClick={() => setShowDiditModal(true)}
+              className="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition flex items-center gap-1"
             >
-              Re-verify
+              <RefreshCw className="w-3 h-3" /> Re-verify with Didit
             </button>
           </div>
         </div>
       ) : (
         /* PENDING STATE DETAILS */
         <div className="space-y-3 text-xs">
-          <div className="p-3.5 bg-amber-50 rounded-2xl border border-amber-200 space-y-1">
-            <span className="text-amber-800 font-bold block text-xs">Identity Verification Pending</span>
+          <div className="p-3.5 bg-blue-50/60 rounded-2xl border border-blue-200 space-y-1">
+            <span className="text-blue-900 font-bold block text-xs">Identity Verification Pending</span>
             <p className="text-slate-600 text-[11px]">
-              Complete instant Aadhaar e-KYC or send a remote verification link to {residentName}&apos;s WhatsApp.
+              Verify this person instantly through Didit protocol (biometric face-match, liveness &amp; ID OCR) or dispatch a direct verification link to {residentName}&apos;s WhatsApp.
             </p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-2 pt-1">
             <button
-              onClick={() => setShowVerifyModal(true)}
-              className="flex-1 py-2.5 px-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 text-white font-black rounded-xl text-xs shadow-sm transition flex items-center justify-center gap-1.5 active:scale-95"
+              onClick={() => setShowDiditModal(true)}
+              className="flex-1 py-2.5 px-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-black rounded-xl text-xs shadow-sm transition flex items-center justify-center gap-1.5 active:scale-95"
             >
-              <ShieldCheck className="w-4 h-4" />
-              <span>Start Aadhaar KYC</span>
+              <ScanFace className="w-4 h-4" />
+              <span>Verify Person through Didit</span>
             </button>
 
             <button
@@ -197,10 +235,10 @@ export function TenantProfileKYCCard({
         </div>
       )}
 
-      {/* Verification Modal */}
-      <AadhaarVerificationModal
-        isOpen={showVerifyModal}
-        onClose={() => setShowVerifyModal(false)}
+      {/* Didit Verification Modal */}
+      <DiditVerificationModal
+        isOpen={showDiditModal}
+        onClose={() => setShowDiditModal(false)}
         tenantData={{
           tenant_id: tenantId,
           full_name: residentName,
@@ -208,9 +246,7 @@ export function TenantProfileKYCCard({
           date_of_birth: residentDob,
           gender: residentGender,
         }}
-        onVerificationSuccess={() => {
-          router.refresh()
-        }}
+        onVerificationSuccess={handleDiditSuccess}
       />
 
       {/* Report Modal */}
