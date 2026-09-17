@@ -311,19 +311,19 @@ export default function MarketplaceTab({ initialSubTab = 'listings' }: Marketpla
       </div>
 
       {/* SubTabs Navigation */}
-      <div className="flex items-center gap-1.5 bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800 overflow-x-auto scrollbar-none">
+      <div className="flex items-center gap-1.5 bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800/80 overflow-x-auto scrollbar-none">
         <button
           onClick={() => setSubTab('listings')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap ${
             subTab === 'listings'
-              ? 'bg-amber-500 text-slate-950 font-black shadow-lg shadow-amber-500/20'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              ? 'bg-slate-800 text-white font-bold border border-slate-700 shadow-xs'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
           }`}
         >
-          <Store className={`w-3.5 h-3.5 ${subTab === 'listings' ? 'text-slate-950' : 'text-amber-400'}`} />
+          <Store className={`w-3.5 h-3.5 ${subTab === 'listings' ? 'text-amber-400' : 'text-slate-400'}`} />
           <span>Manage All Listed Properties</span>
           <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
-            subTab === 'listings' ? 'bg-slate-950 text-amber-400' : 'bg-amber-500/20 text-amber-300'
+            subTab === 'listings' ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-800 text-slate-400'
           }`}>
             {listings.length} {pendingListingsCount > 0 && `(${pendingListingsCount} Pending)`}
           </span>
@@ -331,14 +331,14 @@ export default function MarketplaceTab({ initialSubTab = 'listings' }: Marketpla
 
         <button
           onClick={() => setSubTab('instant_pg')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap ${
             subTab === 'instant_pg'
-              ? 'bg-slate-800 text-white font-black border border-slate-700'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              ? 'bg-slate-800 text-white font-bold border border-slate-700 shadow-xs'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
           }`}
         >
           <Zap className="w-3.5 h-3.5 text-amber-400" />
-          <span>⚡ Instant PG Requests</span>
+          <span>Instant PG Requests</span>
           <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-slate-800 text-slate-300">
             {instantLeads.length} {newInstantCount > 0 && `(${newInstantCount} new)`}
           </span>
@@ -346,10 +346,10 @@ export default function MarketplaceTab({ initialSubTab = 'listings' }: Marketpla
 
         <button
           onClick={() => setSubTab('enquiries')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap ${
             subTab === 'enquiries'
-              ? 'bg-slate-800 text-white font-black border border-slate-700'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              ? 'bg-slate-800 text-white font-bold border border-slate-700 shadow-xs'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
           }`}
         >
           <MessageSquare className="w-3.5 h-3.5 text-blue-400" />
@@ -361,10 +361,10 @@ export default function MarketplaceTab({ initialSubTab = 'listings' }: Marketpla
 
         <button
           onClick={() => setSubTab('visits')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap ${
             subTab === 'visits'
-              ? 'bg-slate-800 text-white font-black border border-slate-700'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              ? 'bg-slate-800 text-white font-bold border border-slate-700 shadow-xs'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
           }`}
         >
           <Calendar className="w-3.5 h-3.5 text-purple-400" />
@@ -537,8 +537,8 @@ export default function MarketplaceTab({ initialSubTab = 'listings' }: Marketpla
               <h4 className="text-xs font-black uppercase tracking-wider text-slate-400">
                 Managed Properties ({listings.length})
               </h4>
-              <span className="text-[11px] text-slate-500">
-                1-Click Approve · Edit Terms · Delete Unit · Live Link
+              <span className="text-[11px] text-slate-400 font-medium">
+                Verified platform inventory
               </span>
             </div>
 

@@ -9,46 +9,7 @@ declare global {
 }
 
 if (!global.__pgsetu_instant_leads__) {
-  global.__pgsetu_instant_leads__ = [
-    {
-      id: 'lead_demo_1',
-      reference_code: 'PG-INSTA-8821',
-      tenant_name: 'Priya Verma',
-      user_name: 'Priya Verma',
-      tenant_phone: '9876501234',
-      user_phone: '9876501234',
-      property_city: 'Bengaluru (Koramangala)',
-      gender: 'girls',
-      pg_type: 'girls',
-      sharing_choice: 'Single Room',
-      budget_range: '₹12,000 - ₹16,000',
-      move_in_date: 'Immediate / Today',
-      notes: 'Near Sony World Signal, Wi-Fi and food required',
-      type: 'instant_pg',
-      status: 'new',
-      created_at: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-      updated_at: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-    },
-    {
-      id: 'lead_demo_2',
-      reference_code: 'PG-INSTA-6419',
-      tenant_name: 'Siddharth Rao',
-      user_name: 'Siddharth Rao',
-      tenant_phone: '9811223344',
-      user_phone: '9811223344',
-      property_city: 'Pune (Hinjewadi Phase 1)',
-      gender: 'boys',
-      pg_type: 'boys',
-      sharing_choice: '2-Sharing',
-      budget_range: '₹8,000 - ₹12,000',
-      move_in_date: 'Within 3 Days',
-      notes: 'Working in Wipro, needs parking for bike',
-      type: 'instant_pg',
-      status: 'contacted',
-      created_at: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
-      updated_at: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-    }
-  ]
+  global.__pgsetu_instant_leads__ = []
 }
 
 export async function POST(request: NextRequest) {

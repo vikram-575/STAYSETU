@@ -18,10 +18,15 @@ export default async function DashboardLayout({
   }
 
   // Strict Role-Based Isolation: Residents and Tenants must NEVER access PG Owner ERP!
+  const isOwnerOrStaff =
+    ['superadmin', 'owner', 'manager', 'accountant', 'staff'].includes(user.role) ||
+    user.email === 'vikramtomar0505@gmail.com'
+
   if (
-    user.role === 'resident' ||
-    (user as any).role === 'tenant' ||
-    (user as any).role === 'user'
+    !isOwnerOrStaff &&
+    (user.role === 'resident' ||
+      (user as any).role === 'tenant' ||
+      (user as any).role === 'user')
   ) {
     redirect('/my-profile')
   }

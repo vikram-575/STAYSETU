@@ -229,11 +229,20 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
                 ? fallbackProfile.organizations.name
                 : (fallbackProfile.role === 'owner' ? 'PG Owner & Host' : 'PG-Setu Member'))
 
+          const isMasterAdmin =
+            fallbackProfile.email?.toLowerCase().trim() === SUPER_ADMIN_EMAIL ||
+            cleanMob === '9453522757' ||
+            fallbackProfile.phone?.includes('9453522757')
+
+          const resolvedRole = isMasterAdmin
+            ? (fallbackProfile.role === 'superadmin' ? 'superadmin' : 'owner')
+            : (fallbackProfile.role || 'owner')
+
           return {
             id: fallbackProfile.id,
             email: fallbackProfile.email,
             full_name: displayName,
-            role: fallbackProfile.role || 'owner',
+            role: resolvedRole,
             organization_id: orgId,
             phone: fallbackProfile.phone || authMobile,
             resident_id: fallbackProfile.resident_id || residentId || null,

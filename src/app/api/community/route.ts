@@ -22,62 +22,7 @@ declare global {
 }
 
 if (!global.__pgsetu_community_posts__) {
-  global.__pgsetu_community_posts__ = [
-    {
-      id: 'post_01',
-      title: 'Ergonomic Study Chair + Table Set (Barely Used)',
-      category: 'buy_sell',
-      description: 'Moving out next month. Selling my Green Soul ergonomic chair and compact folding study table in pristine condition.',
-      priceRupees: 2800,
-      contactName: 'Vivek K.',
-      contactPhone: '9876543210',
-      roomNumber: '302',
-      pgCluster: 'Electronic City Phase 1',
-      imageUrl: 'https://images.unsplash.com/photo-1580481077197-90c7499638b9?w=600&auto=format&fit=crop&q=80',
-      likes: 12,
-      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      status: 'active',
-    },
-    {
-      id: 'post_02',
-      title: 'Looking for a Vegetarian Roommate for Double Sharing',
-      category: 'roommate',
-      description: 'Room 204 has 1 bed vacant. Looking for an IT professional or student who maintains quiet hours during weeknights.',
-      priceRupees: 7500,
-      contactName: 'Aditya Mehta',
-      contactPhone: '9845123678',
-      roomNumber: '204',
-      pgCluster: 'Electronic City Phase 1',
-      likes: 8,
-      createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-      status: 'active',
-    },
-    {
-      id: 'post_03',
-      title: 'Weekend Turf Cricket Tournament (Need 3 Players)',
-      category: 'event',
-      description: 'Friendly 7-a-side box cricket tournament this Sunday 7:00 AM at Smash Turf. Free refreshments!',
-      contactName: 'Sports Club',
-      contactPhone: '9988776655',
-      pgCluster: 'South City Cluster',
-      likes: 24,
-      createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-      status: 'active',
-    },
-    {
-      id: 'post_04',
-      title: 'Lost Boat Airdopes Earbuds Case (Black)',
-      category: 'lost_found',
-      description: 'Misplaced in the 2nd-floor dining hall on Thursday evening. If found, please reach out or hand over to warden.',
-      contactName: 'Sneha R.',
-      contactPhone: '9711223344',
-      roomNumber: '108',
-      pgCluster: 'Electronic City Phase 1',
-      likes: 5,
-      createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-      status: 'active',
-    },
-  ]
+  global.__pgsetu_community_posts__ = []
 }
 
 export async function GET(request: NextRequest) {

@@ -19,10 +19,15 @@ export default async function DashboardPage() {
   const user = await getAuthenticatedUser()
   if (!user) redirect('/login?error=session_expired')
 
+  const isOwnerOrStaff =
+    ['superadmin', 'owner', 'manager', 'accountant', 'staff'].includes(user.role) ||
+    user.email === 'vikramtomar0505@gmail.com'
+
   if (
-    user.role === 'resident' ||
-    (user as any).role === 'tenant' ||
-    (user as any).role === 'user'
+    !isOwnerOrStaff &&
+    (user.role === 'resident' ||
+      (user as any).role === 'tenant' ||
+      (user as any).role === 'user')
   ) {
     redirect('/my-profile')
   }

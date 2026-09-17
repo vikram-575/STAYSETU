@@ -243,40 +243,23 @@ export default function AdminSidebar({
     <aside className="w-full lg:w-64 shrink-0 space-y-4">
       <nav className="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-3 space-y-4 shadow-xl">
         {/* Mode Label Banner */}
-        <div className="px-3 py-2 bg-slate-950/70 rounded-xl border border-slate-800 flex items-center justify-between text-[10px] font-mono">
-          <span className="text-slate-400 uppercase font-bold">Active Control Center</span>
+        <div className="px-3 py-2 bg-slate-950/60 rounded-xl border border-slate-800/80 flex items-center justify-between text-[10px] font-mono">
+          <span className="text-slate-400 uppercase font-bold">Control Center</span>
           <span
             className={cn(
-              'px-2 py-0.5 rounded-full font-bold uppercase',
+              'px-2 py-0.5 rounded-full font-bold uppercase text-[9px]',
               currentMode === 'erp'
                 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                 : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
             )}
           >
-            {currentMode === 'erp' ? 'Property ERP' : 'Renting Marketplace'}
+            {currentMode === 'erp' ? 'Property ERP' : 'Marketplace'}
           </span>
         </div>
 
-        {/* 7-Step Enterprise Onboarding Wizard Card */}
-        <Link
-          href="/onboarding?returnTo=/admin"
-          className="w-full flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-blue-600/20 via-indigo-600/20 to-emerald-600/20 hover:from-blue-600/30 hover:to-emerald-600/30 border border-blue-500/30 hover:border-emerald-500/40 text-xs font-bold text-white transition group shadow-lg"
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-7 h-7 bg-gradient-to-tr from-blue-600 to-indigo-500 text-white rounded-lg flex items-center justify-center shrink-0 shadow-md">
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-            </div>
-            <div className="truncate">
-              <div className="text-white font-bold text-xs truncate">Onboard New PG</div>
-              <div className="text-[10px] text-blue-300/80 font-medium">7-Step Enterprise Wizard</div>
-            </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-blue-400 group-hover:translate-x-0.5 transition shrink-0" />
-        </Link>
-
         {sections.map((section, idx) => (
           <div key={idx} className="space-y-1">
-            <h4 className="px-3 text-[11px] font-black uppercase tracking-wider text-slate-400">
+            <h4 className="px-3 text-[10px] font-black uppercase tracking-wider text-slate-400">
               {section.title}
             </h4>
             <div className="space-y-0.5">
@@ -291,15 +274,15 @@ export default function AdminSidebar({
                       href={item.href}
                       className={cn(
                         'w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition group text-left',
-                        'text-blue-300 hover:text-white bg-blue-950/30 hover:bg-blue-900/50 border border-blue-800/40'
+                        'text-slate-300 hover:text-white hover:bg-slate-800/60 border border-transparent hover:border-slate-700/60'
                       )}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <Icon className="w-4 h-4 shrink-0 text-amber-300" />
-                        <span className="truncate font-bold">{item.label}</span>
+                        <Icon className="w-4 h-4 shrink-0 text-emerald-400" />
+                        <span className="truncate">{item.label}</span>
                       </div>
                       {item.badge && (
-                        <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30 uppercase">
+                        <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 uppercase">
                           {item.badge}
                         </span>
                       )}
@@ -312,12 +295,12 @@ export default function AdminSidebar({
                     key={item.id}
                     onClick={() => onSelectTab(item.id)}
                     className={cn(
-                      'w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition group text-left',
+                      'w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition group text-left',
                       isActive
                         ? currentMode === 'erp'
-                          ? 'bg-emerald-600 text-white font-bold shadow-md shadow-emerald-600/30'
-                          : 'bg-amber-600 text-white font-bold shadow-md shadow-amber-600/30'
-                        : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/70'
+                          ? 'bg-emerald-500/15 text-emerald-300 font-bold border border-emerald-500/30 shadow-2xs'
+                          : 'bg-amber-500/15 text-amber-300 font-bold border border-amber-500/30 shadow-2xs'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
                     )}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
@@ -325,10 +308,10 @@ export default function AdminSidebar({
                         className={cn(
                           'w-4 h-4 shrink-0 transition',
                           isActive
-                            ? 'text-white'
-                            : currentMode === 'erp'
-                            ? 'text-slate-400 group-hover:text-emerald-400'
-                            : 'text-slate-400 group-hover:text-amber-400'
+                            ? currentMode === 'erp'
+                              ? 'text-emerald-400'
+                              : 'text-amber-400'
+                            : 'text-slate-400 group-hover:text-slate-200'
                         )}
                       />
                       <span className="truncate">{item.label}</span>
@@ -340,14 +323,14 @@ export default function AdminSidebar({
                           'px-2 py-0.5 rounded-full text-[10px] font-bold tracking-tight shrink-0',
                           isActive
                             ? currentMode === 'erp'
-                              ? 'bg-emerald-700 text-white'
-                              : 'bg-amber-700 text-white'
+                              ? 'bg-emerald-500/30 text-emerald-200'
+                              : 'bg-amber-500/30 text-amber-200'
                             : item.badgeVariant === 'rose'
-                            ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                            ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
                             : item.badgeVariant === 'amber'
-                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
                             : item.badgeVariant === 'emerald'
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
                             : 'bg-slate-800 text-slate-400 border border-slate-700'
                         )}
                       >

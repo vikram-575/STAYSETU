@@ -50,13 +50,13 @@ export default function AdminHeader({
         </div>
 
         {/* DUAL-MODE CONTROL CENTER SWITCHER */}
-        <div className="flex items-center bg-slate-950/80 p-1 rounded-2xl border border-slate-800 shadow-inner">
+        <div className="flex items-center bg-slate-950/80 p-1 rounded-2xl border border-slate-800/80 shadow-inner">
           <button
             onClick={() => onSelectMode('erp')}
             className={cn(
-              'flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition',
+              'flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition',
               currentMode === 'erp'
-                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-xs font-bold'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
             )}
           >
@@ -67,7 +67,7 @@ export default function AdminHeader({
                 className={cn(
                   'px-1.5 py-0.2 rounded-full text-[10px] font-mono',
                   currentMode === 'erp'
-                    ? 'bg-emerald-700 text-white'
+                    ? 'bg-emerald-500/30 text-emerald-200'
                     : 'bg-slate-800 text-slate-400 border border-slate-700'
                 )}
               >
@@ -79,20 +79,20 @@ export default function AdminHeader({
           <button
             onClick={() => onSelectMode('renting')}
             className={cn(
-              'flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition',
+              'flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition',
               currentMode === 'renting'
-                ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-xs font-bold'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
             )}
           >
             <Store className="w-3.5 h-3.5" />
-            <span>Property Renting</span>
+            <span>Rental Marketplace</span>
             {rentingBadge !== undefined && (
               <span
                 className={cn(
                   'px-1.5 py-0.2 rounded-full text-[10px] font-mono',
                   currentMode === 'renting'
-                    ? 'bg-amber-700 text-white'
+                    ? 'bg-amber-500/30 text-amber-200'
                     : 'bg-slate-800 text-amber-400 border border-amber-500/20'
                 )}
               >
@@ -106,7 +106,7 @@ export default function AdminHeader({
         <div className="flex-1 max-w-xs hidden xl:block">
           <button
             onClick={onOpenSearch}
-            className="w-full flex items-center justify-between px-3.5 py-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-xl border border-slate-700/80 text-xs font-medium transition group shadow-inner"
+            className="w-full flex items-center justify-between px-3.5 py-1.5 bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-xl border border-slate-700/60 text-xs font-medium transition group shadow-inner"
           >
             <span className="flex items-center gap-2">
               <Search className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-400 transition" />
@@ -118,71 +118,49 @@ export default function AdminHeader({
           </button>
         </div>
 
-        {/* Action Controls */}
+        {/* Action Controls - Clean & Streamlined */}
         <div className="flex items-center gap-2">
-          {/* Instant PG Requests Quick Link */}
-          <Link
-            href="/admin?mode=renting&tab=enquiries"
-            onClick={() => onSelectMode('renting')}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-black rounded-xl shadow-sm transition active:scale-95"
-            title="View Live Instant PG Leads from Floating Button"
-          >
-            <Zap className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-            <span className="hidden sm:inline">⚡ Instant PG Leads</span>
-            <span className="sm:hidden">⚡ Leads</span>
-          </Link>
-
-          {/* Direct Connect to 7-Step Enterprise Onboarding Wizard */}
-          <Link
-            href="/onboarding?returnTo=/admin"
-            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-600 hover:from-blue-500 hover:via-indigo-500 hover:to-emerald-500 text-white text-xs font-black rounded-xl shadow-lg shadow-blue-500/25 active:scale-95 transition"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
-            <span className="hidden sm:inline">Onboard New PG</span>
-            <span className="sm:hidden">Onboard</span>
-          </Link>
-
-          {/* Website CMS Quick Link */}
-          <Link
-            href="/admin?tab=website-cms"
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-950/70 hover:bg-emerald-900/80 border border-emerald-500/40 text-emerald-300 text-xs font-bold rounded-xl shadow-sm transition"
-            title="Edit Website Content (CMS)"
-          >
-            <Globe className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="hidden md:inline">Website CMS</span>
-          </Link>
-
           {/* Mobile Search Icon */}
           <button
             onClick={onOpenSearch}
-            className="xl:hidden p-2 text-slate-400 hover:text-white bg-slate-800 rounded-xl border border-slate-700"
+            className="xl:hidden p-2 text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-800 rounded-xl border border-slate-700/80"
             title="Global Search"
           >
             <Search className="w-4 h-4" />
           </button>
 
-          {/* Switch to PG Owner Dashboard */}
+          {/* Quick Links Group (Clean Icon Buttons with Tooltips) */}
+          <div className="hidden sm:flex items-center bg-slate-950/60 p-0.5 rounded-xl border border-slate-800/80">
+            <Link
+              href="/dashboard"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-2 text-slate-400 hover:text-emerald-400 hover:bg-slate-800/60 rounded-lg transition"
+              title="Open PG Owner ERP Dashboard"
+            >
+              <LayoutDashboard className="w-4 h-4" />
+            </Link>
+
+            <Link
+              href="/portal"
+              target="_blank"
+              className="p-2 text-slate-400 hover:text-teal-400 hover:bg-slate-800/60 rounded-lg transition"
+              title="Open Resident Passbook Portal"
+            >
+              <ExternalLink className="w-4 h-4" />
+            </Link>
+          </div>
+
+          {/* Single Primary Action: + Onboard PG */}
           <Link
-            href="/dashboard"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition"
+            href="/onboarding?returnTo=/admin"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-xs transition active:scale-95"
           >
-            <LayoutDashboard className="w-3.5 h-3.5 text-emerald-400" />
-            <span>PG Dashboard</span>
+            <Plus className="w-3.5 h-3.5" />
+            <span>+ Onboard PG</span>
           </Link>
 
-          {/* Tenant Portal Link */}
-          <Link
-            href="/portal"
-            target="_blank"
-            className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/60 hover:bg-slate-750 active:scale-95 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700/60 transition"
-          >
-            <ExternalLink className="w-3.5 h-3.5 text-teal-400" />
-            <span>Resident Passbook</span>
-          </Link>
-
-          <div className="h-6 w-px bg-slate-800 hidden sm:block" />
+          <div className="h-5 w-px bg-slate-800" />
 
           {/* Admin Logout Button */}
           <AdminLogoutButton />

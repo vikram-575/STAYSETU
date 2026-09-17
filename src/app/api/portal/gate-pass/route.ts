@@ -28,25 +28,7 @@ declare global {
 }
 
 if (!global.__pgsetu_gatepasses__) {
-  global.__pgsetu_gatepasses__ = [
-    {
-      id: 'gp_demo_01',
-      passNumber: 'GP-84920',
-      pinCode: '4920',
-      residentName: 'Arjun Verma',
-      residentPhone: '9876543210',
-      roomNumber: '204-B',
-      guestName: 'Rohit Sharma',
-      guestPhone: '9811223344',
-      guestCount: 1,
-      purpose: 'Friend Visiting / Study Session',
-      vehicleNumber: 'KA-01-MJ-4592',
-      expectedArrival: new Date().toISOString(),
-      validUntil: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      status: 'approved',
-      createdAt: new Date().toISOString(),
-    },
-  ]
+  global.__pgsetu_gatepasses__ = []
 }
 
 /**

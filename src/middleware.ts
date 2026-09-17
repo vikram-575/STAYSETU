@@ -52,14 +52,23 @@ export async function middleware(request: NextRequest) {
   } catch {}
 
   const authUserId = request.cookies.get('auth_user_id')?.value
-  const authEmail = request.cookies.get('auth_email')?.value
+  const authEmail = request.cookies.get('auth_email')?.value?.toLowerCase().trim()
   const authRole = request.cookies.get('auth_role')?.value || sbUser?.user_metadata?.role || ''
-  const isResident = authRole === 'resident' || authRole === 'tenant' || authRole === 'user'
+
   const isSuperAdminUser =
     isSuperAdmin ||
     authEmail === 'vikramtomar0505@gmail.com' ||
     sbUser?.user_metadata?.role === 'superadmin' ||
     authRole === 'superadmin'
+
+  const isOwnerOrStaff =
+    isSuperAdminUser ||
+    authRole === 'owner' ||
+    authRole === 'manager' ||
+    authRole === 'accountant' ||
+    authRole === 'staff'
+
+  const isResident = !isOwnerOrStaff && (authRole === 'resident' || authRole === 'tenant' || authRole === 'user')
 
   const isAuthenticated = Boolean(isSuperAdminUser || sbUser || (authUserId && authEmail))
 

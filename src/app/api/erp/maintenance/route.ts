@@ -20,60 +20,7 @@ declare global {
 }
 
 if (!global.__pgsetu_maintenance_assets__) {
-  global.__pgsetu_maintenance_assets__ = [
-    {
-      id: 'ast_01',
-      name: 'Commercial RO Water Plant (500 LPH)',
-      category: 'RO Purifier',
-      location: 'Ground Floor Utility Yard',
-      lastServicedDate: '2025-06-15',
-      nextServiceDueDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // OVERDUE!
-      serviceIntervalDays: 90,
-      vendorName: 'Kent Pure RO Care',
-      vendorPhone: '9845012345',
-      status: 'service_due',
-      costPaise: 350000,
-    },
-    {
-      id: 'ast_02',
-      name: '6-Passenger Automatic Lift',
-      category: 'Elevator / Lift',
-      location: 'Main Tower Core',
-      lastServicedDate: '2025-08-01',
-      nextServiceDueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      serviceIntervalDays: 30,
-      vendorName: 'Otis Elevator AMC',
-      vendorPhone: '9811223344',
-      status: 'healthy',
-      costPaise: 800000,
-    },
-    {
-      id: 'ast_03',
-      name: '45 kVA Kirloskar Silent DG Genset',
-      category: 'DG Genset',
-      location: 'Rear Parking Shed',
-      lastServicedDate: '2025-05-10',
-      nextServiceDueDate: new Date(Date.now() + 40 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      serviceIntervalDays: 180,
-      vendorName: 'PowerTech Diesel Services',
-      vendorPhone: '9988776655',
-      status: 'healthy',
-      costPaise: 1200000,
-    },
-    {
-      id: 'ast_04',
-      name: '24 Split AC Units (Voltas 1.5T 3-Star)',
-      category: 'Air Conditioner',
-      location: 'Floors 1 to 3',
-      lastServicedDate: '2025-04-10',
-      nextServiceDueDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // OVERDUE
-      serviceIntervalDays: 120,
-      vendorName: 'CoolComfort HVAC',
-      vendorPhone: '9744112233',
-      status: 'service_due',
-      costPaise: 1800000,
-    },
-  ]
+  global.__pgsetu_maintenance_assets__ = []
 }
 
 export async function GET(request: NextRequest) {

@@ -83,6 +83,16 @@ export default function MaintenancePage() {
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 animate-spin text-[#16A34A]" />
         </div>
+      ) : !data?.assets || data.assets.length === 0 ? (
+        <div className="bg-white rounded-2xl p-12 border border-gray-200 text-center space-y-3">
+          <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto text-gray-400">
+            <Wrench className="w-6 h-6" />
+          </div>
+          <h3 className="text-sm font-bold text-gray-900">No Equipment or AMC Assets Registered</h3>
+          <p className="text-xs text-gray-500 max-w-sm mx-auto">
+            You have not added any preventive maintenance or equipment contracts yet.
+          </p>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {data?.assets?.map((ast: any) => {

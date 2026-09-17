@@ -61,7 +61,9 @@ export default function StaffPayrollPage() {
           <p className="text-2xl font-black text-gray-900 mt-1">
             {data?.summary?.activeOnDuty || 0} Employees
           </p>
-          <span className="text-[10px] text-emerald-600 font-semibold">100% Shift Coverage</span>
+          <span className="text-[10px] text-emerald-600 font-semibold">
+            {data?.summary?.totalStaff > 0 ? '100% Shift Coverage' : 'No staff enrolled'}
+          </span>
         </div>
 
         <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-2xs">
@@ -74,8 +76,12 @@ export default function StaffPayrollPage() {
 
         <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-2xs">
           <span className="text-[10px] text-gray-400 font-bold uppercase block">Current Shift Coverage</span>
-          <p className="text-2xl font-black text-blue-700 mt-1">3 Shifts / 24 hrs</p>
-          <span className="text-[10px] text-blue-600 font-semibold">Morning, Day & Night Guard</span>
+          <p className="text-2xl font-black text-blue-700 mt-1">
+            {data?.summary?.totalStaff > 0 ? '3 Shifts / 24 hrs' : '0 Shifts Active'}
+          </p>
+          <span className="text-[10px] text-blue-600 font-semibold">
+            {data?.summary?.totalStaff > 0 ? 'Morning, Day & Night Guard' : 'Enroll staff to activate shifts'}
+          </span>
         </div>
       </div>
 
@@ -106,6 +112,16 @@ export default function StaffPayrollPage() {
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 animate-spin text-[#16A34A]" />
+        </div>
+      ) : !data?.staff || data.staff.length === 0 ? (
+        <div className="bg-white rounded-2xl p-12 border border-gray-200 text-center space-y-3">
+          <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto text-gray-400">
+            <Users className="w-6 h-6" />
+          </div>
+          <h3 className="text-sm font-bold text-gray-900">No Staff Members Added</h3>
+          <p className="text-xs text-gray-500 max-w-sm mx-auto">
+            You have not registered any wardens, cooks, security guards, or housekeeping staff yet.
+          </p>
         </div>
       ) : activeTab === 'roster' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

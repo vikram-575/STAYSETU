@@ -18,52 +18,7 @@ declare global {
 }
 
 if (!global.__pgsetu_staff_members__) {
-  global.__pgsetu_staff_members__ = [
-    {
-      id: 'st_01',
-      name: 'Rameshwar Yadav',
-      role: 'Warden',
-      phone: '9845019283',
-      shift: 'General (9 AM - 6 PM)',
-      monthlySalaryPaise: 2800000, // 28,000 INR
-      advanceTakenPaise: 300000,
-      overtimeHours: 5,
-      status: 'active',
-    },
-    {
-      id: 'st_02',
-      name: 'Manjunath Gowda',
-      role: 'Cook',
-      phone: '9811002233',
-      shift: 'Morning (6 AM - 2 PM)',
-      monthlySalaryPaise: 2400000, // 24,000 INR
-      advanceTakenPaise: 0,
-      overtimeHours: 8,
-      status: 'active',
-    },
-    {
-      id: 'st_03',
-      name: 'Santosh Kumar',
-      role: 'Security Guard',
-      phone: '9988112233',
-      shift: 'Night (10 PM - 6 AM)',
-      monthlySalaryPaise: 1800000, // 18,000 INR
-      advanceTakenPaise: 200000,
-      overtimeHours: 12,
-      status: 'active',
-    },
-    {
-      id: 'st_04',
-      name: 'Geetha Bai',
-      role: 'Housekeeping',
-      phone: '9744332211',
-      shift: 'Morning (6 AM - 2 PM)',
-      monthlySalaryPaise: 1500000, // 15,000 INR
-      advanceTakenPaise: 0,
-      overtimeHours: 2,
-      status: 'active',
-    },
-  ]
+  global.__pgsetu_staff_members__ = []
 }
 
 export async function GET(request: NextRequest) {

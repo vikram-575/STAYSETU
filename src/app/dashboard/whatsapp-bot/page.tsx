@@ -18,13 +18,7 @@ export default function WhatsAppBotPage() {
 
   // Real Residents List for Switcher
   const [residentList, setResidentList] = useState<any[]>([])
-  const [selectedResident, setSelectedResident] = useState<any>({
-    resident_id: 'res_demo_1',
-    full_name: 'Arjun Verma',
-    phone: '9876543210',
-    room_number: '204-B',
-    total_outstanding_paise: 1200000,
-  })
+  const [selectedResident, setSelectedResident] = useState<any>(null)
   const [isOwnerSimulatorMode, setIsOwnerSimulatorMode] = useState(false)
 
   // Interactive Simulator Chat State
@@ -37,7 +31,7 @@ export default function WhatsAppBotPage() {
   }>>([
     {
       sender: 'bot',
-      text: 'Hello Arjun! 👋 I am your 24/7 PG-Setu Assistant. How can I help you today? You can check your pending rent, Wi-Fi password, today\'s meal menu, or log a maintenance request.',
+      text: 'Hello! 👋 I am your 24/7 PG-Setu Assistant. How can I help you today? You can check your pending rent, Wi-Fi password, today\'s meal menu, or log a maintenance request.',
       time: '10:00 AM',
     },
   ])
