@@ -60,7 +60,7 @@ export default function ErpDashboardTab({
         <div className="flex items-center gap-2 shrink-0">
           <Link
             href="/onboarding?returnTo=/admin"
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-600 hover:from-blue-500 hover:to-emerald-500 text-white rounded-xl text-xs font-black shadow-lg shadow-blue-500/25 active:scale-95 transition"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/20 active:scale-95 transition"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-300" />
             <span>Onboard New PG (Wizard) →</span>

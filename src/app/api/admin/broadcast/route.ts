@@ -55,9 +55,34 @@ export async function POST(request: NextRequest) {
 
     const totalRecipients = orgs?.length || 0
 
+    // Persist broadcast announcement record in audit_logs for permanent telemetry
+    if (orgs && orgs.length > 0) {
+      const logInserts = orgs.map((org) => ({
+        id: crypto.randomUUID(),
+        organization_id: org.id,
+        action: 'reminder_send' as const,
+        entity_type: 'announcement',
+        entity_id: crypto.randomUUID(),
+        entity_label: title,
+        notes: `Platform broadcast to ${org.name}: ${message}`,
+        after_data: {
+          title,
+          message,
+          target_city,
+          channel,
+          sent_at: new Date().toISOString(),
+        },
+      }))
+
+      const { error: insertErr } = await supabase.from('audit_logs').insert(logInserts)
+      if (insertErr) {
+        console.warn('Failed to insert broadcast audit logs:', insertErr.message)
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      message: `Announcement broadcast successfully queued for ${totalRecipients} PG organizations.`,
+      message: `Announcement broadcast recorded and queued for ${totalRecipients} PG organizations.`,
       recipients_count: totalRecipients,
       broadcast: {
         title,

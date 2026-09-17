@@ -48,7 +48,9 @@ export async function GET(request: NextRequest) {
       }
 
       const hasRazorpay = Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET)
-      const hasTwilio = Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN)
+      const hasWhatsApp = Boolean(process.env.WHATSAPP_API_TOKEN && process.env.WHATSAPP_PHONE_ID)
+      const hasSmsGateway = Boolean(process.env.MSG91_AUTH_KEY || process.env.TWILIO_ACCOUNT_SID)
+      const hasAadhaar = Boolean(process.env.AADHAAR_PROVIDER_API_KEY && process.env.AADHAAR_PROVIDER_SECRET)
       const hasFirebase = Boolean(process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID)
 
       const health = {
@@ -61,37 +63,43 @@ export async function GET(request: NextRequest) {
             name: 'Primary Database (PostgreSQL / Supabase)',
             status: dbStatus,
             latency_ms: dbLatency,
-            message: dbStatus === 'online' ? 'All connections operational' : 'Experiencing latency or connection limits',
+            message: dbStatus === 'online' ? 'Operational — multi-tenant schemas & triggers active' : 'Experiencing latency or connection limits',
           },
           {
-            name: 'Storage & Document CDN',
+            name: 'Storage & Document CDN (Firebase Storage)',
             status: hasFirebase ? 'online' : 'online',
             latency_ms: 18,
-            message: 'Asset upload & CDN edge routing active',
+            message: 'Operational — asset upload & CDN edge active',
           },
           {
-            name: 'Payment Processing Gateway (Razorpay)',
-            status: hasRazorpay ? 'online' : 'degraded',
+            name: 'Payment Processing (Razorpay / Gateway)',
+            status: hasRazorpay ? 'online' : 'standby',
             latency_ms: 45,
-            message: hasRazorpay ? 'API webhooks & checkout active' : 'Live keys pending configuration',
+            message: hasRazorpay ? 'Live API webhooks & checkout active' : 'Standby — Direct UPI links & offline ledger active (keys pending)',
           },
           {
-            name: 'WhatsApp Notification Engine',
-            status: hasTwilio ? 'online' : 'online',
+            name: 'WhatsApp Automation (Meta Cloud API)',
+            status: hasWhatsApp ? 'online' : 'standby',
             latency_ms: 32,
-            message: 'Templates verified, automated delivery operational',
+            message: hasWhatsApp ? 'Meta Cloud API connected' : 'Standby — Instant wa.me click-to-chat active (API token pending)',
           },
           {
             name: 'SMS Notification Gateway',
-            status: 'online',
+            status: hasSmsGateway ? 'online' : 'standby',
             latency_ms: 40,
-            message: 'Transactional SMS routes active',
+            message: hasSmsGateway ? 'Transactional DLT routes active' : 'Standby — Device SMS URI mode active (DLT credentials pending)',
+          },
+          {
+            name: 'Aadhaar / DigiLocker KYC Engine',
+            status: hasAadhaar ? 'online' : 'standby',
+            latency_ms: 25,
+            message: hasAadhaar ? 'Live UIDAI GSP active' : 'Standby — Authorized Sandbox simulator active (live keys pending)',
           },
           {
             name: 'Background Worker & Cron Dispatcher',
-            status: 'online',
+            status: 'standby',
             latency_ms: 12,
-            message: 'Nightly rent invoices & penalty recalculator scheduled',
+            message: 'Standby — Ledger triggers active; external scheduler pending configuration',
           },
         ],
       }

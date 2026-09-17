@@ -78,7 +78,7 @@ export default function AdminSidebar({
       ],
     },
     {
-      title: 'Partners & Onboarding',
+      title: 'Partners & Platform Users',
       items: [
         {
           id: 'onboard',
@@ -97,24 +97,10 @@ export default function AdminSidebar({
         },
         {
           id: 'users',
-          label: 'All Users & Profiles',
+          label: 'All Users & Staff',
           icon: Users2,
-          badge: 'Owners+Tenants',
+          badge: 'Operators',
           badgeVariant: 'emerald',
-        },
-        {
-          id: 'profiles',
-          label: 'Marketplace Leads',
-          icon: UserCheck,
-          badge: 'Registry',
-          badgeVariant: 'slate',
-        },
-        {
-          id: 'enquiries',
-          label: '⚡ Instant PG Leads',
-          icon: Zap,
-          badge: 'Fast-Track',
-          badgeVariant: 'amber',
         },
       ],
     },

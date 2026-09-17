@@ -128,19 +128,6 @@ export async function processWhatsAppMessage(input: WhatsAppInboundMessage): Pro
     console.error('Identity resolution error in WhatsApp bot:', err)
   }
 
-  // Fallback simulator mock if database returned empty for specific test name
-  if (!residentRecord && input.senderName && input.senderName.toLowerCase().includes('arjun')) {
-    residentRecord = {
-      resident_id: 'mock_resident_arjun',
-      full_name: 'Arjun Verma',
-      room_number: '204-B',
-      bed_label: 'Bed 2',
-      total_outstanding_paise: 1200000,
-      organization_id: 'org_demo',
-      status: 'active',
-    }
-    senderRole = 'resident'
-  }
 
   // 2. INTENT CLASSIFICATION PIPELINE
   let intent = 'unknown'

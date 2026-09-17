@@ -59,39 +59,39 @@ export default function CommunicationsTab() {
         </div>
       </div>
 
-      {/* Gateway Telemetry */}
+      {/* Gateway Telemetry & Pipeline Integration Status */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-1">
           <div className="flex items-center justify-between text-xs">
-            <span className="font-bold text-slate-400">WhatsApp Business API</span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-              Active
+            <span className="font-bold text-slate-400">WhatsApp Automation</span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              wa.me Intent Mode
             </span>
           </div>
-          <div className="text-lg font-black text-white">99.4% Delivery</div>
-          <p className="text-[11px] text-slate-500">Rent slips, OTPs & check-in welcome notices</p>
+          <div className="text-base font-black text-white">Direct Click-to-Chat</div>
+          <p className="text-[11px] text-slate-500">Instant WhatsApp pre-filled messaging; Meta Cloud API token pending</p>
         </div>
 
         <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-1">
           <div className="flex items-center justify-between text-xs">
             <span className="font-bold text-slate-400">SMS Transactional Route</span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-              Active
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">
+              Device URI Mode
             </span>
           </div>
-          <div className="text-lg font-black text-white">98.9% Delivery</div>
-          <p className="text-[11px] text-slate-500">DLT registered templates for payment confirmations</p>
+          <div className="text-base font-black text-white">Native SMS Intent</div>
+          <p className="text-[11px] text-slate-500">Opens native mobile messenger; DLT telecom gateway pending</p>
         </div>
 
         <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-1">
           <div className="flex items-center justify-between text-xs">
-            <span className="font-bold text-slate-400">In-App Push & Alerts</span>
+            <span className="font-bold text-slate-400">In-App Broadcast Logs</span>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-              Active
+              Active Audit Trail
             </span>
           </div>
-          <div className="text-lg font-black text-white">Real-Time WebSocket</div>
-          <p className="text-[11px] text-slate-500">Tenant passbook & owner dashboard banners</p>
+          <div className="text-base font-black text-white">Permanent Logs</div>
+          <p className="text-[11px] text-slate-500">All announcements recorded into Postgres audit trail</p>
         </div>
       </div>
 

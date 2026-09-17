@@ -140,7 +140,7 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
         <div className="flex items-center gap-2">
           <Link
             href="/onboarding?returnTo=/admin"
-            className="py-2 px-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-600 hover:from-blue-500 hover:to-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 shadow-lg shadow-blue-500/20 active:scale-95"
+            className="py-2 px-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 shadow-md shadow-emerald-600/20 active:scale-95"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-300" />
             <span>Onboard New PG (Wizard)</span>

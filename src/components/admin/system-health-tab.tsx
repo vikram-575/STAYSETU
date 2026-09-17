@@ -151,6 +151,7 @@ export default function SystemHealthTab() {
                 <option value="resident_kyc">Resident KYC</option>
                 <option value="payment">Payments</option>
                 <option value="rent_override">Rent Overrides</option>
+                <option value="announcement">Announcements & Broadcasts</option>
               </select>
 
               <select
