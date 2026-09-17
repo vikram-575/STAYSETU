@@ -130,6 +130,7 @@ export async function middleware(request: NextRequest) {
     pathname === '/' ||
     pathname.startsWith('/search') ||
     pathname.startsWith('/search-pg') ||
+    pathname.startsWith('/onboarding') ||
     pathname.startsWith('/login') ||
     pathname.startsWith('/register') ||
     pathname.startsWith('/superman/login') ||
@@ -158,14 +159,12 @@ export async function middleware(request: NextRequest) {
     return response
   }
 
-  // Protect /dashboard and /onboarding routes (Owner/Staff ERP only)
-  if (pathname.startsWith('/dashboard') || pathname.startsWith('/onboarding')) {
+  // Protect /dashboard routes (Owner/Staff ERP only)
+  if (pathname.startsWith('/dashboard')) {
     if (!isAuthenticated) {
       const redirectUrl = request.nextUrl.clone()
       redirectUrl.pathname = '/login'
-      if (pathname.startsWith('/dashboard')) {
-        redirectUrl.searchParams.set('redirectTo', pathname)
-      }
+      redirectUrl.searchParams.set('redirectTo', pathname)
       return NextResponse.redirect(redirectUrl)
     }
 
