@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     if (orgId && isValidUUID(orgId)) {
       const results = await Promise.allSettled([
         serviceClient.from('beds').select('status').eq('organization_id', orgId),
-        serviceClient.from('residents').select('*', { count: 'exact', head: true }).eq('organization_id', orgId).eq('status', 'active'),
+        serviceClient.from('resident_assignments').select('id', { count: 'exact', head: true }).eq('organization_id', orgId).is('check_out_date', null),
         serviceClient.from('invoices').select('total_paise, paid_paise, balance_paise, status').eq('organization_id', orgId).gte('period_start', monthStart).lte('period_start', monthEnd).not('status', 'in', '(cancelled,draft)'),
         serviceClient.from('invoices').select('balance_paise, status, due_date').eq('organization_id', orgId).not('status', 'in', '(cancelled,draft,paid)'),
         serviceClient.from('payments').select('amount_paise').eq('organization_id', orgId).eq('payment_date', today).eq('status', 'completed'),
@@ -50,6 +50,8 @@ export async function GET(request: NextRequest) {
     const availableBeds = bedStats?.filter((b) => b.status === 'available').length ?? 0
     const maintenanceBeds = bedStats?.filter((b) => b.status === 'maintenance').length ?? 0
     const occupancyRate = totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0
+    // Active residents must strictly be 0 if the property has 0 beds
+    const displayActiveResidents = totalBeds > 0 ? (activeResidents ?? 0) : 0
     const monthExpectedPaise = monthInvoices?.reduce((s, i) => s + i.total_paise, 0) ?? 0
     const monthCollectedPaise = monthInvoices?.reduce((s, i) => s + i.paid_paise, 0) ?? 0
     const totalOutstandingPaise = allOutstandingInvoices?.reduce((s, i) => s + Math.max(i.balance_paise, 0), 0) ?? 0
@@ -60,7 +62,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       totalBeds, occupiedBeds, availableBeds, maintenanceBeds,
-      occupancyRate, activeResidents: activeResidents ?? 0,
+      occupancyRate, activeResidents: displayActiveResidents,
       monthExpectedPaise, monthCollectedPaise,
       monthOutstandingPaise: monthExpectedPaise - monthCollectedPaise,
       totalOutstandingPaise, totalOverduePaise,

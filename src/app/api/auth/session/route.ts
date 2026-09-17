@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { getAuthenticatedUser } from '@/lib/auth-session'
 import { createServiceClient } from '@/lib/supabase/server'
 import { calculateTrustScore } from '@/lib/trust-score'
+import { isValidUUID } from '@/lib/org-helper'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -50,68 +51,81 @@ export async function GET() {
       if (isOwnerOrStaff) {
         try {
           const orgId = user.organization_id
-          const [propsRes, residentsCountRes, roomsRes, bedsRes, invoicesRes] = await Promise.allSettled([
-            serviceClient
-              .from('properties')
-              .select('*')
-              .eq('organization_id', orgId)
-              .order('created_at', { ascending: false }),
-            serviceClient
-              .from('residents')
-              .select('id', { count: 'exact', head: true })
-              .eq('organization_id', orgId)
-              .eq('status', 'active'),
-            serviceClient
-              .from('rooms')
-              .select('id, base_rent_paise, capacity')
-              .eq('organization_id', orgId),
-            serviceClient
-              .from('beds')
-              .select('id, status')
-              .eq('organization_id', orgId),
-            serviceClient
-              .from('invoices')
-              .select('total_paise')
-              .eq('organization_id', orgId)
-              .not('status', 'in', '(cancelled,draft)'),
-          ])
-
-          const props = propsRes.status === 'fulfilled' ? (propsRes.value.data || []) : []
-          const activeResidents = residentsCountRes.status === 'fulfilled' ? (residentsCountRes.value.count || 0) : 0
-          const rooms = roomsRes.status === 'fulfilled' ? (roomsRes.value.data || []) : []
-          const beds = bedsRes.status === 'fulfilled' ? (bedsRes.value.data || []) : []
-          const invoices = invoicesRes.status === 'fulfilled' ? (invoicesRes.value.data || []) : []
-
-          const totalBeds = beds.length > 0 ? beds.length : rooms.reduce((sum: number, r: any) => sum + (r.capacity || 0), 0)
-          const availableBeds = beds.length > 0 ? beds.filter((b: any) => b.status === 'available').length : Math.max(0, totalBeds - activeResidents)
-          const expectedRev = invoices.reduce((sum: number, inv: any) => sum + (inv.total_paise || 0), 0) || rooms.reduce((sum: number, r: any) => sum + (r.base_rent_paise || 0), 0)
-
-          propertyStats = {
-            total_residents: activeResidents,
-            total_rooms: rooms.length,
-            total_beds: totalBeds,
-            available_beds: availableBeds,
-            expected_revenue_paise: expectedRev,
-          }
-
-          const org = (user.organizations as any) || {}
-          if (props && props.length > 0) {
-            hostedProperties = props.map((p: any) => ({
-              id: p.id,
-              organization_id: p.organization_id,
-              name: p.name || org.name || 'PG Property',
-              phone: p.phone || org.phone || user.phone || '',
-              email: p.email || org.email || user.email || '',
-              address: p.address || org.address || '',
-              city: p.city || org.city || '',
-              state: p.state || org.state || '',
-              pincode: p.pincode || org.pincode || '',
-              description: p.description || '',
-              settings: p.settings || org.settings || {},
-              stats: propertyStats,
-            }))
-          } else {
+          if (!orgId || !isValidUUID(orgId)) {
+            propertyStats = {
+              total_residents: 0,
+              total_rooms: 0,
+              total_beds: 0,
+              available_beds: 0,
+              expected_revenue_paise: 0,
+            }
             hostedProperties = []
+          } else {
+            const [propsRes, assignmentsRes, roomsRes, bedsRes, invoicesRes] = await Promise.allSettled([
+              serviceClient
+                .from('properties')
+                .select('*')
+                .eq('organization_id', orgId)
+                .order('created_at', { ascending: false }),
+              serviceClient
+                .from('resident_assignments')
+                .select('id', { count: 'exact', head: true })
+                .eq('organization_id', orgId)
+                .is('check_out_date', null),
+              serviceClient
+                .from('rooms')
+                .select('id, base_rent_paise, capacity')
+                .eq('organization_id', orgId),
+              serviceClient
+                .from('beds')
+                .select('id, status')
+                .eq('organization_id', orgId),
+              serviceClient
+                .from('invoices')
+                .select('total_paise')
+                .eq('organization_id', orgId)
+                .not('status', 'in', '(cancelled,draft)'),
+            ])
+
+            const props = propsRes.status === 'fulfilled' ? (propsRes.value.data || []) : []
+            const rooms = roomsRes.status === 'fulfilled' ? (roomsRes.value.data || []) : []
+            const beds = bedsRes.status === 'fulfilled' ? (bedsRes.value.data || []) : []
+            const invoices = invoicesRes.status === 'fulfilled' ? (invoicesRes.value.data || []) : []
+
+            const totalBeds = beds.length > 0 ? beds.length : rooms.reduce((sum: number, r: any) => sum + (r.capacity || 0), 0)
+            const assignedResidents = assignmentsRes.status === 'fulfilled' ? (assignmentsRes.value.count || 0) : 0
+            // If total beds is 0 or no properties exist, active residents must strictly be 0
+            const activeResidents = totalBeds > 0 ? assignedResidents : 0
+            const availableBeds = beds.length > 0 ? beds.filter((b: any) => b.status === 'available').length : Math.max(0, totalBeds - activeResidents)
+            const expectedRev = invoices.reduce((sum: number, inv: any) => sum + (inv.total_paise || 0), 0) || rooms.reduce((sum: number, r: any) => sum + (r.base_rent_paise || 0), 0)
+
+            propertyStats = {
+              total_residents: activeResidents,
+              total_rooms: rooms.length,
+              total_beds: totalBeds,
+              available_beds: availableBeds,
+              expected_revenue_paise: expectedRev,
+            }
+
+            const org = (user.organizations as any) || {}
+            if (props && props.length > 0) {
+              hostedProperties = props.map((p: any) => ({
+                id: p.id,
+                organization_id: p.organization_id,
+                name: p.name || org.name || 'PG Property',
+                phone: p.phone || org.phone || user.phone || '',
+                email: p.email || org.email || user.email || '',
+                address: p.address || org.address || '',
+                city: p.city || org.city || '',
+                state: p.state || org.state || '',
+                pincode: p.pincode || org.pincode || '',
+                description: p.description || '',
+                settings: p.settings || org.settings || {},
+                stats: propertyStats,
+              }))
+            } else {
+              hostedProperties = []
+            }
           }
         } catch (err: any) {
           console.warn('[Session Route Hosted Properties Lookup Error]:', err?.message)

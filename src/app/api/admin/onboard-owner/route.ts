@@ -61,6 +61,22 @@ export async function GET(request: NextRequest) {
 
     const orgMap = new Map((dbOrgs || []).map((o) => [o.id, o]))
 
+    // 4. Fetch all properties from Supabase to track website listings
+    const { data: dbProps } = await serviceClient
+      .from('properties')
+      .select('id, name, city, address, organization_id, is_active, created_at')
+      .order('created_at', { ascending: false })
+
+    const propsByOrg = new Map<string, any[]>()
+    for (const p of dbProps || []) {
+      if (p.organization_id) {
+        const list = propsByOrg.get(p.organization_id) || []
+        list.push(p)
+        propsByOrg.set(p.organization_id, list)
+      }
+    }
+    const websitePropertiesCount = (dbProps || []).filter((p) => p.is_active !== false).length
+
     // Merge and deduplicate owner records
     const processedMobiles = new Set<string>()
     const allOwners: any[] = []
@@ -74,12 +90,24 @@ export async function GET(request: NextRequest) {
         (u) => cleanMobile(u.phone || '') === mobile || u.id === fOwner.user_id
       )
       const orgId = fOwner.organization_id || matchedDbUser?.organization_id
-      const linkedOrg = orgId ? orgMap.get(orgId) : null
+      const isPlaceholderOrg = orgId === 'edd624d8-f3a0-4f92-b8b9-515c50ed8e98'
+      const linkedOrg = orgId && !isPlaceholderOrg ? orgMap.get(orgId) : null
+      const orgProps = orgId && !isPlaceholderOrg ? (propsByOrg.get(orgId) || []) : []
 
-      const isLocked =
+      const isPending =
         fOwner.erp_unlocked === false ||
         fOwner.onboarding_status === 'pending_superadmin' ||
-        !orgId
+        fOwner.onboarding_status === 'unlocked_pending_pg' ||
+        !orgId ||
+        isPlaceholderOrg ||
+        orgProps.length === 0
+
+      const isLocked = fOwner.erp_unlocked === false || fOwner.onboarding_status === 'pending_superadmin'
+      const ownerStatus = isPending
+        ? isLocked
+          ? 'pending_superadmin'
+          : 'unlocked_pending_pg'
+        : 'completed'
 
       allOwners.push({
         id: fOwner.id,
@@ -90,11 +118,13 @@ export async function GET(request: NextRequest) {
         dob: fOwner.dob || '',
         gender: fOwner.gender || 'male',
         city: fOwner.city || linkedOrg?.city || '',
-        onboarding_status: isLocked ? 'pending_superadmin' : 'unlocked',
+        onboarding_status: ownerStatus,
         erp_unlocked: !isLocked,
-        can_list_properties: !isLocked,
-        organization_id: orgId || null,
+        can_list_properties: !isPending,
+        organization_id: isPlaceholderOrg ? null : (orgId || null),
         organization_name: linkedOrg?.name || fOwner.property_name || null,
+        properties_count: orgProps.length,
+        properties: orgProps,
         created_at: fOwner.created_at || matchedDbUser?.created_at || new Date().toISOString(),
       })
     }
@@ -105,8 +135,13 @@ export async function GET(request: NextRequest) {
       if (mobile && processedMobiles.has(mobile)) continue
       if (mobile) processedMobiles.add(mobile)
 
-      const linkedOrg = dbOwner.organization_id ? orgMap.get(dbOwner.organization_id) : null
-      const isLocked = !dbOwner.organization_id
+      const orgId = dbOwner.organization_id
+      const isPlaceholderOrg = orgId === 'edd624d8-f3a0-4f92-b8b9-515c50ed8e98'
+      const linkedOrg = orgId && !isPlaceholderOrg ? orgMap.get(orgId) : null
+      const orgProps = orgId && !isPlaceholderOrg ? (propsByOrg.get(orgId) || []) : []
+
+      const isPending = !orgId || isPlaceholderOrg || orgProps.length === 0
+      const ownerStatus = isPending ? 'pending_superadmin' : 'completed'
 
       allOwners.push({
         id: `OW-${mobile.slice(-4)}-${dbOwner.id.slice(0, 4).toUpperCase()}`,
@@ -117,22 +152,29 @@ export async function GET(request: NextRequest) {
         dob: '',
         gender: 'male',
         city: linkedOrg?.city || '',
-        onboarding_status: isLocked ? 'pending_superadmin' : 'unlocked',
-        erp_unlocked: !isLocked,
-        can_list_properties: !isLocked,
-        organization_id: dbOwner.organization_id || null,
+        onboarding_status: ownerStatus,
+        erp_unlocked: !isPending,
+        can_list_properties: !isPending,
+        organization_id: isPlaceholderOrg ? null : (orgId || null),
         organization_name: linkedOrg?.name || null,
+        properties_count: orgProps.length,
+        properties: orgProps,
         created_at: dbOwner.created_at,
       })
     }
 
-    const pendingOwners = allOwners.filter((o) => o.onboarding_status === 'pending_superadmin')
-    const onboardedOwners = allOwners.filter((o) => o.onboarding_status !== 'pending_superadmin')
+    const pendingOwners = allOwners.filter(
+      (o) => o.onboarding_status === 'pending_superadmin' || o.onboarding_status === 'unlocked_pending_pg'
+    )
+    const onboardedOwners = allOwners.filter(
+      (o) => o.onboarding_status !== 'pending_superadmin' && o.onboarding_status !== 'unlocked_pending_pg'
+    )
 
     return NextResponse.json({
       success: true,
       pendingOwners,
       onboardedOwners,
+      websitePropertiesCount,
       totalCount: allOwners.length,
       pendingCount: pendingOwners.length,
     })
@@ -227,7 +269,36 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Action: UNLOCK & FINISH ONBOARDING
+    // Action 1: UNLOCK ERP ACCESS ONLY (First step before PG onboarding)
+    if (action === 'unlock_only') {
+      try {
+        const { queryDocuments, updateDocument } = await import('@/lib/firebase/firestore')
+        if (cleanedMobile) {
+          const docs = await queryDocuments('owner_profiles', [{ field: 'mobile', operator: '==', value: cleanedMobile }])
+          if (docs && docs.length > 0) {
+            await updateDocument('owner_profiles', docs[0].id, {
+              erp_unlocked: true,
+              onboarding_status: 'unlocked_pending_pg',
+              reviewed_by: admin.email || 'superadmin',
+              updated_at: new Date().toISOString(),
+            })
+          }
+        }
+      } catch (fErr) {}
+
+      await serviceClient
+        .from('users')
+        .update({ is_active: true })
+        .eq('id', targetUser.id)
+
+      return NextResponse.json({
+        success: true,
+        status: 'unlocked_pending_pg',
+        message: `ERP access unlocked for ${targetUser.full_name || 'Owner'}. Click "Onboard PG" to configure their property fleet.`,
+      })
+    }
+
+    // Action 2: ONBOARD PG PROPERTY & ADJUST ERP
     const propName = property_name?.trim() || `${targetUser.full_name || 'PG'} Property`
     const propCity = city?.trim() || 'Bangalore'
     const propAddress = address?.trim() || `${propCity}, India`
@@ -235,11 +306,11 @@ export async function POST(request: NextRequest) {
     const roomCount = Math.max(1, Math.min(50, Number(approx_rooms) || 6))
     const rentPaise = starting_rent ? Number(starting_rent) * 100 : 750000
 
-    // 2. Check if user already has an organization
+    // 2. Check if user already has an organization (ignoring placeholder org)
     let orgId = targetUser.organization_id
     let organization: any = null
 
-    if (orgId) {
+    if (orgId && orgId !== 'edd624d8-f3a0-4f92-b8b9-515c50ed8e98') {
       const { data: existingOrg } = await serviceClient
         .from('organizations')
         .select('*')
@@ -307,6 +378,7 @@ export async function POST(request: NextRequest) {
           phone: targetUser.phone,
           email: targetUser.email,
           starting_rent_paise: rentPaise,
+          is_active: true,
           settings: {
             pg_type: effectivePgType,
             amenities: ['High-Speed WiFi', 'Power Backup', 'RO Water', '3 Daily Meals', 'Air Conditioning', 'CCTV Security'],

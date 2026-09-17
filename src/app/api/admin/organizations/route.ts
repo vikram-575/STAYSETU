@@ -73,58 +73,67 @@ export async function GET(request: NextRequest) {
       .select('organization_id, total_paise, paid_paise, balance_paise, status')
       .not('status', 'in', '(cancelled,draft)')
 
-    // Fetch property counts
+    // Fetch property counts & website listings
     const { data: allProps } = await supabase
       .from('properties')
-      .select('id, organization_id')
+      .select('id, organization_id, name, city, address, is_active, created_at')
 
-    const result = (orgs || []).map((org) => {
-      const owner = owners?.find((o) => o.organization_id === org.id)
-      const orgBeds = allBeds?.filter((b) => b.organization_id === org.id) || []
-      const orgResidents = allResidents?.filter((r) => r.organization_id === org.id) || []
-      const orgInvoices = allInvoices?.filter((i) => i.organization_id === org.id) || []
-      const orgProps = allProps?.filter((p) => p.organization_id === org.id) || []
+    const totalWebsiteProperties = (allProps || []).filter((p) => p.is_active !== false).length
 
-      const totalBeds = orgBeds.length
-      const occupiedBeds = orgBeds.filter((b) => b.status === 'occupied').length
-      const totalCollected = orgInvoices.reduce((s, i) => s + (i.paid_paise || 0), 0)
-      const totalOutstanding = orgInvoices.reduce((s, i) => s + Math.max(0, i.balance_paise || 0), 0)
+    const result = (orgs || [])
+      .filter((org) => org.id !== 'edd624d8-f3a0-4f92-b8b9-515c50ed8e98' || (allProps || []).some((p) => p.organization_id === org.id))
+      .map((org) => {
+        const owner = owners?.find((o) => o.organization_id === org.id)
+        const orgBeds = allBeds?.filter((b) => b.organization_id === org.id) || []
+        const orgResidents = allResidents?.filter((r) => r.organization_id === org.id) || []
+        const orgInvoices = allInvoices?.filter((i) => i.organization_id === org.id) || []
+        const orgProps = (allProps || []).filter((p) => p.organization_id === org.id)
 
-      const settings = org.settings || {}
-      const plan = settings.plan || 'starter'
-      const subscriptionStatus = settings.subscription_status || 'active'
+        const totalBeds = orgBeds.length
+        const occupiedBeds = orgBeds.filter((b) => b.status === 'occupied').length
+        const totalCollected = orgInvoices.reduce((s, i) => s + (i.paid_paise || 0), 0)
+        const totalOutstanding = orgInvoices.reduce((s, i) => s + Math.max(0, i.balance_paise || 0), 0)
 
-      return {
-        id: org.id,
-        name: org.name,
-        slug: org.slug,
-        phone: org.phone,
-        email: org.email,
-        city: org.city,
-        address: org.address,
-        gst_enabled: org.gst_enabled,
-        gstin: org.gstin,
-        created_at: org.created_at,
-        plan,
-        subscription_status: subscriptionStatus,
-        subscription_valid_until: settings.subscription_valid_until || null,
-        owner: owner ? {
-          name: owner.full_name,
-          email: owner.email,
-          phone: owner.phone,
-          last_login_at: owner.last_login_at,
-        } : null,
-        properties_count: orgProps.length,
-        total_beds: totalBeds,
-        occupied_beds: occupiedBeds,
-        occupancy_rate: totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0,
-        active_residents_count: orgResidents.length,
-        total_collected_paise: totalCollected,
-        total_outstanding_paise: totalOutstanding,
-      }
+        const settings = org.settings || {}
+        const plan = settings.plan || 'starter'
+        const subscriptionStatus = settings.subscription_status || 'active'
+
+        return {
+          id: org.id,
+          name: org.name,
+          slug: org.slug,
+          phone: org.phone,
+          email: org.email,
+          city: org.city,
+          address: org.address,
+          gst_enabled: org.gst_enabled,
+          gstin: org.gstin,
+          created_at: org.created_at,
+          plan,
+          subscription_status: subscriptionStatus,
+          subscription_valid_until: settings.subscription_valid_until || null,
+          owner: owner ? {
+            name: owner.full_name,
+            email: owner.email,
+            phone: owner.phone,
+            last_login_at: owner.last_login_at,
+          } : null,
+          properties_count: orgProps.length,
+          properties: orgProps,
+          total_beds: totalBeds,
+          occupied_beds: occupiedBeds,
+          occupancy_rate: totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0,
+          active_residents_count: orgResidents.length,
+          total_collected_paise: totalCollected,
+          total_outstanding_paise: totalOutstanding,
+        }
+      })
+
+    return NextResponse.json({
+      success: true,
+      organizations: result,
+      totalWebsiteProperties,
     })
-
-    return NextResponse.json({ success: true, organizations: result })
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Failed to fetch organizations' }, { status: 500 })
   }
