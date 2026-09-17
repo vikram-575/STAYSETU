@@ -80,7 +80,14 @@ export async function resolveEffectiveOrg(
     }
   }
 
-  // 3. Fallback: Grab the first organization in the database
+  // 3. Fallback: Only for superadmin or authorized master user, grab the first organization in the database
+  const isSuperAdmin = user?.role === 'superadmin' || user?.email === 'vikramtomar0505@gmail.com'
+
+  if (!isSuperAdmin) {
+    // Un-onboarded owners and residents must NOT be automatically allotted any property or organization!
+    return null
+  }
+
   const { data: firstOrg } = await serviceClient
     .from('organizations')
     .select('id, name, slug, gst_enabled')

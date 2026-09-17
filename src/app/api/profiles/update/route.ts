@@ -27,6 +27,7 @@ export async function PATCH(request: NextRequest) {
       full_name,
       email,
       phone,
+      dob,
       gender,
       age,
       profession,
@@ -87,7 +88,23 @@ export async function PATCH(request: NextRequest) {
       ...existingNotesObj,
       updated_at: now,
     }
-    if (age !== undefined) updatedNotesObj.age = Number(age)
+    if (dob) {
+      updatedNotesObj.dob = dob.trim()
+      const birthDate = new Date(dob.trim())
+      if (!isNaN(birthDate.getTime())) {
+        const today = new Date()
+        let calculatedAge = today.getFullYear() - birthDate.getFullYear()
+        const m = today.getMonth() - birthDate.getMonth()
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+          calculatedAge--
+        }
+        if (calculatedAge > 0 && calculatedAge < 120) {
+          updatedNotesObj.age = calculatedAge
+        }
+      }
+    } else if (age !== undefined) {
+      updatedNotesObj.age = Number(age)
+    }
     if (profession !== undefined) updatedNotesObj.profession = profession?.trim()
     if (college_or_company !== undefined) updatedNotesObj.college_or_company = college_or_company?.trim()
     if (aadhaar_verified !== undefined) {
@@ -225,6 +242,27 @@ export async function PATCH(request: NextRequest) {
       }
     } catch {}
 
+    // Also sync to Firestore tenant_profiles / owner_profiles if doc exists
+    if (cleanedMobile) {
+      try {
+        const { queryDocuments, updateDocument } = await import('@/lib/firebase/firestore')
+        const collectionName = user.role === 'owner' ? 'owner_profiles' : 'tenant_profiles'
+        const docs = await queryDocuments(collectionName, [{ field: 'mobile', operator: '==', value: cleanedMobile }])
+        if (docs && docs.length > 0) {
+          const docId = docs[0].id
+          const fUpdates: Record<string, any> = { updated_at: now }
+          if (dob) fUpdates.dob = dob.trim()
+          if (updatedNotesObj.age) fUpdates.age = updatedNotesObj.age
+          if (gender) fUpdates.gender = gender
+          if (full_name) fUpdates.full_name = full_name.trim()
+          if (profession) fUpdates.profession = profession.trim()
+          await updateDocument(collectionName, docId, fUpdates)
+        }
+      } catch (fErr) {
+        console.warn('[Profile Update Firestore Sync Warning]:', fErr)
+      }
+    }
+
     // Assemble unified profile response
     const finalProfile = {
       id: tenantRegId,
@@ -232,6 +270,7 @@ export async function PATCH(request: NextRequest) {
       email: savedResident?.email || email?.trim() || user.email,
       mobile: cleanedMobile,
       gender: savedResident?.gender || gender || 'male',
+      dob: updatedNotesObj.dob || dob?.trim() || '',
       age: updatedNotesObj.age || (age ? Number(age) : null),
       profession: updatedNotesObj.profession || profession?.trim() || '',
       college_or_company: updatedNotesObj.college_or_company || college_or_company?.trim() || '',

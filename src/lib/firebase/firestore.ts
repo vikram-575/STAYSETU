@@ -41,9 +41,13 @@ export async function getDocument<T = any>(collectionName: string, id: string): 
   }
 }
 
+export type FirestoreQueryCondition =
+  | [string, any, any]
+  | { field: string; operator: any; value: any }
+
 export async function queryCollection<T = any>(
   collectionName: string,
-  queries: Array<[string, any, any]> = [],
+  queries: Array<FirestoreQueryCondition> = [],
   orderBy?: { field: string; direction?: 'asc' | 'desc' },
   limit?: number
 ): Promise<T[]> {
@@ -53,8 +57,13 @@ export async function queryCollection<T = any>(
 
     let ref: any = db.collection(collectionName)
 
-    for (const [field, op, val] of queries) {
-      ref = ref.where(field, op, val)
+    for (const q of queries) {
+      if (Array.isArray(q)) {
+        const [field, op, val] = q
+        ref = ref.where(field, op, val)
+      } else if (q && typeof q === 'object') {
+        ref = ref.where(q.field, q.operator, q.value)
+      }
     }
 
     if (orderBy) {
@@ -126,3 +135,6 @@ export async function deleteDocument(collectionName: string, id: string): Promis
     console.warn(`[Firestore deleteDocument warning in ${collectionName}/${id}]:`, err?.message)
   }
 }
+
+export const queryDocuments = queryCollection
+

@@ -248,6 +248,19 @@ export async function GET() {
         residentRow = data
       }
 
+      // Query Firestore tenant_profiles or owner_profiles for dob and onboarding verification
+      let firestoreDoc: any = null
+      if (cleanMobile.length >= 10) {
+        try {
+          const { queryDocuments } = await import('@/lib/firebase/firestore')
+          const colName = user.role === 'owner' ? 'owner_profiles' : 'tenant_profiles'
+          const fDocs = await queryDocuments(colName, [{ field: 'mobile', operator: '==', value: cleanMobile }])
+          if (fDocs && fDocs.length > 0) {
+            firestoreDoc = fDocs[0]
+          }
+        } catch (fErr) {}
+      }
+
       if (residentRow) {
         let notesObj: Record<string, any> = {}
         if (residentRow.notes) {
@@ -262,8 +275,9 @@ export async function GET() {
           email: residentRow.email || user.email,
           mobile: residentRow.phone || cleanMobile,
           gender: residentRow.gender || 'male',
-          age: notesObj.age || null,
-          profession: notesObj.profession || '',
+          dob: notesObj.dob || firestoreDoc?.dob || '',
+          age: notesObj.age || firestoreDoc?.age || null,
+          profession: notesObj.profession || firestoreDoc?.profession || '',
           college_or_company: notesObj.college_or_company || '',
           emergency_name: residentRow.emergency_name || '',
           emergency_phone: residentRow.emergency_phone || '',
@@ -273,31 +287,46 @@ export async function GET() {
           aadhaar_verified: notesObj.aadhaar_verified ?? Boolean(residentRow.id_number),
           aadhaar_last4: notesObj.aadhaar_last4 || residentRow.id_number || '',
           aadhaar_verified_date: notesObj.aadhaar_verified_date || '',
+          erp_unlocked: firestoreDoc?.erp_unlocked ?? Boolean(user.organization_id),
+          can_list_properties: firestoreDoc?.can_list_properties ?? Boolean(user.organization_id),
+          onboarding_status: firestoreDoc?.onboarding_status || 'verified',
         }
       } else {
-        // Synthesize fallback profile for user from users table
+        // Synthesize fallback profile for user from users table or firestore
         profileData = {
           id: (user as any).registration_number || `TN-${cleanMobile.slice(-4) || '2026'}`,
-          full_name: user.full_name || 'PG-Setu Member',
-          email: user.email,
+          full_name: user.full_name || firestoreDoc?.full_name || 'PG-Setu Member',
+          email: user.email || firestoreDoc?.email || '',
           mobile: cleanMobile,
-          gender: (user as any).gender || 'male',
-          age: (user as any).age || null,
-          profession: (user as any).profession || '',
+          gender: (user as any).gender || firestoreDoc?.gender || 'male',
+          dob: (user as any).dob || firestoreDoc?.dob || '',
+          age: (user as any).age || firestoreDoc?.age || null,
+          profession: (user as any).profession || firestoreDoc?.profession || '',
           college_or_company: '',
           emergency_name: '',
           emergency_phone: '',
           emergency_relation: '',
           permanent_address: '',
-          permanent_city: '',
+          permanent_city: firestoreDoc?.city || '',
           aadhaar_verified: false,
           aadhaar_last4: '',
           aadhaar_verified_date: '',
+          erp_unlocked: firestoreDoc?.erp_unlocked ?? Boolean(user.organization_id),
+          can_list_properties: firestoreDoc?.can_list_properties ?? Boolean(user.organization_id),
+          onboarding_status: firestoreDoc?.onboarding_status || (user.organization_id ? 'unlocked' : 'pending_superadmin'),
         }
       }
     } catch (err: any) {
       console.warn('[Session Route Profile Resolution Warning]:', err?.message)
     }
+
+    const isSuperAdmin = user.role === 'superadmin' || user.email === 'vikramtomar0505@gmail.com'
+    const isOwnerUnlocked =
+      isSuperAdmin ||
+      (user.role === 'owner' &&
+        Boolean(user.organization_id) &&
+        profileData?.erp_unlocked !== false &&
+        profileData?.onboarding_status !== 'pending_superadmin')
 
     return NextResponse.json(
       {
@@ -310,6 +339,8 @@ export async function GET() {
         passbookSummary,
         transactions,
         profile: profileData,
+        isOwnerUnlocked,
+        ownerProfile: user.role === 'owner' ? profileData : null,
       },
       {
         headers: {

@@ -6,7 +6,8 @@ import Link from 'next/link'
 import {
   Building2, Search, ShieldCheck, ShieldAlert, KeyRound,
   ExternalLink, Phone, Mail, MapPin, CheckCircle2,
-  Clock, AlertTriangle, ChevronRight, X, Loader2, Edit3, Sparkles, Plus
+  Clock, AlertTriangle, ChevronRight, X, Loader2, Edit3, Sparkles, Plus,
+  Lock, User, Check, RefreshCw
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/money'
 import { formatDate } from '@/lib/utils'
@@ -21,6 +22,23 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
   const [organizations, setOrganizations] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState(initialSearch)
   const [statusFilter, setStatusFilter] = useState('all')
+
+  // Tab View Mode: 'organizations' | 'pending'
+  const [viewMode, setViewMode] = useState<'organizations' | 'pending'>('organizations')
+  const [pendingOwners, setPendingOwners] = useState<any[]>([])
+  const [pendingLoading, setPendingLoading] = useState(false)
+
+  // Onboard / Unlock Modal state
+  const [onboardModalOwner, setOnboardModalOwner] = useState<any>(null)
+  const [onboardPropName, setOnboardPropName] = useState('')
+  const [onboardCity, setOnboardCity] = useState('')
+  const [onboardAddress, setOnboardAddress] = useState('')
+  const [onboardPgType, setOnboardPgType] = useState('coliving')
+  const [onboardRooms, setOnboardRooms] = useState('6')
+  const [onboardRent, setOnboardRent] = useState('7500')
+  const [onboardSubmitting, setOnboardSubmitting] = useState(false)
+  const [onboardSuccess, setOnboardSuccess] = useState('')
+  const [onboardError, setOnboardError] = useState('')
 
   // Impersonation state
   const [impersonatingOrgId, setImpersonatingOrgId] = useState<string | null>(null)
@@ -49,9 +67,77 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
     }
   }
 
+  const loadPendingOwners = async () => {
+    setPendingLoading(true)
+    try {
+      const res = await fetch('/api/admin/onboard-owner')
+      const data = await res.json()
+      if (data.success) {
+        setPendingOwners(data.pendingOwners || [])
+      }
+    } catch (err) {
+      console.error('Failed to load pending owners', err)
+    } finally {
+      setPendingLoading(false)
+    }
+  }
+
   useEffect(() => {
     loadOrganizations()
+    loadPendingOwners()
   }, [])
+
+  const handleOpenOnboardModal = (owner: any) => {
+    setOnboardModalOwner(owner)
+    setOnboardPropName(`${owner.full_name}'s PG`)
+    setOnboardCity(owner.city || 'Bangalore')
+    setOnboardAddress(owner.city ? `${owner.city}, India` : '')
+    setOnboardPgType('coliving')
+    setOnboardRooms('6')
+    setOnboardRent('7500')
+    setOnboardError('')
+    setOnboardSuccess('')
+  }
+
+  const handleCompleteOnboarding = async (action: 'unlock' | 'reject') => {
+    if (!onboardModalOwner) return
+    setOnboardSubmitting(true)
+    setOnboardError('')
+    setOnboardSuccess('')
+
+    try {
+      const res = await fetch('/api/admin/onboard-owner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          userId: onboardModalOwner.user_id,
+          mobile: onboardModalOwner.mobile,
+          property_name: onboardPropName.trim(),
+          city: onboardCity.trim(),
+          address: onboardAddress.trim(),
+          pg_type: onboardPgType,
+          approx_rooms: Number(onboardRooms) || 6,
+          starting_rent: Number(onboardRent) || 7500,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to finish onboarding')
+      }
+
+      setOnboardSuccess(data.message || 'Owner successfully onboarded and ERP unlocked!')
+      setTimeout(() => {
+        setOnboardModalOwner(null)
+        loadPendingOwners()
+        loadOrganizations()
+      }, 1500)
+    } catch (err: any) {
+      setOnboardError(err.message || 'Failed to complete owner onboarding')
+    } finally {
+      setOnboardSubmitting(false)
+    }
+  }
 
   // 1-Click PG Impersonation ("Login as PG Owner")
   const handleImpersonate = async (org: any) => {
@@ -123,6 +209,17 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
     )
   })
 
+  const filteredPendingOwners = pendingOwners.filter((o) => {
+    if (!searchQuery) return true
+    const q = searchQuery.toLowerCase()
+    return (
+      o.full_name?.toLowerCase().includes(q) ||
+      o.mobile?.toLowerCase().includes(q) ||
+      o.city?.toLowerCase().includes(q) ||
+      o.email?.toLowerCase().includes(q)
+    )
+  })
+
   return (
     <div className="space-y-6">
       {/* Header & Controls */}
@@ -133,7 +230,7 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
             PG Owners CRM & Verification Workflow
           </h3>
           <p className="text-xs text-slate-400 mt-0.5">
-            Manage partner operators, SaaS subscription tiers, KYC reviews, and 1-click platform impersonation.
+            Manage partner operators, SaaS subscription tiers, KYC reviews, and complete pending owner onboardings.
           </p>
         </div>
 
@@ -146,22 +243,177 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
             <span>Onboard New PG (Wizard)</span>
           </Link>
 
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-slate-800 border border-slate-700 text-xs text-slate-200 rounded-xl px-3 py-2 focus:outline-none"
-          >
-            <option value="all">All Owners & Statuses</option>
-            <option value="verified">Verified Operators</option>
-            <option value="unverified">Pending Verification</option>
-            <option value="active">Active Subscribers</option>
-            <option value="trial">Trial Accounts</option>
-          </select>
+          {viewMode === 'organizations' && (
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="bg-slate-800 border border-slate-700 text-xs text-slate-200 rounded-xl px-3 py-2 focus:outline-none"
+            >
+              <option value="all">All Owners & Statuses</option>
+              <option value="verified">Verified Operators</option>
+              <option value="unverified">Pending Verification</option>
+              <option value="active">Active Subscribers</option>
+              <option value="trial">Trial Accounts</option>
+            </select>
+          )}
         </div>
       </div>
 
-      {/* Organizations Table */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+      {/* Segmented View Switcher */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3">
+        <button
+          type="button"
+          onClick={() => setViewMode('organizations')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+            viewMode === 'organizations'
+              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+              : 'bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-800'
+          }`}
+        >
+          <Building2 className="w-3.5 h-3.5" />
+          <span>Active PG Organizations ({organizations.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setViewMode('pending')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 relative ${
+            viewMode === 'pending'
+              ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20'
+              : 'bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-800'
+          }`}
+        >
+          <Lock className="w-3.5 h-3.5" />
+          <span>Pending Owner Onboardings (Locked)</span>
+          {pendingOwners.length > 0 && (
+            <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-400 text-amber-950">
+              {pendingOwners.length}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            loadOrganizations()
+            loadPendingOwners()
+          }}
+          className="p-2 bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl text-xs transition ml-auto flex items-center gap-1"
+          title="Refresh Lists"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Refresh</span>
+        </button>
+      </div>
+
+      {/* VIEW 1: PENDING LOCKED OWNERS TABLE */}
+      {viewMode === 'pending' && (
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+          <div className="p-4 border-b border-slate-800 flex items-center justify-between gap-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                placeholder="Search pending owners by name, phone, city..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-800/80 border border-slate-700 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none font-medium"
+              />
+            </div>
+            <span className="text-xs text-slate-400">
+              Pending: <span className="text-amber-400 font-bold">{filteredPendingOwners.length}</span> owners
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-950/60 border-b border-slate-800 text-[11px] font-black uppercase text-slate-400 tracking-wider">
+                <tr>
+                  <th className="px-4 py-3">Owner Profile</th>
+                  <th className="px-4 py-3">Personal Details</th>
+                  <th className="px-4 py-3">City of Residence</th>
+                  <th className="px-4 py-3">Registered On</th>
+                  <th className="px-4 py-3">ERP Platform Status</th>
+                  <th className="px-4 py-3 text-right">SuperAdmin Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {pendingLoading ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-12">
+                      <Loader2 className="w-6 h-6 text-amber-500 animate-spin mx-auto" />
+                      <p className="text-xs text-slate-400 mt-2">Checking for pending owner onboardings...</p>
+                    </td>
+                  </tr>
+                ) : filteredPendingOwners.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-12 text-slate-500 text-xs">
+                      <ShieldCheck className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
+                      <p className="font-bold text-slate-300">All registered PG owners are onboarded & unlocked!</p>
+                      <p className="text-slate-500 mt-1">No pending onboarding applications currently awaiting SuperAdmin review.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredPendingOwners.map((owner) => (
+                    <tr key={owner.id || owner.mobile} className="hover:bg-slate-800/40 transition">
+                      <td className="px-4 py-3.5">
+                        <div className="font-bold text-slate-100 flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5 text-amber-400" />
+                          <span>{owner.full_name}</span>
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2">
+                          <span className="font-mono text-emerald-400">+91 {owner.mobile}</span>
+                          {owner.email && <span className="text-slate-500 truncate max-w-[140px]">{owner.email}</span>}
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-3.5">
+                        <div className="text-slate-300 capitalize">
+                          {owner.gender || '—'}
+                          {owner.dob && <span className="text-slate-400 text-[11px]"> • DOB: {owner.dob}</span>}
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-3.5">
+                        <div className="text-slate-300 flex items-center gap-1">
+                          <MapPin className="w-3.5 h-3.5 text-slate-500" />
+                          <span>{owner.city || 'Not provided'}</span>
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-3.5 text-slate-400">
+                        {owner.created_at ? formatDate(owner.created_at) : 'Recent'}
+                      </td>
+
+                      <td className="px-4 py-3.5">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          <Lock className="w-3 h-3" />
+                          <span>ERP Locked (Pending)</span>
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-3.5 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenOnboardModal(owner)}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-md shadow-emerald-600/20 active:scale-95"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                          <span>Finish Onboarding & Unlock</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW 2: ACTIVE PG ORGANIZATIONS TABLE */}
+      {viewMode === 'organizations' && (
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
         <div className="p-4 border-b border-slate-800 flex items-center justify-between gap-4">
           <div className="relative flex-1 max-w-md">
             <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
@@ -301,6 +553,7 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
           </table>
         </div>
       </div>
+      )}
 
       {/* Owner 360 Slide-Over Drawer */}
       {selectedOrg && (
@@ -408,6 +661,204 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
               >
                 Save Decision
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SuperAdmin Onboard & Unlock Owner Modal */}
+      {onboardModalOwner && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
+          <div className="w-full max-w-lg bg-slate-900 border border-amber-500/30 rounded-2xl p-6 space-y-4 shadow-2xl my-8">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white">
+                    Finish Onboarding & Unlock ERP
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Provision PG Organization, create first property, and unlock ERP dashboard.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setOnboardModalOwner(null)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-xl bg-slate-800 border border-slate-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Owner Personal Profile Review */}
+            <div className="p-3.5 bg-slate-950/60 rounded-xl border border-slate-800 space-y-1.5 text-xs">
+              <div className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1.5">
+                <User className="w-3 h-3 text-amber-400" />
+                Owner Personal Details (Registered)
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-slate-300 mt-2">
+                <div>
+                  <span className="text-slate-500 block text-[10px]">Full Name</span>
+                  <span className="font-bold text-white">{onboardModalOwner.full_name}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[10px]">Phone Number</span>
+                  <span className="font-mono text-white">{onboardModalOwner.mobile}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[10px]">Email Address</span>
+                  <span className="text-white">{onboardModalOwner.email || 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[10px]">Date of Birth / Gender</span>
+                  <span className="text-white">
+                    {onboardModalOwner.dob || 'N/A'} {onboardModalOwner.gender ? `(${onboardModalOwner.gender})` : ''}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Provision Property Configuration */}
+            <div className="space-y-3 pt-1">
+              <div className="text-[11px] font-bold uppercase text-slate-300 tracking-wider">
+                PG Property & Organization Setup
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 block mb-1">
+                  Property / PG Brand Name *
+                </label>
+                <input
+                  type="text"
+                  value={onboardPropName}
+                  onChange={(e) => setOnboardPropName(e.target.value)}
+                  placeholder="e.g. Sri Lakshmi Luxury PG"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-400 block mb-1">
+                    City *
+                  </label>
+                  <input
+                    type="text"
+                    value={onboardCity}
+                    onChange={(e) => setOnboardCity(e.target.value)}
+                    placeholder="e.g. Bangalore"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-400 block mb-1">
+                    PG Type
+                  </label>
+                  <select
+                    value={onboardPgType}
+                    onChange={(e) => setOnboardPgType(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                  >
+                    <option value="coliving">Co-Living (Unisex)</option>
+                    <option value="boys">Boys PG</option>
+                    <option value="girls">Girls PG</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 block mb-1">
+                  Physical Address / Landmark
+                </label>
+                <input
+                  type="text"
+                  value={onboardAddress}
+                  onChange={(e) => setOnboardAddress(e.target.value)}
+                  placeholder="e.g. #42, 5th Cross, Koramangala"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-400 block mb-1">
+                    Initial Rooms to Provision
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={onboardRooms}
+                    onChange={(e) => setOnboardRooms(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-400 block mb-1">
+                    Default Monthly Rent (₹)
+                  </label>
+                  <input
+                    type="number"
+                    min="1000"
+                    step="500"
+                    value={onboardRent}
+                    onChange={(e) => setOnboardRent(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {onboardError && (
+              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-400 font-semibold flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />
+                <span>{onboardError}</span>
+              </div>
+            )}
+
+            {onboardSuccess && (
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-400 font-semibold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                <span>{onboardSuccess}</span>
+              </div>
+            )}
+
+            <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setOnboardModalOwner(null)}
+                disabled={onboardSubmitting}
+                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition"
+              >
+                Cancel
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleCompleteOnboarding('reject')}
+                  disabled={onboardSubmitting}
+                  className="px-3.5 py-2 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/40 rounded-xl text-xs font-bold transition"
+                >
+                  Reject & Keep Locked
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleCompleteOnboarding('unlock')}
+                  disabled={onboardSubmitting || !onboardPropName.trim()}
+                  className="px-4 py-2 bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-lg shadow-amber-500/20 disabled:opacity-50"
+                >
+                  {onboardSubmitting ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                  )}
+                  <span>Approve & Unlock ERP</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

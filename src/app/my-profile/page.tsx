@@ -11,7 +11,8 @@ import {
   Download, FileText, Wallet, Receipt, CreditCard, ChevronRight, Award, Shield,
   CheckCircle, MapPin, QrCode, Share2, Sparkles, Zap, Smartphone,
   HeartHandshake, ChevronDown, Filter, AlertTriangle, BedDouble, TrendingUp, Plus,
-  Camera, UploadCloud, Trash2, Image as ImageIcon
+  Camera, UploadCloud, Trash2, Image as ImageIcon,
+  Lock, MessageSquare
 } from 'lucide-react'
 import { ListPropertyModal } from '@/components/marketplace/list-property-modal'
 
@@ -235,6 +236,7 @@ function MyProfileContent() {
   // Edit Profile Form State
   const [editName, setEditName] = useState('')
   const [editEmail, setEditEmail] = useState('')
+  const [editDob, setEditDob] = useState('')
   const [editGender, setEditGender] = useState('male')
   const [editAge, setEditAge] = useState('25')
   const [editProfession, setEditProfession] = useState('')
@@ -246,6 +248,10 @@ function MyProfileContent() {
   const [editPermanentCity, setEditPermanentCity] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('')
+
+  // Gated Owner Listing State
+  const [isListingLockedModalOpen, setIsListingLockedModalOpen] = useState(false)
+  const [isOwnerUnlockedState, setIsOwnerUnlockedState] = useState(true)
 
   // Aadhaar Verification State
   const [aadhaarInput, setAadhaarInput] = useState('')
@@ -289,6 +295,10 @@ function MyProfileContent() {
               setActiveTab('properties')
             }
 
+            // Superadmin is always unlocked; owner is unlocked only if verified
+            const isUnlocked = data.isOwnerUnlocked ?? Boolean(data.user.organization_id)
+            setIsOwnerUnlockedState(isUnlocked)
+
             // Server profile is the authoritative source of truth
             const serverProfile = data.profile || {}
             setProfileData(serverProfile)
@@ -296,6 +306,7 @@ function MyProfileContent() {
               localStorage.setItem('pgsetu_profile_data', JSON.stringify(serverProfile))
             } catch {}
 
+            setEditDob(serverProfile.dob || '')
             setEditGender(serverProfile.gender || 'male')
             setEditAge(serverProfile.age ? serverProfile.age.toString() : '')
             setEditProfession(serverProfile.profession || '')
@@ -323,6 +334,14 @@ function MyProfileContent() {
       router.push('/login?role=owner')
       return
     }
+
+    // Property listing gatekeeper: Owner must be onboarded/unlocked by SuperAdmin before listing properties
+    const isSuperAdmin = currentUser?.role === 'superadmin' || currentUser?.email === 'vikramtomar0505@gmail.com'
+    if (!isSuperAdmin && currentUser?.role === 'owner' && !isOwnerUnlockedState) {
+      setIsListingLockedModalOpen(true)
+      return
+    }
+
     setIsListPropertyWizardOpen(true)
   }
 
@@ -596,6 +615,7 @@ function MyProfileContent() {
     const updatedProfilePayload = {
       full_name: editName.trim(),
       email: editEmail.trim(),
+      dob: editDob,
       gender: editGender,
       age: Number(editAge) || undefined,
       profession: editProfession.trim(),
@@ -619,6 +639,7 @@ function MyProfileContent() {
         const resData = await res.json()
         if (resData.profile) {
           setProfileData(resData.profile)
+          if (resData.profile.dob) setEditDob(resData.profile.dob)
           setEditGender(resData.profile.gender || 'male')
           setEditAge(resData.profile.age ? resData.profile.age.toString() : '')
           setEditProfession(resData.profile.profession || '')
@@ -999,6 +1020,50 @@ function MyProfileContent() {
             </div>
           </div>
         </div>
+
+        {/* 2B. GATED OWNER ONBOARDING WARNING (IF ERP / LISTING LOCKED) */}
+        {isOwner && !isOwnerUnlockedState && (
+          <div className="rounded-2xl border-2 border-amber-200 bg-amber-50/95 p-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-900 shadow-inner">
+                <Lock className="h-5 w-5 stroke-[2.2]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm font-bold text-amber-950">
+                    Owner Onboarding Pending — ERP Platform & Listing Locked
+                  </h3>
+                  <span className="rounded-full bg-amber-200/90 px-2 py-0.5 text-[10px] font-extrabold text-amber-900 uppercase tracking-wider">
+                    SuperAdmin Review
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-gray-700 leading-relaxed">
+                  Your owner profile is registered. To ensure quality listings, full ERP access and property listing on the website will unlock once SuperAdmin reviews your account and finishes your PG onboarding.
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <a
+                    href={`https://wa.me/919453522757?text=${encodeURIComponent(
+                      `Hello SuperAdmin, I registered as a PG Owner on PGSetu (${currentUser?.full_name || 'Owner'}, Mobile: +91 ${currentUser?.phone || ''}). Please finish my onboarding and unlock my ERP platform.`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-[#166534] transition"
+                  >
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    <span>Chat with SuperAdmin to Unlock</span>
+                  </a>
+                  <a
+                    href="/dashboard"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-50 transition"
+                  >
+                    <Lock className="h-3.5 w-3.5 text-amber-700" />
+                    <span>View Locked ERP Screen</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ---------------------------------------------------------- */}
         {/* 3. MOBILE QUICK ACTION DOCK (ROLE-ADAPTIVE 4 TOUCH PILLS) */}
@@ -2414,9 +2479,9 @@ function MyProfileContent() {
                 </div>
 
                 <div className="rounded-xl bg-gray-50 p-2.5">
-                  <span className="text-gray-400 text-[10px] font-bold block">Gender & Age</span>
+                  <span className="text-gray-400 text-[10px] font-bold block">DOB & Age</span>
                   <p className="font-bold text-gray-900 mt-0.5 capitalize">
-                    {profileData?.gender || 'Not set'} {profileData?.age ? `• ${profileData.age} Yrs` : ''}
+                    {profileData?.dob ? new Date(profileData.dob).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Not set'} {profileData?.age ? `• ${profileData.age} Yrs` : ''}
                   </p>
                 </div>
 
@@ -2512,7 +2577,34 @@ function MyProfileContent() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                    Date of Birth <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    max={new Date().toISOString().split('T')[0]}
+                    value={editDob}
+                    onChange={(e) => {
+                      setEditDob(e.target.value)
+                      if (e.target.value) {
+                        const birthDate = new Date(e.target.value)
+                        const today = new Date()
+                        let calculatedAge = today.getFullYear() - birthDate.getFullYear()
+                        const m = today.getMonth() - birthDate.getMonth()
+                        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                          calculatedAge--
+                        }
+                        if (calculatedAge > 0 && calculatedAge < 120) {
+                          setEditAge(String(calculatedAge))
+                        }
+                      }
+                    }}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-gray-300 outline-none focus:border-[#16A34A] bg-white font-medium"
+                  />
+                </div>
                 <div>
                   <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">Gender</label>
                   <select
@@ -2525,18 +2617,19 @@ function MyProfileContent() {
                     <option value="other">Other</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">Age</label>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min={16}
-                    max={100}
-                    value={editAge}
-                    onChange={(e) => setEditAge(e.target.value)}
-                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-300 outline-none focus:border-[#16A34A]"
-                  />
-                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">Age</label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={16}
+                  max={100}
+                  value={editAge}
+                  onChange={(e) => setEditAge(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-300 outline-none focus:border-[#16A34A]"
+                />
               </div>
 
               <div>
@@ -3468,6 +3561,49 @@ function MyProfileContent() {
         onClose={() => setIsListPropertyWizardOpen(false)}
         onListingCreated={handleWizardListingCreated}
       />
+
+      {/* 13. MODAL 9: LOCKED PROPERTY LISTING ALERT MODAL */}
+      {isListingLockedModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+            <button
+              onClick={() => setIsListingLockedModalOpen(false)}
+              className="absolute right-4 top-4 text-gray-400 hover:text-gray-700"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <div className="flex flex-col items-center text-center">
+              <div className="h-14 w-14 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center mb-3 shadow-inner">
+                <Lock className="h-7 w-7 stroke-[2.2]" />
+              </div>
+              <h3 className="text-lg font-black text-gray-900">Property Listing Locked</h3>
+              <p className="mt-2 text-xs text-gray-600 leading-relaxed">
+                As per PGSetu security policy, PG Owners can only list properties on the website after SuperAdmin verifies personal details and finishes official onboarding.
+              </p>
+              <div className="mt-5 w-full space-y-2">
+                <a
+                  href={`https://wa.me/919453522757?text=${encodeURIComponent(
+                    `Hello SuperAdmin, I want to list my PG property on PGSetu. Please finish my onboarding and unlock listing for Mobile: +91 ${currentUser?.phone || ''}.`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] py-3 text-xs font-bold text-white shadow-md hover:opacity-95 transition"
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  <span>Request Unlocking via WhatsApp</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setIsListingLockedModalOpen(false)}
+                  className="w-full py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 transition"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Share Toast */}
       {sharedToast && (

@@ -50,13 +50,14 @@ function UnifiedLoginForm() {
   const [aadhaarOtpSent, setAadhaarOtpSent] = useState(false)
   const [aadhaarVerified, setAadhaarVerified] = useState(false)
 
-  // Owner Form Fields (for when no PG account is found)
+  // Tenant Form Fields
+  const [dob, setDob] = useState('')
+
+  // Owner Personal Details Form Fields (personal details only, no PG created on signup)
   const [ownerName, setOwnerName] = useState('')
-  const [propertyName, setPropertyName] = useState('')
-  const [city, setCity] = useState('')
-  const [pgType, setPgType] = useState('coliving')
-  const [address, setAddress] = useState('')
-  const [approxRooms, setApproxRooms] = useState('6')
+  const [ownerDob, setOwnerDob] = useState('')
+  const [ownerGender, setOwnerGender] = useState<'male' | 'female' | 'other' | ''>('')
+  const [ownerCity, setOwnerCity] = useState('')
   const [ownerEmail, setOwnerEmail] = useState('')
 
   // UI state
@@ -192,7 +193,24 @@ function UnifiedLoginForm() {
     }
   }
 
-  // 2C. Submit New PG Owner Details & Create Account
+  // Helper to handle Tenant DOB changes and auto-calculate age
+  const handleTenantDobChange = (val: string) => {
+    setDob(val)
+    if (val) {
+      const birthDate = new Date(val)
+      const today = new Date()
+      let calculatedAge = today.getFullYear() - birthDate.getFullYear()
+      const m = today.getMonth() - birthDate.getMonth()
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        calculatedAge--
+      }
+      if (calculatedAge > 0 && calculatedAge < 120) {
+        setAge(String(calculatedAge))
+      }
+    }
+  }
+
+  // 2C. Submit New PG Owner Personal Details & Register (No PG created on signup)
   const handleNewOwnerSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -201,12 +219,16 @@ function UnifiedLoginForm() {
       setError('Please enter your full name.')
       return
     }
-    if (!propertyName.trim()) {
-      setError('Please enter your PG / Property name.')
+    if (!ownerDob) {
+      setError('Please enter your date of birth.')
       return
     }
-    if (!city.trim()) {
-      setError('Please enter the city where your PG is located.')
+    if (!ownerGender) {
+      setError('Please select your gender.')
+      return
+    }
+    if (!ownerCity.trim()) {
+      setError('Please enter your city of residence.')
       return
     }
 
@@ -221,11 +243,9 @@ function UnifiedLoginForm() {
           action: 'register-new-owner',
           mobile: cleaned,
           owner_name: ownerName.trim(),
-          property_name: propertyName.trim(),
-          city: city.trim(),
-          pg_type: pgType,
-          address: address.trim(),
-          approx_rooms: approxRooms ? Number(approxRooms) : 6,
+          dob: ownerDob,
+          gender: ownerGender,
+          city: ownerCity.trim(),
           email: ownerEmail.trim() || undefined,
           pre_verified: true,
           otp: otp.trim() || devOtp || '123456',
@@ -234,12 +254,12 @@ function UnifiedLoginForm() {
 
       const data = await res.json()
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to create PG account.')
+        throw new Error(data.error || 'Failed to register owner account.')
       }
 
       window.location.href = data.redirect || '/my-profile'
     } catch (err: any) {
-      setError(err.message || 'Failed to create PG account. Please try again.')
+      setError(err.message || 'Failed to register owner account. Please try again.')
       setLoading(false)
     }
   }
@@ -251,6 +271,10 @@ function UnifiedLoginForm() {
 
     if (!fullName.trim()) {
       setError('Please enter your full name.')
+      return
+    }
+    if (!dob) {
+      setError('Date of Birth is mandatory. Please enter your DOB.')
       return
     }
     if (!gender) {
@@ -273,6 +297,12 @@ function UnifiedLoginForm() {
   // 4. Finalize Registration (With or Without Aadhaar)
   const handleFinalizeRegistration = async (skipAadhaar = false) => {
     setError('')
+
+    if (!dob) {
+      setError('Date of Birth is mandatory.')
+      return
+    }
+
     setLoading(true)
 
     const cleaned = cleanMobile(mobile)
@@ -286,6 +316,7 @@ function UnifiedLoginForm() {
           otp: otp.trim() || devOtp || '123456',
           pre_verified: true,
           full_name: fullName,
+          dob,
           gender,
           age: Number(age),
           profession,
@@ -633,7 +664,7 @@ function UnifiedLoginForm() {
       )}
 
       {/* ────────────────────────────────────────────────────────── */}
-      {/* 2B. NEW PG OWNER REGISTRATION (BASIC INFORMATION & DETAIL) */}
+      {/* 2B. NEW PG OWNER REGISTRATION (PERSONAL DETAILS ONLY) */}
       {/* ────────────────────────────────────────────────────────── */}
       {step === 'new_owner_details' && (
         <form onSubmit={handleNewOwnerSubmit} className="space-y-4">
@@ -642,9 +673,11 @@ function UnifiedLoginForm() {
             <span>Mobile +91 {cleanMobile(mobile)} Verified!</span>
           </div>
 
-          <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 text-xs text-emerald-950">
-            <span className="font-bold block text-emerald-900">No PG Account Found</span>
-            <span className="text-gray-600">Enter basic information and details below to create your PG owner account and launch your dashboard immediately.</span>
+          <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3 text-xs text-blue-950">
+            <span className="font-bold block text-blue-900">Owner Profile Registration</span>
+            <span className="text-gray-600">
+              Enter your personal details to register as a PG Owner. The ERP platform and property listing remain securely locked until SuperAdmin reviews and finishes your onboarding.
+            </span>
           </div>
 
           {/* Alternate Tenant Account if found */}
@@ -683,128 +716,110 @@ function UnifiedLoginForm() {
             />
           </div>
 
-          {/* PG / Property Name */}
+          {/* DOB & Gender Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                Date of Birth <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                required
+                max={new Date().toISOString().split('T')[0]}
+                value={ownerDob}
+                onChange={(e) => setOwnerDob(e.target.value)}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-gray-300 focus:border-[#16A34A] focus:ring-2 focus:ring-[#16A34A]/20 outline-none font-medium bg-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                Gender <span className="text-red-500">*</span>
+              </label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {[
+                  { id: 'male', label: 'Male' },
+                  { id: 'female', label: 'Female' },
+                  { id: 'other', label: 'Other' },
+                ].map((g) => (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => setOwnerGender(g.id as any)}
+                    className={`py-2 rounded-xl text-xs font-bold border transition text-center ${
+                      ownerGender === g.id
+                        ? 'border-[#14532D] bg-[#14532D] text-white shadow-xs'
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    {g.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* City of Residence */}
           <div>
             <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-              PG / Hostel / Property Name <span className="text-red-500">*</span>
+              City of Residence <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               required
-              value={propertyName}
-              onChange={(e) => setPropertyName(e.target.value)}
-              placeholder="e.g. Sai Balaji Luxury PG"
+              list="owner-residence-cities"
+              value={ownerCity}
+              onChange={(e) => setOwnerCity(e.target.value)}
+              placeholder="e.g. Bangalore, Delhi, Jaipur..."
               className="w-full px-3.5 py-2 text-sm rounded-xl border border-gray-300 focus:border-[#16A34A] focus:ring-2 focus:ring-[#16A34A]/20 outline-none font-medium"
             />
+            <datalist id="owner-residence-cities">
+              <option value="Bangalore" />
+              <option value="Delhi" />
+              <option value="Gurgaon" />
+              <option value="Noida" />
+              <option value="Kota" />
+              <option value="Pune" />
+              <option value="Hyderabad" />
+              <option value="Mumbai" />
+              <option value="Jaipur" />
+              <option value="Dehradun" />
+              <option value="Indore" />
+              <option value="Chennai" />
+              <option value="Ahmedabad" />
+              <option value="Chandigarh" />
+            </datalist>
           </div>
 
-          {/* City & PG Type Grid */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                City <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                list="popular-cities-list"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                placeholder="e.g. Bangalore"
-                className="w-full px-3 py-2 text-sm rounded-xl border border-gray-300 focus:border-[#16A34A] focus:ring-2 focus:ring-[#16A34A]/20 outline-none font-medium"
-              />
-              <datalist id="popular-cities-list">
-                <option value="Bangalore" />
-                <option value="Delhi" />
-                <option value="Gurgaon" />
-                <option value="Noida" />
-                <option value="Kota" />
-                <option value="Pune" />
-                <option value="Hyderabad" />
-                <option value="Mumbai" />
-                <option value="Jaipur" />
-                <option value="Dehradun" />
-                <option value="Indore" />
-                <option value="Chennai" />
-                <option value="Ahmedabad" />
-                <option value="Chandigarh" />
-              </datalist>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                PG Type <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={pgType}
-                onChange={(e) => setPgType(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-xl border border-gray-300 focus:border-[#16A34A] focus:ring-2 focus:ring-[#16A34A]/20 outline-none font-medium bg-white"
-              >
-                <option value="coliving">Co-Living (Unisex)</option>
-                <option value="boys">Boys PG</option>
-                <option value="girls">Girls PG</option>
-                <option value="hostel">Student Hostel</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Locality / Area */}
+          {/* Owner Email Address */}
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-              Locality / Area / Landmark <span className="text-gray-400 font-normal">(Optional)</span>
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                Email Address
+              </label>
+              <span className="text-[10px] text-gray-400 font-medium">Optional</span>
+            </div>
             <input
-              type="text"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="e.g. Sector 62, Near Metro Station"
-              className="w-full px-3.5 py-2 text-sm rounded-xl border border-gray-300 focus:border-[#16A34A] focus:ring-2 focus:ring-[#16A34A]/20 outline-none font-medium"
+              type="email"
+              value={ownerEmail}
+              onChange={(e) => setOwnerEmail(e.target.value)}
+              placeholder="e.g. owner@gmail.com"
+              className="w-full px-3 py-2 text-sm rounded-xl border border-gray-300 focus:border-[#16A34A] focus:ring-2 focus:ring-[#16A34A]/20 outline-none font-medium"
             />
-          </div>
-
-          {/* Approx Rooms & Email Grid */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                Total Rooms <span className="text-gray-400 font-normal">(Approx)</span>
-              </label>
-              <input
-                type="number"
-                min={1}
-                max={50}
-                value={approxRooms}
-                onChange={(e) => setApproxRooms(e.target.value)}
-                placeholder="6"
-                className="w-full px-3 py-2 text-sm rounded-xl border border-gray-300 focus:border-[#16A34A] focus:ring-2 focus:ring-[#16A34A]/20 outline-none font-medium"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                Email Address <span className="text-gray-400 font-normal">(Optional)</span>
-              </label>
-              <input
-                type="email"
-                value={ownerEmail}
-                onChange={(e) => setOwnerEmail(e.target.value)}
-                placeholder="e.g. owner@gmail.com"
-                className="w-full px-3 py-2 text-sm rounded-xl border border-gray-300 focus:border-[#16A34A] focus:ring-2 focus:ring-[#16A34A]/20 outline-none font-medium"
-              />
-            </div>
           </div>
 
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={loading || !ownerName.trim() || !propertyName.trim() || !city.trim()}
+            disabled={loading || !ownerName.trim() || !ownerDob || !ownerGender || !ownerCity.trim()}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] py-3 text-sm font-bold text-white shadow-md hover:opacity-95 disabled:opacity-50 transition"
           >
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <>
-                <Building2 className="h-4 w-4" />
-                <span>Create PG Account & View Profile</span>
+                <User className="h-4 w-4" />
+                <span>Register as PG Owner</span>
                 <ArrowRight className="h-4 w-4" />
               </>
             )}
@@ -890,14 +905,18 @@ function UnifiedLoginForm() {
 
           {/* CTAs */}
           <div className="space-y-2">
-            <Link
-              href={`/onboarding?phone=${cleanMobile(mobile)}`}
+            <button
+              type="button"
+              onClick={() => {
+                setStep('new_owner_details')
+                setError('')
+              }}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] py-3 text-sm font-bold text-white shadow-md hover:opacity-95 transition"
             >
-              <Building2 className="h-4 w-4" />
-              <span>Register Your PG Property Now (Free)</span>
+              <User className="h-4 w-4" />
+              <span>Register as PG Owner</span>
               <ArrowRight className="h-4 w-4" />
-            </Link>
+            </button>
 
             <button
               type="button"
@@ -989,8 +1008,21 @@ function UnifiedLoginForm() {
             </div>
           </div>
 
-          {/* Age & Email Grid */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Date of Birth & Age Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                Date of Birth <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                required
+                max={new Date().toISOString().split('T')[0]}
+                value={dob}
+                onChange={(e) => handleTenantDobChange(e.target.value)}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-gray-300 focus:border-[#16A34A] focus:ring-2 focus:ring-[#16A34A]/20 outline-none font-medium bg-white"
+              />
+            </div>
             <div>
               <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
                 Age <span className="text-red-500">*</span>
@@ -1006,21 +1038,23 @@ function UnifiedLoginForm() {
                 className="w-full px-3.5 py-2 text-sm rounded-xl border border-gray-300 focus:border-[#16A34A] focus:ring-2 focus:ring-[#16A34A]/20 outline-none font-medium"
               />
             </div>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  Email
-                </label>
-                <span className="text-[10px] text-gray-400 font-medium">Optional</span>
-              </div>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="e.g. name@mail.com"
-                className="w-full px-3.5 py-2 text-sm rounded-xl border border-gray-300 focus:border-[#16A34A] focus:ring-2 focus:ring-[#16A34A]/20 outline-none font-medium"
-              />
+          </div>
+
+          {/* Email Address */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                Email Address
+              </label>
+              <span className="text-[10px] text-gray-400 font-medium">Optional</span>
             </div>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="e.g. name@mail.com"
+              className="w-full px-3.5 py-2 text-sm rounded-xl border border-gray-300 focus:border-[#16A34A] focus:ring-2 focus:ring-[#16A34A]/20 outline-none font-medium"
+            />
           </div>
 
           {/* Profession */}
@@ -1047,7 +1081,7 @@ function UnifiedLoginForm() {
             <button
               type="button"
               onClick={() => handleFinalizeRegistration(true)}
-              disabled={loading || !fullName.trim() || !gender || !age || !profession}
+              disabled={loading || !fullName.trim() || !dob || !gender || !age || !profession}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] py-3 text-sm font-bold text-white shadow-md hover:opacity-95 disabled:opacity-50 transition"
             >
               {loading ? (
@@ -1062,7 +1096,7 @@ function UnifiedLoginForm() {
 
             <button
               type="submit"
-              disabled={loading || !fullName.trim() || !gender || !age || !profession}
+              disabled={loading || !fullName.trim() || !dob || !gender || !age || !profession}
               className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-gray-300 bg-white py-2.5 text-xs font-bold text-[#14532D] hover:bg-gray-50 transition"
             >
               <span>Optional: Verify Aadhaar ID (Instant Badge)</span>
