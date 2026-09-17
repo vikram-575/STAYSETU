@@ -384,48 +384,15 @@ export async function POST(request: NextRequest) {
       const effectiveEmail = user?.email || resident?.email || matchedOrg?.email || firestoreProfile?.email || `${cleaned}@${requestedRole === 'owner' ? 'owner' : 'user'}.pgsetu.com`
       const effectiveRole = requestedRole === 'owner' ? (user?.role || 'owner') : 'resident'
       let residentId = requestedRole === 'tenant' ? (resident?.id || user?.resident_id || null) : null
-      const orgId = user?.organization_id || resident?.organization_id || matchedOrg?.id || defaultOrgId
+      const orgId = requestedRole === 'owner'
+        ? (user?.organization_id || matchedOrg?.id || defaultOrgId)
+        : (resident?.organization_id || user?.organization_id || null)
       const tenantRegId = resident?.registration_number || firestoreProfile?.id || `TN-${cleaned.slice(-4)}`
 
       const now = new Date().toISOString()
 
-      // Ensure resident record exists in Supabase ONLY for tenants so profile is maintained on server
-      if (requestedRole === 'tenant' && !residentId) {
-        try {
-          const defaultNotes = {
-            age: 25,
-            profession: firestoreProfile?.profession || 'Verified Resident',
-            aadhaar_verified: false,
-            aadhaar_last4: '',
-            aadhaar_verified_date: '',
-            created_at: now,
-          }
-          const { data: newRes } = await serviceClient
-            .from('residents')
-            .insert({
-              organization_id: orgId,
-              registration_number: tenantRegId,
-              full_name: effectiveName,
-              phone: cleaned,
-              email: effectiveEmail,
-              gender: firestoreProfile?.gender || 'male',
-              status: 'active',
-              emergency_name: null,
-              emergency_phone: null,
-              emergency_relation: null,
-              permanent_address: null,
-              permanent_city: null,
-              id_type: null,
-              id_number: null,
-              notes: JSON.stringify(defaultNotes),
-              created_at: now,
-              updated_at: now,
-            })
-            .select('id')
-            .maybeSingle()
-          if (newRes) residentId = newRes.id
-        } catch {}
-      }
+      // NOTE: Tenants are NOT auto-assigned to any PG upon login.
+      // A tenant is only assigned to a PG when explicitly allotted by a PG Owner or Superadmin.
 
       // ─── SAVE / UPSERT SIGNED-IN USER IN SUPABASE ───────────
       const { data: savedUser, error: saveErr } = await serviceClient
@@ -493,6 +460,8 @@ export async function POST(request: NextRequest) {
           maxAge: 60 * 60 * 24 * 30,
           path: '/',
         })
+      } else {
+        cookieStore.delete('resident_id')
       }
 
       if (orgId) {
@@ -510,6 +479,9 @@ export async function POST(request: NextRequest) {
           maxAge: 60 * 60 * 24 * 30,
           path: '/',
         })
+      } else {
+        cookieStore.delete('org_id')
+        cookieStore.delete('organization_id')
       }
 
       // When owner or resident logs in, direct them to website profile page (/my-profile)
@@ -602,56 +574,19 @@ export async function POST(request: NextRequest) {
       const targetUserId = existingUser ? existingUser.id : crypto.randomUUID()
       const now = new Date().toISOString()
 
-      // ─── SAVE IN SUPABASE RESIDENTS TABLE (FULL PROFILE) ────
+      // ─── SAVE IN SUPABASE USERS TABLE (TENANT PROFILE ONLY, NO PG AUTO-ALLOTMENT) ──
+      // Tenants do NOT belong to any PG until explicitly checked-in/allotted by a PG owner or admin.
       let residentId: string | null = null
-      try {
-        const notesObj = {
-          age: Number(age),
-          profession: profession.trim(),
-          aadhaar_verified: Boolean(aadhaar_verified),
-          aadhaar_last4: aadhaar_number ? aadhaar_number.replace(/\D/g, '').slice(-4) : null,
-          created_at: now,
-        }
-
-        const { data: newResident, error: resErr } = await serviceClient
-          .from('residents')
-          .insert({
-            organization_id: defaultOrgId,
-            registration_number: uniqueTenantId,
-            full_name: full_name.trim(),
-            phone: cleanedMobile,
-            email: effectiveEmail,
-            gender: gender || 'male',
-            status: 'active',
-            id_type: aadhaar_number ? 'aadhaar' : null,
-            id_number: aadhaar_number ? aadhaar_number.replace(/\D/g, '').slice(-4) : null,
-            notes: JSON.stringify(notesObj),
-            created_at: now,
-            updated_at: now,
-          })
-          .select()
-          .maybeSingle()
-
-        if (newResident) {
-          residentId = newResident.id
-        } else if (resErr) {
-          console.warn('[Supabase Residents Insert Warning]:', resErr.message)
-        }
-      } catch (rErr: any) {
-        console.warn('[Supabase Residents Insert Exception]:', rErr?.message)
-      }
-
-      // ─── SAVE IN SUPABASE USERS TABLE ───────────────────────
       const { data: savedUser, error: saveErr } = await serviceClient
         .from('users')
         .upsert({
           id: targetUserId,
-          organization_id: defaultOrgId,
+          organization_id: null,
           email: effectiveEmail,
           full_name: full_name.trim(),
           phone: cleanedMobile,
           role: 'resident',
-          resident_id: residentId,
+          resident_id: null,
           is_active: true,
           last_login_at: now,
           created_at: now,
@@ -726,15 +661,9 @@ export async function POST(request: NextRequest) {
         maxAge: 60 * 60 * 24 * 30,
         path: '/',
       })
-      if (residentId) {
-        cookieStore.set('resident_id', residentId, {
-          httpOnly: false,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 60 * 60 * 24 * 30,
-          path: '/',
-        })
-      }
+      cookieStore.delete('resident_id')
+      cookieStore.delete('org_id')
+      cookieStore.delete('organization_id')
 
       const returnedProfile = {
         id: uniqueTenantId,

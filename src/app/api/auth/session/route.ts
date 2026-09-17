@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
 import { getAuthenticatedUser } from '@/lib/auth-session'
 import { createServiceClient } from '@/lib/supabase/server'
+import { calculateTrustScore } from '@/lib/trust-score'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -142,6 +143,16 @@ export async function GET() {
 
             const org: any = res.organizations
 
+            // CRITICAL CHECK: An actual stay exists ONLY if resident has an allotted room or is checked out.
+            // If room_number is null and status is not checked_out, this is an unallotted profile, not an active stay.
+            const hasRoomAllotment = Boolean(currentView?.room_number)
+            const isCompletedStay = res.status === 'checked_out'
+
+            if (!hasRoomAllotment && !isCompletedStay) {
+              // Unallotted tenant - skip adding as an active stay
+              continue
+            }
+
             userStays.push({
               id: res.id,
               registration_number: res.registration_number,
@@ -155,7 +166,7 @@ export async function GET() {
               status: res.status === 'checked_out' ? 'completed' : 'active',
               monthly_rent_paise: currentView?.monthly_rent_paise || 0,
               deposit_held_paise: currentView?.deposit_held_paise || 0,
-              deposit_status: res.status === 'checked_out' ? 'Refunded via UPI' : (currentView?.deposit_held_paise ? 'Held in Escrow Trust' : 'Pending Allotment'),
+              deposit_status: res.status === 'checked_out' ? 'Refunded via UPI' : (currentView?.deposit_held_paise ? 'Held in Escrow Trust' : 'Allotted'),
               total_paid_paise: currentView?.total_paid_paise || 0,
               total_outstanding_paise: currentView?.total_outstanding_paise || 0,
             })
@@ -166,7 +177,9 @@ export async function GET() {
       }
     }
 
-    // ── 2. Passbook Ledger Metrics ──
+    // ── 2. Passbook Ledger Metrics & Dynamic 0-100 Trust Score ──
+    const trustScore = calculateTrustScore(userStays)
+
     const totalRentPaidPaise = userStays.reduce((acc, s) => acc + (s.total_paid_paise || 0), 0)
     const activeDepositsPaise = userStays.filter((s) => s.status === 'active').reduce((acc, s) => acc + (s.deposit_held_paise || 0), 0)
     const totalDuePaise = userStays.reduce((acc, s) => acc + (s.total_outstanding_paise || 0), 0)
@@ -176,9 +189,9 @@ export async function GET() {
       active_deposits_paise: activeDepositsPaise,
       total_due_paise: totalDuePaise,
       total_stays_count: userStays.length,
-      on_time_payment_rate: userStays.length > 0 ? '100%' : 'N/A',
-      renter_credit_score: userStays.length > 0 ? '790 / 850' : 'N/A',
-      renter_tier: userStays.length > 0 ? 'Tier 1 Verified Tenant' : 'Member',
+      on_time_payment_rate: trustScore.onTimePaymentRate,
+      renter_credit_score: trustScore.scoreFormatted,
+      renter_tier: trustScore.tier,
     }
 
     // ── 3. Recent Transactions Ledger (Queried from Supabase) ──

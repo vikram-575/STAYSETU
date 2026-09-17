@@ -525,7 +525,7 @@ function MyProfileContent() {
 
   const isAadhaarVerified = Boolean(profileData?.aadhaar_verified)
   const aadhaarLast4 = profileData?.aadhaar_last4 || ''
-  const activeStay = stays.find((s) => s.status === 'active') || stays[0]
+  const activeStay = stays.find((s) => s.status === 'active' && s.room_number) || null
 
   const totalRentFormatted = passbookSummary
     ? `₹${(passbookSummary.total_rent_paid_paise / 100).toLocaleString('en-IN')}`
@@ -946,7 +946,7 @@ function MyProfileContent() {
                   <span className="font-bold text-emerald-300">
                     {activeStay?.room_number
                       ? `${activeStay.room_number} (${activeStay.bed_label || 'Bed A'})`
-                      : 'Pending Room Assignment'}
+                      : 'No Active PG Allotted'}
                   </span>
                 </>
               )}
@@ -1904,16 +1904,16 @@ function MyProfileContent() {
                   <div className="mt-1 text-base sm:text-lg font-black text-purple-900">
                     {passbookSummary?.renter_credit_score && passbookSummary.renter_credit_score !== 'N/A'
                       ? passbookSummary.renter_credit_score
-                      : (stays.length > 0 ? '790 / 850' : 'N/A')}
+                      : '0 / 100'}
                   </div>
                   <span className="text-[10px] font-bold text-purple-700 block mt-0.5">
-                    {passbookSummary?.renter_tier || (stays.length > 0 ? 'Tier 1 Tenant' : 'Member')}
+                    {passbookSummary?.renter_tier || 'New Tenant'}
                   </span>
                 </div>
               </div>
 
-              {/* Active Stay Detailed Highlight */}
-              {activeStay && (
+              {/* Active Stay Detailed Highlight or Empty State */}
+              {activeStay ? (
                 <div className="rounded-3xl border border-emerald-200 bg-emerald-50/40 p-4 sm:p-5">
                   <div className="flex items-center justify-between pb-3 border-b border-emerald-100">
                     <div className="flex items-center gap-2">
@@ -1981,17 +1981,15 @@ function MyProfileContent() {
                     </div>
                   </div>
                 </div>
-              )}
-
-              {/* Empty State when no stays registered */}
-              {stays.length === 0 && (
+              ) : (
+                /* Empty State when no active stay is allotted */
                 <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50/60 p-6 text-center">
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
                     <Building2 className="h-6 w-6" />
                   </div>
-                  <h3 className="mt-3 text-sm font-bold text-gray-900">No Active Stay Allotted</h3>
+                  <h3 className="mt-3 text-sm font-bold text-gray-900">No Active PG Allotment</h3>
                   <p className="mt-1 text-xs text-gray-500 max-w-sm mx-auto">
-                    You are registered as a verified PG-Setu Member. Once your PG manager assigns your room and bed, your stay pass and rent ledger will appear here.
+                    You are not currently allotted to any PG. Your PG owner or superadmin will allot your room and bed upon check-in.
                   </p>
                   <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                     <Link
