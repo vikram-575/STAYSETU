@@ -119,6 +119,19 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
     }
   }
 
+  const handleNavigateToOnboarding = (owner: any) => {
+    const params = new URLSearchParams()
+    params.set('returnTo', '/admin')
+    if (owner.mobile) params.set('mobile', owner.mobile)
+    if (owner.full_name) params.set('name', owner.full_name)
+    if (owner.city) params.set('city', owner.city)
+    if (owner.email) params.set('email', owner.email)
+    if (owner.user_id) params.set('userId', owner.user_id)
+    if (owner.id) params.set('ownerId', owner.id)
+
+    router.push(`/onboarding?${params.toString()}`)
+  }
+
   const handleOpenOnboardModal = (owner: any) => {
     setOnboardModalOwner(owner)
     setOnboardPropName(owner.full_name ? `${owner.full_name}'s PG` : 'New Luxury PG')
@@ -405,18 +418,29 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
           )}
         </button>
 
-        <button
-          type="button"
-          onClick={() => {
-            loadOrganizations()
-            loadPendingOwners()
-          }}
-          className="p-2 bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl text-xs transition ml-auto flex items-center gap-1"
-          title="Refresh Lists"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Refresh</span>
-        </button>
+        <div className="flex items-center gap-2 ml-auto">
+          <Link
+            href="/onboarding?returnTo=/admin"
+            className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-blue-600/20"
+            title="Launch Enterprise PG Onboarding Wizard (/onboarding?returnTo=/admin)"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+            <span>Launch Onboarding (/onboarding)</span>
+          </Link>
+
+          <button
+            type="button"
+            onClick={() => {
+              loadOrganizations()
+              loadPendingOwners()
+            }}
+            className="p-2 bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl text-xs transition flex items-center gap-1"
+            title="Refresh Lists"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+        </div>
       </div>
 
       {/* VIEW 1: PENDING LOCKED OWNERS TABLE */}
@@ -531,8 +555,9 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
                             {isUnlockedAwaitingPg ? (
                               <button
                                 type="button"
-                                onClick={() => handleOpenOnboardModal(owner)}
+                                onClick={() => handleNavigateToOnboarding(owner)}
                                 className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-md shadow-emerald-600/20 active:scale-95"
+                                title="Open full Enterprise Onboarding page (/onboarding?returnTo=/admin)"
                               >
                                 <Sparkles className="w-3.5 h-3.5 text-amber-300" />
                                 <span>Onboard PG</span>
@@ -555,9 +580,9 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
 
                                 <button
                                   type="button"
-                                  onClick={() => handleOpenOnboardModal(owner)}
-                                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition"
-                                  title="Unlock ERP and configure PG fleet in one step"
+                                  onClick={() => handleNavigateToOnboarding(owner)}
+                                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-semibold transition"
+                                  title="Open full Enterprise Onboarding page (/onboarding?returnTo=/admin)"
                                 >
                                   Onboard PG
                                 </button>
@@ -925,7 +950,18 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
                     Onboard PG Property & Adjust ERP
                   </h3>
                   <p className="text-[11px] text-slate-400">
-                    Provision PG Property, auto-generate rooms & beds, and adjust owner ERP dashboard.
+                    Provision PG Property, auto-generate rooms & beds, or{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const owner = onboardModalOwner
+                        setOnboardModalOwner(null)
+                        handleNavigateToOnboarding(owner)
+                      }}
+                      className="text-blue-400 hover:underline font-bold inline-flex items-center gap-0.5"
+                    >
+                      switch to Full Onboarding Wizard (/onboarding) <ExternalLink className="w-3 h-3" />
+                    </button>
                   </p>
                 </div>
               </div>

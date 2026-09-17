@@ -26,6 +26,8 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const {
+      userId,
+      owner_id,
       // Step 1: PG Identity & Address
       org_name,
       property_name,
@@ -86,7 +88,18 @@ export async function POST(request: NextRequest) {
     }
 
     const serviceClient = await createServiceClient()
-    const effectiveEmail = (email || authEmail || (adminSession ? SUPER_ADMIN_EMAIL : `owner_${Date.now()}@pgsetu.com`)).toLowerCase().trim()
+    const cleanMobile = (phone || '').replace(/[^0-9]/g, '').slice(-10)
+
+    let effectiveEmail = (email || '').trim().toLowerCase()
+    if (!effectiveEmail || effectiveEmail === SUPER_ADMIN_EMAIL.toLowerCase()) {
+      if (cleanMobile.length >= 10) {
+        effectiveEmail = `${cleanMobile}@owner.pgsetu.online`
+      } else if (authEmail && authEmail.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase()) {
+        effectiveEmail = authEmail.toLowerCase().trim()
+      } else {
+        effectiveEmail = `owner_${Date.now()}@pgsetu.online`
+      }
+    }
     const ownerTemporaryPassword = generate8DigitPassword()
 
     // Generate unique organization slug
@@ -226,28 +239,47 @@ export async function POST(request: NextRequest) {
       console.warn('[Owner Auth Setup Warning]:', authErr)
     }
 
-    // Determine target UUID for users table
-    const targetOwnerUserId = authUserId || crypto.randomUUID()
+    // Match existing owner user if already created during login / OTP
+    let targetOwnerUserId: string | null = null
+
+    if (userId || owner_id) {
+      const { data: userById } = await serviceClient
+        .from('users')
+        .select('id, email, phone')
+        .eq('id', userId || owner_id)
+        .maybeSingle()
+      if (userById) targetOwnerUserId = userById.id
+    }
+
+    if (!targetOwnerUserId && cleanMobile.length >= 10) {
+      const { data: userByPhone } = await serviceClient
+        .from('users')
+        .select('id, email, phone')
+        .or(`phone.ilike.%${cleanMobile}%,phone.eq.${cleanMobile}`)
+        .maybeSingle()
+      if (userByPhone) targetOwnerUserId = userByPhone.id
+    }
+
+    if (!targetOwnerUserId && effectiveEmail && effectiveEmail !== SUPER_ADMIN_EMAIL.toLowerCase()) {
+      const { data: userByEmail } = await serviceClient
+        .from('users')
+        .select('id, email, phone')
+        .ilike('email', effectiveEmail)
+        .maybeSingle()
+      if (userByEmail) targetOwnerUserId = userByEmail.id
+    }
+
+    const finalOwnerUserId = targetOwnerUserId || authUserId || crypto.randomUUID()
 
     // Upsert profile in users table with explicit ID
     try {
-      const { data: existingDbUser } = await serviceClient
-        .from('users')
-        .select('id')
-        .ilike('email', effectiveEmail)
-        .maybeSingle()
-
-      if (existingDbUser && existingDbUser.id !== targetOwnerUserId) {
-        await serviceClient.from('users').delete().eq('id', existingDbUser.id)
-      }
-
       const { error: userUpsertErr } = await serviceClient.from('users').upsert(
         {
-          id: targetOwnerUserId,
+          id: finalOwnerUserId,
           organization_id: orgId,
           email: effectiveEmail,
           full_name: owner_name?.trim() || org_name,
-          phone: phone?.trim() || null,
+          phone: cleanMobile || phone?.trim() || null,
           role: 'owner',
           is_active: true,
         },
@@ -261,7 +293,7 @@ export async function POST(request: NextRequest) {
       // Link owner_user_id in organization
       await serviceClient
         .from('organizations')
-        .update({ owner_user_id: targetOwnerUserId })
+        .update({ owner_user_id: finalOwnerUserId })
         .eq('id', orgId)
     } catch (userErr) {
       console.warn('[User Record Setup Warning]:', userErr)
@@ -348,6 +380,7 @@ export async function POST(request: NextRequest) {
         state: state?.trim() || null,
         pincode: pincode?.trim() || null,
         phone: phone?.trim() || null,
+        is_active: true,
       })
       .select()
       .single()
@@ -519,6 +552,35 @@ export async function POST(request: NextRequest) {
           is_system: true,
         },
       ])
+    } catch {}
+
+    // 8. Automatically Unlock ERP in Firestore & Update Owner Onboarding Status
+    try {
+      const { queryDocuments, updateDocument } = await import('@/lib/firebase/firestore')
+      if (cleanMobile.length >= 10) {
+        const docs = await queryDocuments('owner_profiles', [{ field: 'mobile', operator: '==', value: cleanMobile }])
+        if (docs && docs.length > 0) {
+          for (const doc of docs) {
+            await updateDocument('owner_profiles', doc.id, {
+              erp_unlocked: true,
+              can_list_properties: true,
+              onboarding_status: 'completed',
+              organization_id: orgId,
+              property_name: property.name,
+              city: org.city || city || '',
+              updated_at: new Date().toISOString(),
+              reviewed_by: adminSession?.email || 'superadmin',
+            })
+          }
+        }
+      }
+    } catch (fErr: any) {
+      console.warn('[Onboarding Firestore Profile Unlock Warning]:', fErr?.message)
+    }
+
+    // Clear ERP locked cookie so owner session is immediately unlocked
+    try {
+      cookieStore.delete('erp_locked')
     } catch {}
 
     return NextResponse.json({

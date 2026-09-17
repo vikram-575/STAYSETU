@@ -42,6 +42,28 @@ function OnboardingContent() {
       .catch(() => {})
   }, [isFromAdmin])
 
+  // Prefill form from query parameters when navigated from SuperAdmin (/admin)
+  useEffect(() => {
+    const qMobile = searchParams.get('mobile') || ''
+    const qName = searchParams.get('name') || searchParams.get('owner_name') || ''
+    const qCity = searchParams.get('city') || ''
+    const qEmail = searchParams.get('email') || ''
+    const qPropName = searchParams.get('property_name') || searchParams.get('propertyName') || ''
+    const qOrgName = searchParams.get('org_name') || searchParams.get('orgName') || ''
+
+    if (qMobile || qName || qCity || qEmail || qPropName || qOrgName) {
+      setForm((prev) => ({
+        ...prev,
+        owner_name: prev.owner_name || qName,
+        phone: prev.phone || qMobile,
+        city: prev.city || qCity,
+        email: prev.email || qEmail,
+        org_name: prev.org_name || qOrgName || (qName ? `${qName}'s PG Living` : ''),
+        property_name: prev.property_name || qPropName || (qName ? `${qName} PG Living` : ''),
+      }))
+    }
+  }, [searchParams])
+
   // Form State
   const [form, setForm] = useState({
     // Step 1: PG Identity & Location
@@ -180,6 +202,7 @@ function OnboardingContent() {
     try {
       const payload = {
         ...form,
+        userId: searchParams.get('userId') || searchParams.get('ownerId') || undefined,
         staff_members: staffMembers,
       }
 
@@ -1351,7 +1374,13 @@ function OnboardingContent() {
                 }}
                 className="w-full py-3.5 px-6 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 text-white font-black rounded-xl text-xs sm:text-sm shadow-xl shadow-blue-500/25 transition flex items-center justify-center gap-2 active:scale-[0.99]"
               >
-                <span>{isFromAdmin ? 'Return to Command Center (/superman) →' : 'Enter PG Dashboard Now →'}</span>
+                <span>
+                  {returnTo.includes('/admin')
+                    ? 'Return to SuperAdmin CRM (/admin) →'
+                    : isFromAdmin
+                    ? 'Return to Command Center (/superman) →'
+                    : 'Enter PG Dashboard Now →'}
+                </span>
               </button>
 
               {onboardingSuccessData.credentials?.phone && (
