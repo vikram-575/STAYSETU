@@ -67,40 +67,43 @@ export function WhyChooseUs() {
           ))}
         </div>
 
-        {/* DESKTOP VIEW: Full 3-Column Table (sm+) */}
+        {/* DESKTOP VIEW: Full 3-Column Table (sm+) (Issues 6, 7 & 10 Fix: Left-aligned headers, balanced icons, compact layout with zebra striping) */}
         <div className="hidden sm:block mt-8 overflow-hidden rounded-2xl border border-gray-200/90 bg-white shadow-sm">
           <table className="w-full text-left border-collapse text-xs sm:text-sm">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50/80">
-                <th className="p-4 font-bold text-gray-500 uppercase tracking-wider text-[11px] w-1/3">
+              <tr className="border-b border-gray-200 bg-gray-50/90">
+                <th className="px-5 py-3.5 font-bold text-[#17211B] uppercase tracking-wider text-xs w-[28%] text-left">
                   Rental Feature
                 </th>
-                <th className="p-4 font-bold text-gray-400 uppercase tracking-wider text-[11px] w-1/3">
+                <th className="px-5 py-3.5 font-bold text-gray-500 uppercase tracking-wider text-xs w-[36%] text-left">
                   Traditional Classifieds & Brokers
                 </th>
-                <th className="p-4 font-bold text-[#14532D] uppercase tracking-wider text-[11px] w-1/3 bg-[#DCFCE7]/40">
+                <th className="px-5 py-3.5 font-bold text-[#14532D] uppercase tracking-wider text-xs w-[36%] bg-[#DCFCE7]/50 text-left">
                   PGSetu Marketplace
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {rows.map((row, i) => (
-                <tr key={row.id || i} className="hover:bg-gray-50/50 transition">
-                  <td className="p-4 font-bold text-[#17211B]">{row.feature}</td>
-                  <td className="p-4 text-gray-500">
-                    <div className="flex items-start gap-2">
-                      <div className="flex h-4.5 w-4.5 items-center justify-center rounded-full bg-rose-100 text-rose-600 shrink-0 mt-0.5">
-                        <X className="h-3 w-3" />
+                <tr
+                  key={row.id || i}
+                  className={`transition ${i % 2 === 1 ? 'bg-gray-50/40' : 'bg-white'} hover:bg-emerald-50/20`}
+                >
+                  <td className="px-5 py-3.5 font-bold text-[#17211B]">{row.feature}</td>
+                  <td className="px-5 py-3.5 text-[#647067]">
+                    <div className="flex items-start gap-2.5">
+                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 text-white shrink-0 mt-0.5 shadow-2xs">
+                        <X className="h-3 w-3 stroke-[2.5]" aria-hidden="true" />
                       </div>
-                      <span>{row.traditional}</span>
+                      <span className="leading-snug">{row.traditional}</span>
                     </div>
                   </td>
-                  <td className="p-4 font-semibold text-[#14532D] bg-[#DCFCE7]/20">
-                    <div className="flex items-start gap-2">
-                      <div className="flex h-4.5 w-4.5 items-center justify-center rounded-full bg-[#16A34A] text-white shrink-0 mt-0.5">
-                        <Check className="h-3 w-3" />
+                  <td className="px-5 py-3.5 font-semibold text-[#14532D] bg-[#DCFCE7]/20">
+                    <div className="flex items-start gap-2.5">
+                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#16A34A] text-white shrink-0 mt-0.5 shadow-2xs">
+                        <Check className="h-3 w-3 stroke-[2.5]" aria-hidden="true" />
                       </div>
-                      <span>{row.pgSetu}</span>
+                      <span className="leading-snug">{row.pgSetu}</span>
                     </div>
                   </td>
                 </tr>
@@ -109,22 +112,22 @@ export function WhyChooseUs() {
           </table>
         </div>
 
-        {/* Counter Stats Grid - Sleek and compact */}
-        <div className="mt-6 sm:mt-10 grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+        {/* Counter Stats Grid (Issue 19 Fix: High-contrast stroke-[2.5] icons) */}
+        <div className="mt-6 sm:mt-10 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
           {stats.map((stat, idx) => {
             const Icon = STAT_ICONS[idx % STAT_ICONS.length]
             return (
               <div
                 key={idx}
-                className="flex flex-col items-center justify-center rounded-xl sm:rounded-2xl border border-gray-200/80 bg-white p-2.5 sm:p-4 text-center shadow-2xs hover:border-[#16A34A]/40 transition"
+                className="flex flex-col items-center justify-center rounded-2xl border border-gray-200/90 bg-white p-3 sm:p-5 text-center shadow-2xs hover:border-[#16A34A]/50 transition"
               >
-                <div className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-lg bg-[#DCFCE7] text-[#16A34A] mb-1 sm:mb-2 shrink-0">
-                  <Icon className="h-3.5 w-3.5 sm:h-4.5 sm:w-4.5" />
+                <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-[#DCFCE7] text-[#14532D] mb-1.5 sm:mb-2 shrink-0">
+                  <Icon className="h-4 w-4 sm:h-5 sm:w-5 stroke-[2.5]" aria-hidden="true" />
                 </div>
-                <span className="text-base sm:text-xl lg:text-2xl font-black text-[#14532D] tracking-tight">
+                <span className="text-lg sm:text-xl lg:text-2xl font-black text-[#14532D] tracking-tight">
                   {stat.value}
                 </span>
-                <span className="mt-0.5 text-[9.5px] sm:text-xs font-medium text-[#647067] leading-tight">
+                <span className="mt-0.5 text-xs font-medium text-[#647067] leading-tight">
                   {stat.label}
                 </span>
               </div>

@@ -31,6 +31,17 @@ interface PropertyCardProps {
   onToggleCompare?: (property: PropertyListing) => void
 }
 
+function formatAmenity(raw: string): string {
+  if (!raw) return ''
+  return raw
+    .replace(/_/g, ' ')
+    .replace(/\(.*?\)/g, '')
+    .trim()
+    .split(' ')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ')
+}
+
 export function PropertyCard({
   property,
   onSelectDetails,
@@ -232,9 +243,9 @@ export function PropertyCard({
             {property.amenities.slice(0, 1).map((amenity, i) => (
               <span
                 key={i}
-                className="rounded-lg bg-gray-100 px-2 py-0.5 text-xs font-medium text-[#17211B] truncate max-w-[90px]"
+                className="rounded-lg bg-gray-100 px-2 py-0.5 text-xs font-medium text-[#17211B] truncate max-w-[110px]"
               >
-                {amenity.replace(/\(.*?\)/g, '').trim()}
+                {formatAmenity(amenity)}
               </span>
             ))}
             {property.amenities.slice(1, 3).map((amenity, i) => (
@@ -242,7 +253,7 @@ export function PropertyCard({
                 key={i}
                 className="hidden sm:inline-block rounded-lg bg-gray-100 px-2 py-0.5 text-xs font-medium text-[#17211B]"
               >
-                {amenity.replace(/\(.*?\)/g, '').trim()}
+                {formatAmenity(amenity)}
               </span>
             ))}
             {property.amenities.length > 3 && (
@@ -254,8 +265,8 @@ export function PropertyCard({
         </div>
 
         {/* Pricing & Bottom Action Row */}
-        <div className="mt-1.5 sm:mt-3 border-t border-gray-100 pt-1.5 sm:pt-2.5">
-          <div className="flex items-center justify-between gap-1 sm:gap-2">
+        <div className="mt-2 sm:mt-3 border-t border-gray-100 pt-2 sm:pt-2.5">
+          <div className="flex items-center justify-between gap-1.5 sm:gap-2">
             <div className="min-w-0">
               <div className="flex items-baseline gap-1">
                 <span className="text-sm sm:text-xl font-extrabold text-[#14532D]">
@@ -268,22 +279,25 @@ export function PropertyCard({
               </p>
             </div>
 
-            {/* Quick Action Buttons */}
+            {/* Quick Action Buttons (Issues 16 & 22 Fix: Prominent View CTA + Labeled Compare Button) */}
             <div className="flex items-center gap-1.5 shrink-0">
-              {/* Compare Toggle (desktop only) */}
+              {/* Compare Button (Issue 22 Fix: Explicit label & tooltip) */}
               <button
+                type="button"
                 onClick={handleCompareClick}
-                className={`hidden sm:flex h-8 w-8 items-center justify-center rounded-lg border text-xs transition active:scale-95 cursor-pointer ${
+                aria-label={isCompared ? 'Remove from comparison' : 'Compare this property'}
+                title={isCompared ? 'Remove from comparison' : 'Compare this property'}
+                className={`hidden sm:flex h-9 px-2.5 items-center gap-1 rounded-xl border text-xs transition active:scale-95 cursor-pointer ${
                   isCompared
-                    ? 'border-[#16A34A] bg-[#DCFCE7] text-[#14532D]'
+                    ? 'border-[#16A34A] bg-[#DCFCE7] text-[#14532D] font-bold'
                     : 'border-gray-200 text-[#647067] hover:border-gray-300 hover:text-[#17211B]'
                 }`}
-                title={isCompared ? 'Remove from compare' : 'Add to compare'}
               >
-                <GitCompare className="h-3.5 w-3.5" />
+                <GitCompare className="h-3.5 w-3.5" aria-hidden="true" />
+                <span className="text-xs font-semibold hidden md:inline">Compare</span>
               </button>
 
-              {/* View Details CTA */}
+              {/* View Details CTA (Issue 16 Fix: Prominent height & visual emphasis) */}
               <Link
                 href={`/property/${property.id}`}
                 onClick={(e) => {
@@ -292,10 +306,10 @@ export function PropertyCard({
                     onSelectDetails(property)
                   }
                 }}
-                className="inline-flex items-center gap-1 rounded-xl bg-[#14532D] px-2.5 sm:px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-[#16A34A] transition active:scale-95"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#14532D] hover:bg-[#166534] px-3.5 py-2 sm:px-4 sm:py-2 text-xs font-bold text-white shadow-xs transition active:scale-95 cursor-pointer"
               >
                 <span>View</span>
-                <Eye className="h-3.5 w-3.5" />
+                <Eye className="h-3.5 w-3.5" aria-hidden="true" />
               </Link>
             </div>
           </div>

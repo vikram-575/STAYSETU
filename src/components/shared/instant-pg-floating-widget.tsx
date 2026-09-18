@@ -178,7 +178,7 @@ export default function InstantPgFloatingWidget() {
               </button>
 
               <div className="flex items-center gap-2 mb-1">
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-emerald-950 flex items-center gap-1 shadow-xs">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider bg-amber-400 text-emerald-950 flex items-center gap-1 shadow-xs">
                   <Zap className="w-3 h-3 fill-emerald-950" />
                   Fast-Track Allotment
                 </span>
@@ -190,7 +190,7 @@ export default function InstantPgFloatingWidget() {
               <h3 className="text-base sm:text-xl font-black tracking-tight text-white">
                 ⚡ Get Instant Verified PG Allotment
               </h3>
-              <p className="text-[11px] sm:text-xs text-emerald-100 mt-0.5 leading-snug">
+              <p className="text-xs text-emerald-100 mt-0.5 leading-snug">
                 Fill your requirements & our centralized Super Admin team will match you with ready-to-move beds immediately.
               </p>
             </div>
@@ -381,7 +381,7 @@ export default function InstantPgFloatingWidget() {
                   {/* Row 4: Budget & Move-in Date */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="text-[11px] font-black uppercase text-gray-500 block mb-1">
+                      <label className="text-xs font-bold uppercase text-gray-500 block mb-1">
                         Monthly Budget
                       </label>
                       <select
@@ -397,7 +397,7 @@ export default function InstantPgFloatingWidget() {
                     </div>
 
                     <div>
-                      <label className="text-[11px] font-black uppercase text-gray-500 block mb-1">
+                      <label className="text-xs font-bold uppercase text-gray-500 block mb-1">
                         Move-in Timeline
                       </label>
                       <select
@@ -415,7 +415,7 @@ export default function InstantPgFloatingWidget() {
 
                   {/* Notes / Optional */}
                   <div>
-                    <label className="text-[11px] font-black uppercase text-gray-500 block mb-1">
+                    <label className="text-xs font-bold uppercase text-gray-500 block mb-1">
                       Specific Notes / Office / Food Preference (Optional)
                     </label>
                     <input
@@ -446,7 +446,7 @@ export default function InstantPgFloatingWidget() {
                         </>
                       )}
                     </button>
-                    <p className="text-[10px] text-center text-gray-400 mt-2">
+                    <p className="text-xs text-center text-gray-400 mt-2">
                       🔒 100% Free Service · Zero Brokerage · Instant Super Admin Dispatch
                     </p>
                   </div>

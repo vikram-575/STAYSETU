@@ -101,28 +101,24 @@ export function MarketplaceNavbar({
       {/* Top Announcement Bar (Issue 11: Seamlessly attached to navigation without dead whitespace) */}
       {announcement?.enabled && announcement?.text && (
         <aside aria-label="Announcement" className="relative z-50 bg-gradient-to-r from-[#14532D] via-[#166534] to-[#14532D] text-white text-xs px-4 py-2 border-b border-[#16A34A]/30">
-          <div className="mx-auto max-w-7xl flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 truncate">
-              {announcement.badge && (
-                <span className="rounded-full bg-[#FEF3C7] text-[#14532D] font-bold text-xs px-2 py-0.5 shrink-0">
-                  {announcement.badge}
-                </span>
-              )}
-              <span className="font-medium truncate text-gray-100">
-                {announcement.text}
+          <div className="mx-auto max-w-7xl flex items-center justify-center gap-2 text-center flex-wrap">
+            {announcement.badge && (
+              <span className="rounded-full bg-[#FEF3C7] text-[#14532D] font-bold text-xs px-2 py-0.5 shrink-0">
+                {announcement.badge}
               </span>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              {announcement.linkText && (
-                <Link
-                  href={announcement.linkUrl || '/#featured-properties'}
-                  className="font-bold text-[#DCFCE7] hover:text-white underline text-xs"
-                >
-                  {announcement.linkText} →
-                </Link>
-              )}
-            </div>
+            )}
+            <span className="font-medium text-gray-100">
+              {announcement.text}
+            </span>
+            {announcement.linkText && (
+              <Link
+                href={announcement.linkUrl || '/#featured-properties'}
+                className="font-bold text-[#DCFCE7] hover:text-white underline inline-flex items-center gap-1 shrink-0 ml-1 transition"
+              >
+                <span>{announcement.linkText}</span>
+                <span>→</span>
+              </Link>
+            )}
           </div>
         </aside>
       )}

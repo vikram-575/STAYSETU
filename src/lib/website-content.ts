@@ -296,7 +296,7 @@ export const DEFAULT_WEBSITE_CONTENT: WebsiteContent = {
         state: 'Maharashtra',
         listingCount: 1,
         startingPrice: 6500,
-        image: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?auto=format&fit=crop&w=600&q=80',
+        image: 'https://images.unsplash.com/photo-1596401057633-54a8fe8ef647?auto=format&fit=crop&w=600&q=80',
         popularLocalities: ['Hinjewadi', 'Viman Nagar', 'Kharadi', 'Baner', 'Wakad'],
         featured: true,
       },

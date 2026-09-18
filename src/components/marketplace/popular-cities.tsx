@@ -117,13 +117,13 @@ export function PopularCities({ onSelectCity, activeCity, properties = [] }: Pop
               onClick={() => handleCityClick('all')}
               className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#16A34A] hover:underline"
             >
-              <span>View all {citiesList.length} cities</span>
-              <ArrowRight className="h-4 w-4" />
+              <span>Search all locations</span>
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
         </div>
 
-        {/* Cities Rolling Reel (Mobile horizontal auto-rolling carousel + Desktop responsive grid) */}
+        {/* Cities Rolling Reel (Issues 8, 11 & 15 Fix: Balanced 4-col 4x2 grid, high contrast gradient, standardized 'PGs' terminology) */}
         <div
           ref={reelRef}
           onMouseEnter={() => setIsPaused(true)}
@@ -132,7 +132,7 @@ export function PopularCities({ onSelectCity, activeCity, properties = [] }: Pop
           onTouchEnd={() => {
             setTimeout(() => setIsPaused(false), 2500)
           }}
-          className="mt-4 sm:mt-8 flex overflow-x-auto snap-x snap-mandatory gap-2.5 pb-2.5 pt-1 -mx-3.5 px-3.5 no-scrollbar sm:mx-0 sm:px-0 sm:grid sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 sm:gap-4 scroll-smooth"
+          className="mt-4 sm:mt-8 flex overflow-x-auto snap-x snap-mandatory gap-2.5 pb-2.5 pt-1 -mx-3.5 px-3.5 no-scrollbar sm:mx-0 sm:px-0 sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:gap-4 scroll-smooth"
         >
           {citiesList.map((city) => {
             const isSelected = activeCity === city.name
@@ -147,18 +147,17 @@ export function PopularCities({ onSelectCity, activeCity, properties = [] }: Pop
               ? Math.min(...matchedProps.map((p) => p.price))
               : city.startingPrice
 
-            const displaySpaces = realTotalBeds > 0
-              ? `${realTotalBeds} Spaces`
-              : `${realListingCount} ${realListingCount === 1 ? 'PG' : 'PGs'}`
+            // Issue 8 Fix: Consistent 'PGs' / 'PG' terminology across all cities
+            const displaySpaces = `${realListingCount} ${realListingCount === 1 ? 'PG' : 'PGs'}`
 
             return (
               <div
                 key={city.name}
                 onClick={() => handleCityClick(city.name)}
-                className={`group relative flex cursor-pointer flex-col overflow-hidden rounded-xl sm:rounded-2xl border transition-all hover:-translate-y-1 hover:shadow-lg active:scale-98 w-[136px] sm:w-auto shrink-0 snap-start ${
+                className={`group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border transition-all hover:-translate-y-1 hover:shadow-lg active:scale-98 w-[136px] sm:w-auto shrink-0 snap-start ${
                   isSelected
                     ? 'border-[#16A34A] ring-2 ring-[#16A34A] shadow-md'
-                    : 'border-gray-200/80 bg-white hover:border-gray-300'
+                    : 'border-gray-200/90 bg-white hover:border-gray-300'
                 }`}
               >
                 {/* City Image Container (responsive aspect ratio) */}
@@ -173,17 +172,18 @@ export function PopularCities({ onSelectCity, activeCity, properties = [] }: Pop
                       target.src = 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=600&q=80'
                     }}
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
+                  {/* Issue 15 Fix: Deeper gradient overlay to guarantee high-contrast text legibility */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-transparent" />
 
                   {/* Starting Price Pill */}
-                  <div className="absolute top-1 right-1 sm:top-2 sm:right-2 rounded-md bg-white/95 px-1 sm:px-1.5 py-0.5 text-[8px] sm:text-[10px] font-bold text-[#14532D] shadow-xs backdrop-blur-xs">
+                  <div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 rounded-lg bg-white/95 px-2 py-0.5 text-xs font-bold text-[#14532D] shadow-xs backdrop-blur-xs">
                     ₹{realMinPrice >= 1000 ? `${Math.round(realMinPrice / 1000)}k` : realMinPrice}/mo
                   </div>
 
-                  {/* City Name & State Overlay */}
-                  <div className="absolute bottom-1.5 sm:bottom-2.5 left-1.5 sm:left-2.5 text-white pr-1">
-                    <h3 className="text-xs sm:text-base font-extrabold tracking-tight line-clamp-1">{city.name}</h3>
-                    <p className="text-[8px] sm:text-[10px] text-gray-200 font-medium">{city.state}</p>
+                  {/* City Name & State Overlay with drop shadow */}
+                  <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 text-white pr-1 drop-shadow-md">
+                    <h3 className="text-sm sm:text-base font-extrabold tracking-tight line-clamp-1">{city.name}</h3>
+                    <p className="text-xs text-gray-200 font-medium">{city.state}</p>
                   </div>
                 </div>
 
