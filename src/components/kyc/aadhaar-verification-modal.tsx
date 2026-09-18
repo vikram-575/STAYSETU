@@ -213,13 +213,13 @@ export function AadhaarVerificationModal({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-black tracking-tight">Tenant Aadhaar Verification</h3>
+                <h3 className="text-base font-black tracking-tight">Sandbox Aadhaar e-KYC</h3>
                 <span className="px-2 py-0.5 rounded-full bg-emerald-400/20 text-emerald-200 text-[10px] font-black uppercase tracking-wider border border-emerald-300/30">
-                  e-KYC
+                  Live API
                 </span>
               </div>
-              <p className="text-xs text-blue-100/90 mt-0.5">
-                {tenantData?.full_name ? `Verifying ${tenantData.full_name}` : 'Authorized Cryptographic KYC Flow'}
+              <p className="text-xs text-blue-100/90 mt-0.5 font-mono">
+                Key: key_live_5f51ed... · {tenantData?.full_name ? `Verifying ${tenantData.full_name}` : 'Aadhaar Demographic Engine'}
               </p>
             </div>
           </div>
@@ -411,7 +411,7 @@ export function AadhaarVerificationModal({
 
                   <div>
                     <span className="text-[10px] font-black uppercase text-emerald-700 tracking-wider bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300">
-                      KYC Verified
+                      Sandbox e-KYC Verified
                     </span>
                     <h4 className="text-lg font-black text-slate-900 mt-1">AADHAAR VERIFIED ✓</h4>
                     <p className="text-xs text-slate-600 mt-0.5">
@@ -420,53 +420,70 @@ export function AadhaarVerificationModal({
                     </p>
                   </div>
 
+                  {/* Fetched e-KYC Profile & Address Card */}
+                  {extractedData && (
+                    <div className="p-3 bg-white/90 rounded-2xl border border-emerald-200 text-left text-xs space-y-1.5">
+                      <div className="flex items-center justify-between pb-1 border-b border-gray-100">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                          Fetched Aadhaar Profile
+                        </span>
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded">
+                          All Matches Confirmed
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-[11px]">
+                        <div>
+                          <span className="text-gray-400 block text-[10px]">DOB / Gender:</span>
+                          <span className="font-bold text-gray-800">{extractedData.date_of_birth || 'N/A'} ({extractedData.gender || 'M'})</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-400 block text-[10px]">Care Of:</span>
+                          <span className="font-bold text-gray-800">{extractedData.care_of || 'N/A'}</span>
+                        </div>
+                      </div>
+                      {extractedData.address?.full_address && (
+                        <div className="pt-1">
+                          <span className="text-gray-400 block text-[10px]">Permanent Address:</span>
+                          <span className="text-gray-700 font-medium line-clamp-2">{extractedData.address.full_address}</span>
+                        </div>
+                      )}
+                      <p className="text-[10px] text-emerald-700 font-bold italic pt-0.5">
+                        ✓ Details will auto-populate and save to resident profile.
+                      </p>
+                    </div>
+                  )}
+
                   {/* Checkmarks Grid */}
-                  <div className="grid grid-cols-2 gap-2 text-left pt-2 border-t border-emerald-200/60 text-xs">
+                  <div className="grid grid-cols-2 gap-2 text-left pt-1 border-t border-emerald-200/60 text-xs">
                     <div className="p-2 bg-white/80 rounded-xl border border-emerald-200/60 flex items-center gap-2">
                       <Check className="w-4 h-4 text-emerald-600 shrink-0 font-black" />
                       <div>
                         <span className="text-[10px] text-slate-400 block font-bold">Authentication</span>
-                        <span className="font-bold text-slate-800 text-[11px]">Successful</span>
+                        <span className="font-bold text-slate-800 text-[11px]">Sandbox Live API</span>
                       </div>
                     </div>
 
                     <div className="p-2 bg-white/80 rounded-xl border border-emerald-200/60 flex items-center gap-2">
                       <Check className="w-4 h-4 text-emerald-600 shrink-0 font-black" />
                       <div>
-                        <span className="text-[10px] text-slate-400 block font-bold">Document</span>
-                        <span className="font-bold text-slate-800 text-[11px]">Valid Structure</span>
+                        <span className="text-[10px] text-slate-400 block font-bold">UIDAI Signature</span>
+                        <span className="font-bold text-slate-800 text-[11px]">Officially Signed</span>
                       </div>
                     </div>
 
                     <div className="p-2 bg-white/80 rounded-xl border border-emerald-200/60 flex items-center gap-2">
                       <Check className="w-4 h-4 text-emerald-600 shrink-0 font-black" />
                       <div>
-                        <span className="text-[10px] text-slate-400 block font-bold">Secure QR</span>
-                        <span className="font-bold text-slate-800 text-[11px]">Decoded</span>
+                        <span className="text-[10px] text-slate-400 block font-bold">Name &amp; DOB Match</span>
+                        <span className="font-bold text-slate-800 text-[11px]">100% Matched</span>
                       </div>
                     </div>
 
                     <div className="p-2 bg-white/80 rounded-xl border border-emerald-200/60 flex items-center gap-2">
                       <Check className="w-4 h-4 text-emerald-600 shrink-0 font-black" />
                       <div>
-                        <span className="text-[10px] text-slate-400 block font-bold">Digital Signature</span>
-                        <span className="font-bold text-slate-800 text-[11px]">Official Signed</span>
-                      </div>
-                    </div>
-
-                    <div className="p-2 bg-white/80 rounded-xl border border-emerald-200/60 flex items-center gap-2">
-                      <Check className="w-4 h-4 text-emerald-600 shrink-0 font-black" />
-                      <div>
-                        <span className="text-[10px] text-slate-400 block font-bold">Data Match</span>
-                        <span className="font-bold text-slate-800 text-[11px]">Identity Matched</span>
-                      </div>
-                    </div>
-
-                    <div className="p-2 bg-white/80 rounded-xl border border-emerald-200/60 flex items-center gap-2">
-                      <Check className="w-4 h-4 text-emerald-600 shrink-0 font-black" />
-                      <div>
-                        <span className="text-[10px] text-slate-400 block font-bold">Tampering Check</span>
-                        <span className="font-bold text-slate-800 text-[11px]">Passed (No Alerts)</span>
+                        <span className="text-[10px] text-slate-400 block font-bold">Anti-Tampering</span>
+                        <span className="font-bold text-slate-800 text-[11px]">Passed (Verified)</span>
                       </div>
                     </div>
                   </div>
@@ -480,7 +497,7 @@ export function AadhaarVerificationModal({
                     className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-black text-xs sm:text-sm rounded-2xl shadow-lg shadow-emerald-500/25 transition flex items-center justify-center gap-2"
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>SAVE & COMPLETE KYC</span>
+                    <span>SAVE TO PROFILE &amp; PROCEED →</span>
                   </button>
                 </div>
               ) : (

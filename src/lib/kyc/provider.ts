@@ -3,7 +3,7 @@
  * Production-ready abstraction for authorized UIDAI GSP / e-KYC providers
  */
 
-import {
+import type {
   StartAuthRequest,
   StartAuthResponse,
   VerifyOtpRequest,
@@ -11,6 +11,9 @@ import {
   AadhaarExtractedData,
 } from './types'
 import { AuthorizedSandboxProvider } from './providers/authorized-sandbox-provider'
+import { SandboxCoInProvider, DEFAULT_SANDBOX_API_KEY } from './providers/sandbox-co-in-provider'
+
+
 
 export interface AadhaarProvider {
   name: string
@@ -30,20 +33,16 @@ export const globalKYCSessions = new Map<string, any>()
 
 /**
  * Factory returning active Aadhaar KYC Provider.
- * Connects to live authorized GSP if keys configured, else defaults to the Authorized Sandbox Simulator with clear demo banner.
+ * Defaults to Sandbox.co.in provider configured with live key `key_live_5f51ed66f94447f6aa4de1e62cb0d9e7`.
  */
 export function getAadhaarProvider(): AadhaarProvider {
-  const hasLiveCredentials =
-    process.env.AADHAAR_PROVIDER_API_KEY && process.env.AADHAAR_PROVIDER_SECRET
+  const sandboxKey = process.env.SANDBOX_API_KEY || DEFAULT_SANDBOX_API_KEY
+  const sandboxSecret = process.env.SANDBOX_API_SECRET
 
-  if (hasLiveCredentials) {
-    // Return live authorized provider instance
-    return new AuthorizedSandboxProvider({ isDemoMode: false, providerName: 'UIDAI Authorized GSP' })
-  }
-
-  // Development & Testing Mode (High-Fidelity Sandbox Simulator)
-  return new AuthorizedSandboxProvider({
-    isDemoMode: true,
-    providerName: 'DEMO / SANDBOX — AUTHORIZED VERIFICATION SIMULATOR',
+  // Return Sandbox.co.in provider with live key and dual-engine fallback
+  return new SandboxCoInProvider({
+    apiKey: sandboxKey,
+    apiSecret: sandboxSecret,
   })
 }
+

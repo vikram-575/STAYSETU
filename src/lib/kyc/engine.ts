@@ -8,13 +8,15 @@
  * 5. Anti-Tampering & Anomaly Detection
  */
 
-import {
+import type {
   AadhaarExtractedData,
   KYCCheckItem,
   VerificationStatus,
   CheckStatus,
 } from './types'
 import { calculateNameMatch } from './security'
+
+
 
 export interface VerificationEngineInput {
   kyc_id: string

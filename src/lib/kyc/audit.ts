@@ -1,5 +1,5 @@
-import { createServiceClient } from '@/lib/supabase/server'
-import { KYCAuditLogEntry } from './types'
+import type { KYCAuditLogEntry } from './types'
+
 
 /**
  * Record an immutable KYC Audit Log entry
@@ -24,6 +24,7 @@ export async function logKYCEvent(params: {
   }
 
   try {
+    const { createServiceClient } = await import('@/lib/supabase/server')
     const supabase = await createServiceClient()
     await supabase.from('kyc_audit_logs').insert({
       organization_id: params.organization_id,
@@ -35,9 +36,10 @@ export async function logKYCEvent(params: {
       created_at: entry.timestamp,
     })
   } catch (err) {
-    // If Supabase table isn't migrated yet, gracefully log in console without blocking execution
+    // If Supabase table isn't migrated yet or running in offline tests, gracefully log
     console.info('[KYC Audit Event]:', params.event, params.actor, params.metadata)
   }
+
 
   return entry
 }
@@ -47,6 +49,7 @@ export async function logKYCEvent(params: {
  */
 export async function getKYCAuditLogs(kycId: string, orgId: string): Promise<KYCAuditLogEntry[]> {
   try {
+    const { createServiceClient } = await import('@/lib/supabase/server')
     const supabase = await createServiceClient()
     const { data } = await supabase
       .from('kyc_audit_logs')

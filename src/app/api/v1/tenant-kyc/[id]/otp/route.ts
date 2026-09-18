@@ -58,6 +58,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
               extracted_name: verificationResult.extracted_data?.name,
               extracted_dob: verificationResult.extracted_data?.date_of_birth,
               extracted_gender: verificationResult.extracted_data?.gender,
+              extracted_address: verificationResult.extracted_data?.address,
               checks_summary: verificationResult.checks.map((c) => ({ type: c.check_type, status: c.status })),
             },
           }, { onConflict: 'verification_id' })
@@ -70,13 +71,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
         // 2. If a tenant_id exists, update resident's KYC status directly in Supabase
         if (session.tenant_id) {
+          const updatePayload: Record<string, any> = {
+            id_type: 'aadhaar',
+            id_number: session.masked_aadhaar,
+            notes: `Sandbox Aadhaar Verified (${verificationResult.verification_id}) on ${new Date().toLocaleDateString('en-IN')}`,
+          }
+          if (verificationResult.extracted_data?.address?.full_address) {
+            updatePayload.permanent_address = verificationResult.extracted_data.address.full_address
+          }
           await supabase
             .from('residents')
-            .update({
-              id_type: 'aadhaar',
-              id_number: session.masked_aadhaar,
-              notes: `Aadhaar Verified (${verificationResult.verification_id}) on ${new Date().toLocaleDateString('en-IN')}`,
-            })
+            .update(updatePayload)
             .eq('id', session.tenant_id)
             .eq('organization_id', orgId)
         }

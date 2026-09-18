@@ -3,7 +3,7 @@
  * Simulates authorized UIDAI GSP OTP & e-KYC flow without bypassing security
  */
 
-import {
+import type {
   AadhaarExtractedData,
   StartAuthRequest,
   StartAuthResponse,
@@ -14,6 +14,8 @@ import { maskAadhaar, validateAadhaarFormat, generateVerificationId } from '../s
 import { executeVerificationEngine } from '../engine'
 import { logKYCEvent } from '../audit'
 import { globalKYCSessions } from '../provider'
+
+
 
 interface ProviderConfig {
   isDemoMode?: boolean
