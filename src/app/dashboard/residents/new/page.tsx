@@ -11,7 +11,6 @@ import {
 } from 'lucide-react'
 import { formatCurrency, rupeesToPaise } from '@/lib/money'
 import { FirebaseFileUploader } from '@/components/ui/firebase-file-uploader'
-import { DiditVerificationModal, DiditVerifiedData } from '@/components/kyc/didit-verification-modal'
 import { AadhaarVerificationModal } from '@/components/kyc/aadhaar-verification-modal'
 import { AadhaarExtractedData } from '@/lib/kyc/types'
 
@@ -35,11 +34,7 @@ export default function CheckInResidentPage() {
   const [error, setError] = useState('')
   const [successData, setSuccessData] = useState<{ registration_number: string; resident_id: string } | null>(null)
   
-  // Didit Identity Verification State
-  const [showDiditModal, setShowDiditModal] = useState(false)
-  const [diditVerified, setDiditVerified] = useState<DiditVerifiedData | null>(null)
-
-  // Sandbox Aadhaar Verification State
+  // Sandbox Live Aadhaar Verification State
   const [showSandboxAadhaarModal, setShowSandboxAadhaarModal] = useState(false)
   const [sandboxAadhaarVerified, setSandboxAadhaarVerified] = useState<{
     verification_id: string
@@ -57,7 +52,7 @@ export default function CheckInResidentPage() {
     setSandboxAadhaarVerified(result)
     const ext = result.extracted_data
     if (ext) {
-      const addrParts = [ext.address?.house, ext.address?.street].filter(Boolean).join(', ')
+      const addrParts = [ext.address?.house, ext.address?.street].filter(Boolean).join(', ') || ext.address?.full_address || ''
       setForm((prev) => ({
         ...prev,
         full_name: ext.name || prev.full_name,
@@ -83,22 +78,6 @@ export default function CheckInResidentPage() {
           : `[Sandbox Aadhaar Verified: ${result.verification_id}]`,
       }))
     }
-  }
-
-  const handleDiditSuccess = (data: DiditVerifiedData) => {
-    setDiditVerified(data)
-    setForm((prev) => ({
-      ...prev,
-      full_name: data.full_name || prev.full_name,
-      id_type: data.id_type || 'aadhaar',
-      id_number: data.id_number || prev.id_number,
-      date_of_birth: data.date_of_birth || prev.date_of_birth,
-      gender: data.gender || prev.gender,
-      kyc_doc_url: data.document_front_url || prev.kyc_doc_url,
-      notes: prev.notes
-        ? `${prev.notes}\n[Didit Verified: ${data.verification_id}]`
-        : `[Didit Verified: ${data.verification_id}]`,
-    }))
   }
 
   // Isolated PG Inventory state
@@ -1048,18 +1027,15 @@ export default function CheckInResidentPage() {
               </div>
             )}
 
-            {/* Step 3: Identity Proof Details, Sandbox Aadhaar & Didit Verification */}
+            {/* Step 3: Identity Proof Details & Sandbox Live Aadhaar Verification */}
             {currentStep === 3 && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-b border-gray-100 pb-2">
                   <div>
                     <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
                       <span>3. Identity Proof Document &amp; Notes</span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1 font-mono">
-                        <ShieldCheck className="w-3 h-3 text-emerald-600" /> Sandbox Aadhaar
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-blue-100 text-blue-800 border border-blue-200 flex items-center gap-1">
-                        <ScanFace className="w-3 h-3 text-blue-600" /> Didit
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Sandbox Live Aadhaar
                       </span>
                     </h3>
                   </div>
@@ -1128,10 +1104,10 @@ export default function CheckInResidentPage() {
                       <div>
                         <div className="flex items-center gap-2">
                           <h4 className="text-xs sm:text-sm font-black text-gray-900">
-                            Verify Aadhaar with Sandbox
+                            Verify Aadhaar with Sandbox Live
                           </h4>
-                          <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 font-mono">
-                            key_live_5f51ed...
+                          <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            Live e-KYC
                           </span>
                         </div>
                         <p className="text-[11px] text-gray-600 mt-0.5">
@@ -1151,82 +1127,6 @@ export default function CheckInResidentPage() {
                   </div>
                 )}
 
-                {/* Didit Person Verification Banner */}
-                {diditVerified ? (
-                  <div className="p-4 bg-emerald-50/90 border border-emerald-300 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/30 shrink-0">
-                        <CheckCircle2 className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-xs font-black text-emerald-950 uppercase tracking-wide">
-                            Person Verified via Didit Protocol ✓
-                          </h4>
-                          <span className="font-mono text-[10px] font-bold bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded border border-emerald-400">
-                            {diditVerified.verification_id}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-emerald-800 mt-0.5">
-                          Verified: <strong>{diditVerified.full_name || form.full_name}</strong> · ID: {diditVerified.id_number || 'Official Govt ID'} · Biometrics &amp; Liveness: Passed (100%)
-                        </p>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setShowDiditModal(true)}
-                      className="py-1.5 px-3 bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold transition shrink-0"
-                    >
-                      Re-verify with Didit
-                    </button>
-                  </div>
-                ) : (
-                  <div className="p-4 bg-gradient-to-r from-blue-950/5 via-indigo-950/5 to-purple-950/5 border border-blue-200/80 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
-                    <div className="flex items-start sm:items-center gap-3.5">
-                      <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/25 shrink-0">
-                        <ScanFace className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-xs sm:text-sm font-black text-gray-900">
-                            Verify Person through Didit
-                          </h4>
-                          <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-300">
-                            Recommended
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-gray-600 mt-0.5">
-                          Instant AI identity verification with physical ID document OCR, biometric face match &amp; liveness detection.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
-                      <button
-                        type="button"
-                        onClick={() => setShowDiditModal(true)}
-                        className="flex-1 sm:flex-none py-2.5 px-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs rounded-xl shadow-md shadow-blue-500/20 transition flex items-center justify-center gap-1.5 active:scale-95 whitespace-nowrap"
-                      >
-                        <ShieldCheck className="w-4 h-4" />
-                        <span>Verify Person through Didit</span>
-                      </button>
-
-                      {form.phone && (
-                        <button
-                          type="button"
-                          onClick={() => setShowDiditModal(true)}
-                          title="Generate Didit link for tenant WhatsApp"
-                          className="py-2.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 shrink-0"
-                        >
-                          <Phone className="w-3.5 h-3.5 text-emerald-600" />
-                          <span className="hidden sm:inline">WhatsApp</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4 pt-1">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
@@ -1237,8 +1137,7 @@ export default function CheckInResidentPage() {
                       onChange={(e) => setForm({ ...form, id_type: e.target.value })}
                       className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#16A34A] outline-none font-semibold"
                     >
-                      <option value="didit_verified">Didit Verified Identity (AI Protocol)</option>
-                      <option value="aadhaar">Aadhaar Card (National ID)</option>
+                      <option value="aadhaar">Aadhaar Card (National ID - Sandbox Verified)</option>
                       <option value="pan">PAN Card</option>
                       <option value="passport">Passport</option>
                       <option value="driving_licence">Driving License</option>
@@ -1545,18 +1444,6 @@ export default function CheckInResidentPage() {
         </div>
       )}
 
-      {/* Didit Biometric & Document Verification Modal */}
-      <DiditVerificationModal
-        isOpen={showDiditModal}
-        onClose={() => setShowDiditModal(false)}
-        tenantData={{
-          full_name: form.full_name,
-          phone: form.phone,
-          date_of_birth: form.date_of_birth,
-          gender: form.gender,
-        }}
-        onVerificationSuccess={handleDiditSuccess}
-      />
 
       {/* Sandbox Aadhaar e-KYC Verification Modal */}
       <AadhaarVerificationModal

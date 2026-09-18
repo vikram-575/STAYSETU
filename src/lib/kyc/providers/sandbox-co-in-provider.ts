@@ -37,7 +37,7 @@ export class SandboxCoInProvider implements AadhaarProvider {
   constructor(config?: ProviderConfig) {
     this.apiKey = config?.apiKey || process.env.SANDBOX_API_KEY || DEFAULT_SANDBOX_API_KEY
     this.apiSecret = config?.apiSecret || process.env.SANDBOX_API_SECRET || ''
-    this.name = `Sandbox Aadhaar e-KYC (${this.apiKey.slice(0, 16)}...)`
+    this.name = 'Sandbox Live Aadhaar e-KYC'
     this.isDemoMode = config?.isDemoMode ?? !this.apiSecret
   }
 
@@ -172,7 +172,7 @@ export class SandboxCoInProvider implements AadhaarProvider {
       kyc_id: verificationId,
       event: 'OTP_SENT',
       actor: 'Sandbox Verification Service',
-      metadata: { masked_aadhaar: maskedAadhaar, key: this.apiKey.slice(0, 14) },
+      metadata: { masked_aadhaar: maskedAadhaar, live_mode: true },
     })
 
     return {
@@ -377,7 +377,7 @@ export class SandboxCoInProvider implements AadhaarProvider {
       kyc_id: session.verification_id,
       event: 'AUTHENTICATION_SUCCESS',
       actor: 'Sandbox Aadhaar Service',
-      metadata: { method: 'authorized_otp', key: this.apiKey.slice(0, 14) },
+      metadata: { method: 'authorized_otp', live_mode: true },
     })
 
     await logKYCEvent({
