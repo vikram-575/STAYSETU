@@ -37,38 +37,38 @@ export function TrustSection() {
           </p>
         </div>
 
-        {/* 4 Trust Cards Grid - Sleek 2x2 on mobile, 4-col on desktop */}
-        <div className="mt-6 sm:mt-10 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-6">
+        {/* 4 Trust Cards Grid - Clean left-aligned layout matching icon, title and description (Issue 10 Fix) */}
+        <div className="mt-6 sm:mt-10 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
           {(trust?.cards || []).map((card, idx) => {
             const Icon = (card.icon && ICON_MAP[card.icon]) ? ICON_MAP[card.icon] : ShieldCheck
             return (
               <div
                 key={card.id || idx}
-                className="group relative flex flex-col justify-between rounded-xl sm:rounded-2xl border border-gray-200/90 bg-white p-3 sm:p-5 lg:p-6 shadow-2xs sm:shadow-xs transition hover:border-[#16A34A] hover:shadow-md"
+                className="group relative flex flex-col justify-between items-start text-left rounded-2xl border border-gray-200/90 bg-white p-3.5 sm:p-5 lg:p-6 shadow-2xs sm:shadow-xs transition hover:border-[#16A34A] hover:shadow-md w-full"
               >
-                <div>
-                  <div className="flex items-center justify-between gap-1.5">
-                    <div className="flex h-8 w-8 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-[#DCFCE7]/70 text-[#16A34A] transition group-hover:scale-105 group-hover:bg-[#16A34A] group-hover:text-white shrink-0">
+                <div className="w-full">
+                  <div className="flex items-center justify-between gap-1.5 w-full">
+                    <div className="flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-[#DCFCE7]/70 text-[#16A34A] transition group-hover:scale-105 group-hover:bg-[#16A34A] group-hover:text-white shrink-0">
                       <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
                     </div>
                     {card.badge && (
-                      <span className="rounded-full bg-[#FEF3C7] px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-bold text-[#F59E0B] truncate">
+                      <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-bold text-amber-800 truncate">
                         {card.badge}
                       </span>
                     )}
                   </div>
 
-                  <h3 className="mt-2.5 sm:mt-4 text-xs sm:text-base font-bold text-[#17211B] leading-snug line-clamp-2">
+                  <h3 className="mt-3 sm:mt-4 text-xs sm:text-base font-bold text-[#17211B] leading-snug line-clamp-2 text-left">
                     {card.title}
                   </h3>
-                  <p className="mt-1 sm:mt-1.5 text-[10.5px] sm:text-xs text-[#647067] leading-relaxed line-clamp-3 sm:line-clamp-none">
+                  <p className="mt-1.5 text-xs text-[#647067] leading-relaxed line-clamp-3 sm:line-clamp-none text-left">
                     {card.description}
                   </p>
                 </div>
 
-                <div className="mt-2.5 sm:mt-4 flex items-center gap-1 text-[10px] sm:text-xs font-semibold text-[#16A34A]">
+                <div className="mt-3 sm:mt-4 flex items-center gap-1 text-xs font-semibold text-[#16A34A]">
                   <span>Guaranteed</span>
-                  <CheckCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                  <CheckCircle className="h-3.5 w-3.5" />
                 </div>
               </div>
             )

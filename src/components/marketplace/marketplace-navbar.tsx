@@ -146,38 +146,32 @@ export function MarketplaceNavbar({
           </div>
         </Link>
 
-        {/* Desktop Navigation Links */}
-        <nav className="hidden items-center gap-7 md:flex">
+        {/* Desktop Navigation Links (Issue 8 Fix: Clear visual hierarchy & uncluttered items) */}
+        <nav className="hidden items-center gap-6 md:flex">
           <Link
             href="/search"
-            className="text-sm font-medium text-[#17211B] transition hover:text-[#16A34A]"
+            className="text-sm font-bold text-[#14532D] transition hover:text-[#16A34A] flex items-center gap-1"
           >
-            Search PG
+            <span>Search PG</span>
           </Link>
           <button
             onClick={() => handleNavClick('popular-cities')}
-            className="text-sm font-medium text-[#647067] transition hover:text-[#16A34A]"
+            className="text-sm font-medium text-[#647067] transition hover:text-[#17211B] cursor-pointer"
           >
-            Popular Cities
+            Cities
           </button>
           <Link
             href="/software"
-            className="text-sm font-medium text-[#14532D] font-bold transition hover:text-[#16A34A] flex items-center gap-1"
+            className="text-sm font-medium text-[#17211B] transition hover:text-[#16A34A] flex items-center gap-1.5"
           >
             <span>ERP Software</span>
-            <span className="rounded-full bg-[#FEF3C7] px-1.5 py-0.5 text-xs font-bold text-[#F59E0B]">PRO</span>
+            <span className="rounded-full bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-xs font-bold text-amber-800">PRO</span>
           </Link>
           <button
             onClick={() => handleNavClick('trust-section')}
-            className="text-sm font-medium text-[#647067] transition hover:text-[#16A34A]"
+            className="text-sm font-medium text-[#647067] transition hover:text-[#17211B] cursor-pointer"
           >
             Trust & Safety
-          </button>
-          <button
-            onClick={() => handleNavClick('why-choose-us')}
-            className="text-sm font-medium text-[#647067] transition hover:text-[#16A34A]"
-          >
-            Why PGSetu
           </button>
         </nav>
 

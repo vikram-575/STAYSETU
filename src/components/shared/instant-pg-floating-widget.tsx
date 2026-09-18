@@ -125,35 +125,39 @@ export default function InstantPgFloatingWidget() {
 
   return (
     <>
-      {/* FLOATING ACTION BUTTON (TRIGGER) - Sits cleanly above mobile bottom nav bar */}
-      <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-6 right-3 sm:right-6 z-30 select-none">
-        {/* Mobile Compact Circular FAB (44px) - never blocks property cards */}
-        <button
-          onClick={() => setIsOpen(true)}
-          className="flex sm:hidden relative items-center justify-center w-11 h-11 bg-[#14532D] text-white rounded-full shadow-lg shadow-emerald-950/30 active:scale-95 transition-all duration-200 border border-white/30 cursor-pointer"
-          title="Instant Verified PG Support"
-          aria-label="Get Instant PG"
-        >
-          <div className="w-6 h-6 rounded-full bg-amber-400 text-emerald-950 flex items-center justify-center shadow-xs">
-            <Zap className="w-3.5 h-3.5 fill-emerald-950" />
-          </div>
-        </button>
+      {/* FLOATING ACTION BUTTON (TRIGGER) - Aligned with main max-w-7xl content column (Issue 9 Fix) */}
+      <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-6 inset-x-0 pointer-events-none z-30 select-none">
+        <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 flex justify-end">
+          <div className="pointer-events-auto">
+            {/* Mobile Compact Circular FAB (44px) */}
+            <button
+              onClick={() => setIsOpen(true)}
+              className="flex sm:hidden relative items-center justify-center w-11 h-11 bg-[#14532D] text-white rounded-full shadow-lg shadow-emerald-950/30 active:scale-95 transition-all duration-200 border border-white/30 cursor-pointer"
+              title="Instant Verified PG Support"
+              aria-label="Get Instant PG"
+            >
+              <div className="w-6 h-6 rounded-full bg-amber-400 text-emerald-950 flex items-center justify-center shadow-xs">
+                <Zap className="w-3.5 h-3.5 fill-emerald-950" />
+              </div>
+            </button>
 
-        {/* Desktop / Tablet Sleek Pill Button (Issues 8, 9, 15: Streamlined, accessible & non-distracting) */}
-        <button
-          onClick={() => setIsOpen(true)}
-          className="hidden sm:flex group items-center gap-2.5 px-3.5 py-2.5 bg-[#14532D] hover:bg-[#166534] text-white font-semibold text-xs rounded-full shadow-lg shadow-emerald-950/20 hover:shadow-emerald-900/30 active:scale-95 transition-all cursor-pointer border border-emerald-400/25 backdrop-blur-sm"
-          title="Book Instant Verified PG"
-          aria-label="Get Instant Verified PG"
-        >
-          <div className="w-6 h-6 rounded-full bg-emerald-700 flex items-center justify-center text-amber-300 shrink-0">
-            <Zap className="w-3.5 h-3.5 fill-amber-300" />
+            {/* Desktop / Tablet Sleek Pill Button */}
+            <button
+              onClick={() => setIsOpen(true)}
+              className="hidden sm:flex group items-center gap-2.5 px-4 py-2.5 bg-[#14532D] hover:bg-[#166534] text-white font-semibold text-xs rounded-full shadow-lg shadow-emerald-950/20 hover:shadow-emerald-900/30 active:scale-95 transition-all cursor-pointer border border-emerald-400/25 backdrop-blur-sm"
+              title="Book Instant Verified PG"
+              aria-label="Get Instant Verified PG"
+            >
+              <div className="w-6 h-6 rounded-full bg-emerald-700 flex items-center justify-center text-amber-300 shrink-0">
+                <Zap className="w-3.5 h-3.5 fill-amber-300" />
+              </div>
+              <span className="font-bold tracking-tight">Instant PG</span>
+              <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/25 text-emerald-100 border border-emerald-400/20">
+                Direct Allotment
+              </span>
+            </button>
           </div>
-          <span className="font-bold tracking-tight">Instant PG</span>
-          <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/25 text-emerald-100 border border-emerald-400/20">
-            Direct Allotment
-          </span>
-        </button>
+        </div>
       </div>
 
       {/* POPUP MODAL DRAWER */}
