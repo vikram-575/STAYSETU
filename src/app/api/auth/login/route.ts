@@ -50,8 +50,9 @@ export async function POST(request: NextRequest) {
     // ── 1. MASTER COMPANY SUPER ADMIN AUTHENTICATION ───────────────────────
     const isMasterAdminEmail =
       cleanEmail === SUPER_ADMIN_EMAIL || cleanEmail === 'vikramtomar0505@gmail.com'
-    const isMasterPassword =
-      password === SUPER_ADMIN_PASSWORD || password === 'qwerty123'
+    const isMasterPassword = SUPER_ADMIN_PASSWORD
+      ? password === SUPER_ADMIN_PASSWORD
+      : false
 
     if (isMasterAdminEmail && isMasterPassword) {
       const adminToken = await signAdminToken(cleanEmail)
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
         const supabase = await createClient()
         const { data: authData } = await supabase.auth.signInWithPassword({
           email: cleanEmail,
-          password: 'qwerty123',
+          password: SUPER_ADMIN_PASSWORD || password,
         })
         if (authData?.user) {
           supabaseUserId = authData.user.id
@@ -262,108 +263,6 @@ export async function POST(request: NextRequest) {
       }
 
       if (authError) {
-        // Fallback: Check if user exists in database `users` table
-        const serviceClient = await createServiceClient()
-        const { data: dbUser } = await serviceClient
-          .from('users')
-          .select('id, role, organization_id, email, full_name, phone')
-          .ilike('email', cleanEmail)
-          .maybeSingle()
-
-        if (dbUser) {
-          if (!dbUser.organization_id) {
-            const { data: matchedOrg } = await serviceClient
-              .from('organizations')
-              .select('id')
-              .or(`email.ilike.${cleanEmail},phone.eq.${dbUser.phone || 'none'}`)
-              .maybeSingle()
-
-            const { data: defaultOrg } = !matchedOrg
-              ? await serviceClient.from('organizations').select('id').order('created_at', { ascending: true }).limit(1).maybeSingle()
-              : { data: null }
-
-            const orgIdToLink = matchedOrg?.id || defaultOrg?.id
-            if (orgIdToLink) {
-              dbUser.organization_id = orgIdToLink
-              await serviceClient.from('users').update({ organization_id: orgIdToLink }).eq('id', dbUser.id)
-            }
-          }
-
-          const isMasterSuperAdmin =
-            cleanEmail === SUPER_ADMIN_EMAIL ||
-            cleanEmail === 'vikramtomar0505@gmail.com' ||
-            (isFromSuperAdminPortal && (dbUser.role === 'superadmin' || cleanEmail.includes('admin')))
-
-          const role = isMasterSuperAdmin ? 'superadmin' : (dbUser.role || 'owner')
-          const isSuperAdmin = role === 'superadmin'
-          // Only force password change if db record says so OR an 8-digit pin was used
-          // (never for superadmin — superadmin always has a real password)
-          const is8DigitPin = /^\d{8}$/.test(password.trim())
-          const mustChangePassword = !isSuperAdmin && is8DigitPin
-
-          cookieStore.set('auth_email', cleanEmail, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: 60 * 60 * 24 * 7,
-            path: '/',
-          })
-          cookieStore.set('auth_role', role, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: 60 * 60 * 24 * 7,
-            path: '/',
-          })
-          cookieStore.set('auth_user_id', dbUser.id, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: 60 * 60 * 24 * 7,
-            path: '/',
-          })
-
-          if (mustChangePassword) {
-            cookieStore.set('must_change_password', 'true', {
-              httpOnly: true,
-              secure: process.env.NODE_ENV === 'production',
-              sameSite: 'lax',
-              maxAge: 60 * 60 * 24 * 7,
-              path: '/',
-            })
-          } else {
-            cookieStore.set('must_change_password', '', { maxAge: 0, path: '/' })
-          }
-
-          if (isSuperAdmin) {
-            const adminToken = await signAdminToken(cleanEmail)
-            cookieStore.set('superadmin_token', adminToken, {
-              httpOnly: true,
-              secure: process.env.NODE_ENV === 'production',
-              sameSite: 'lax',
-              maxAge: 60 * 60 * 24 * 30,
-              path: '/',
-            })
-          } else {
-            // Ensure stale superadmin_token is cleared for non-superadmin users
-            cookieStore.set('superadmin_token', '', { maxAge: 0, path: '/' })
-          }
-
-          const isResidentRole = role === 'resident' || role === 'tenant' || role === 'user'
-          const destination = isSuperAdmin
-            ? '/superman'
-            : mustChangePassword
-            ? '/set-password'
-            : '/my-profile'
-
-          return NextResponse.json({
-            success: true,
-            role,
-            requiresPasswordChange: mustChangePassword,
-            redirect: destination,
-          })
-        }
-
         return NextResponse.json(
           { error: authError.message || 'Invalid email, phone number, or password.' },
           { status: 401 }

@@ -8,7 +8,11 @@ import {
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/money'
 
-export default function StructureTab() {
+interface StructureTabProps {
+  initialSearch?: string
+}
+
+export default function StructureTab({ initialSearch = '' }: StructureTabProps) {
   const [properties, setProperties] = useState<any[]>([])
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>('')
   const [hierarchy, setHierarchy] = useState<any>(null)
@@ -25,7 +29,10 @@ export default function StructureTab() {
       const data = await res.json()
       if (data.success && data.properties?.length > 0) {
         setProperties(data.properties)
-        setSelectedPropertyId(data.properties[0].id)
+        const match = initialSearch
+          ? data.properties.find((p: any) => p.name?.toLowerCase().includes(initialSearch.toLowerCase()))
+          : null
+        setSelectedPropertyId(match ? match.id : data.properties[0].id)
       }
     } catch (err) {
       console.error('Failed to load property list', err)

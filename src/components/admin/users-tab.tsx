@@ -6,7 +6,7 @@ import {
   Building2, CheckCircle2, XCircle, Clock, Loader2,
   Home, Users, Eye, X, ChevronRight, ExternalLink,
   KeyRound, Copy, Check, MapPin, Bed, Calendar, Shield,
-  Sparkles, Filter, RefreshCw
+  Sparkles, Filter, RefreshCw, Download
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
@@ -61,6 +61,9 @@ export default function UsersTab() {
   const [searchQuery, setSearchQuery] = useState('')
   const [userTypeFilter, setUserTypeFilter] = useState<'all' | 'owner' | 'tenant' | 'admin' | 'staff'>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 25
+  const [impersonatingUserId, setImpersonatingUserId] = useState<string | null>(null)
 
   // 360° Profile Modal
   const [selectedProfile, setSelectedProfile] = useState<UserProfile | null>(null)
@@ -155,6 +158,79 @@ export default function UsersTab() {
       u.room_number?.toLowerCase().includes(q)
     )
   })
+
+  useEffect(() => {
+    setPage(1)
+  }, [searchQuery, userTypeFilter, statusFilter])
+
+  const paginatedUsers = filteredUsers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const totalPages = Math.ceil(filteredUsers.length / PAGE_SIZE)
+
+  const downloadCSV = () => {
+    if (filteredUsers.length === 0) return
+    const headers = [
+      'Full Name',
+      'Email',
+      'Phone',
+      'User Type',
+      'Role',
+      'Registration Number',
+      'Organization / PG',
+      'Room Number',
+      'Bed',
+      'Status',
+      'Created / Check-in Date'
+    ]
+    const rows = filteredUsers.map((u) => [
+      `"${(u.full_name || '').replace(/"/g, '""')}"`,
+      `"${(u.email || '').replace(/"/g, '""')}"`,
+      `"${(u.phone || '').replace(/"/g, '""')}"`,
+      `"${(u.user_type || '').replace(/"/g, '""')}"`,
+      `"${(u.display_role || u.role || '').replace(/"/g, '""')}"`,
+      `"${(u.registration_number || '').replace(/"/g, '""')}"`,
+      `"${(u.property_name || u.organization_name || '').replace(/"/g, '""')}"`,
+      `"${(u.room_number || '').replace(/"/g, '""')}"`,
+      `"${(u.bed_label || '').replace(/"/g, '""')}"`,
+      `"${(u.status || (u.is_active ? 'active' : 'inactive')).replace(/"/g, '""')}"`,
+      `"${u.check_in_date || u.created_at || ''}"`
+    ])
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.setAttribute('href', url)
+    link.setAttribute('download', `pg-setu-users-${new Date().toISOString().split('T')[0]}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const handleImpersonateUser = async (u: UserProfile) => {
+    if (!u.organization_id) {
+      alert('This user is not associated with an active PG organization to impersonate.')
+      return
+    }
+    setImpersonatingUserId(u.id)
+    try {
+      const res = await fetch('/api/admin/impersonate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organization_id: u.organization_id,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        window.location.href = '/dashboard'
+      } else {
+        alert(data.error || 'Failed to switch context')
+      }
+    } catch (err) {
+      console.error('Impersonation error', err)
+    } finally {
+      setImpersonatingUserId(null)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -313,6 +389,16 @@ export default function UsersTab() {
               <option value="active">Active Only</option>
               <option value="inactive">Inactive / Past</option>
             </select>
+
+            <button
+              onClick={downloadCSV}
+              disabled={filteredUsers.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 hover:text-white text-xs font-semibold rounded-xl border border-slate-700 transition cursor-pointer shrink-0"
+              title="Export filtered users to CSV"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Export CSV</span>
+            </button>
           </div>
         </div>
 
@@ -344,7 +430,7 @@ export default function UsersTab() {
                   </td>
                 </tr>
               ) : (
-                filteredUsers.map((u) => {
+                paginatedUsers.map((u) => {
                   const isOwner = u.user_type === 'owner'
                   const isTenant = u.user_type === 'tenant'
                   const isAdmin = u.user_type === 'admin'
@@ -472,7 +558,7 @@ export default function UsersTab() {
                       </td>
 
                       {/* Actions */}
-                      <td className="px-4 py-3.5 text-right">
+                      <td className="px-4 py-3.5 text-right space-x-1.5">
                         <button
                           onClick={() => setSelectedProfile(u)}
                           className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs font-bold transition active:scale-95 border border-slate-700 hover:border-slate-600 shadow-xs"
@@ -480,6 +566,21 @@ export default function UsersTab() {
                           <Eye className="w-3.5 h-3.5 text-emerald-400" />
                           <span>View Profile</span>
                         </button>
+                        {u.organization_id && (u.user_type === 'owner' || u.role === 'owner' || u.role === 'manager') && (
+                          <button
+                            onClick={() => handleImpersonateUser(u)}
+                            disabled={impersonatingUserId === u.id}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 rounded-lg text-xs font-bold border border-blue-500/30 transition active:scale-95 shadow-xs"
+                            title={`Login as PG Owner/Manager into ${u.organization_name || 'PG'}`}
+                          >
+                            {impersonatingUserId === u.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <KeyRound className="w-3.5 h-3.5 text-blue-400" />
+                            )}
+                            <span>Login as PG</span>
+                          </button>
+                        )}
                       </td>
                     </tr>
                   )
@@ -488,6 +589,36 @@ export default function UsersTab() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+            <div>
+              Showing <span className="font-bold text-white">{(page - 1) * PAGE_SIZE + 1}</span> to{' '}
+              <span className="font-bold text-white">{Math.min(page * PAGE_SIZE, filteredUsers.length)}</span> of{' '}
+              <span className="font-bold text-white">{filteredUsers.length}</span> users
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl text-white font-medium transition cursor-pointer"
+              >
+                Previous
+              </button>
+              <span className="px-2 font-mono">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl text-white font-medium transition cursor-pointer"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 360° Profile Slide-over / Modal */}

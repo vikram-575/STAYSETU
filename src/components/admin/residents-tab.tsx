@@ -5,7 +5,7 @@ import {
   Users2, Search, Filter, ShieldCheck, Copy, Check,
   ExternalLink, Phone, Mail, Calendar, BedDouble,
   Landmark, DollarSign, ChevronRight, X, Loader2,
-  AlertCircle, Edit2
+  AlertCircle, Edit2, Download
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/money'
 import { formatDate } from '@/lib/utils'
@@ -21,6 +21,11 @@ export default function ResidentsTab({ initialSearch = '' }: ResidentsTabProps) 
   const [statusFilter, setStatusFilter] = useState('all')
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
+  // Bulk Selection & Pagination
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const PAGE_SIZE = 25
+  const [page, setPage] = useState(1)
+
   // 360 Drawer state
   const [selectedResidentId, setSelectedResidentId] = useState<string | null>(null)
   const [profile360, setProfile360] = useState<any>(null)
@@ -31,6 +36,37 @@ export default function ResidentsTab({ initialSearch = '' }: ResidentsTabProps) 
   const [newRentRupees, setNewRentRupees] = useState('')
   const [overrideReason, setOverrideReason] = useState('')
   const [overrideLoading, setOverrideLoading] = useState(false)
+
+  // CSV Export
+  const downloadCSV = () => {
+    const targetList = selectedIds.size > 0
+      ? residents.filter((r) => selectedIds.has(r.id))
+      : residents
+
+    const headers = ['Permanent Reg #', 'Full Name', 'Phone', 'Email', 'PG Organization', 'Room', 'Bed', 'Agreed Rent (INR)', 'KYC Status', 'Tenancy Status']
+    const rows = targetList.map((r: any) => [
+      r.registration_number || '',
+      r.full_name || '',
+      r.phone || '',
+      r.email || '',
+      r.org_name || '',
+      r.room_number || '',
+      r.bed_name || '',
+      ((r.agreed_rent_paise || 0) / 100).toFixed(2),
+      r.is_verified ? 'Verified' : 'Pending',
+      r.status || 'Active',
+    ])
+    const csv = [headers, ...rows].map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `residents-${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
 
   const loadResidents = async () => {
     setLoading(true)
@@ -49,7 +85,11 @@ export default function ResidentsTab({ initialSearch = '' }: ResidentsTabProps) 
 
   useEffect(() => {
     loadResidents()
+    setPage(1)
   }, [statusFilter])
+
+  const paginatedResidents = residents.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const totalPages = Math.ceil(residents.length / PAGE_SIZE)
 
   // Fetch 360 profile
   const openResident360 = async (residentId: string) => {
@@ -149,18 +189,64 @@ export default function ResidentsTab({ initialSearch = '' }: ResidentsTabProps) 
               className="w-full bg-slate-800/80 border border-slate-700 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none font-medium"
             />
           </div>
-          <button
-            onClick={loadResidents}
-            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition"
-          >
-            Search
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={loadResidents}
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition cursor-pointer"
+            >
+              Search
+            </button>
+            <button
+              onClick={downloadCSV}
+              disabled={residents.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 hover:text-white text-xs font-semibold rounded-xl border border-slate-700 transition cursor-pointer"
+              title="Export all filtered residents to CSV"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Export CSV</span>
+            </button>
+          </div>
         </div>
+
+        {/* Bulk Action Bar */}
+        {selectedIds.size > 0 && (
+          <div className="p-3 bg-emerald-950/50 border-b border-emerald-800/40 flex items-center justify-between">
+            <span className="text-xs font-bold text-emerald-300">
+              {selectedIds.size} resident{selectedIds.size > 1 ? 's' : ''} selected
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={downloadCSV}
+                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+              >
+                <Download className="w-3 h-3" />
+                <span>Export Selected</span>
+              </button>
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="px-2.5 py-1 text-xs text-slate-400 hover:text-white transition cursor-pointer"
+              >
+                Clear Selection
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-950/60 border-b border-slate-800 text-[11px] font-black uppercase text-slate-400 tracking-wider">
               <tr>
+                <th className="px-3 py-3 w-10 text-center">
+                  <input
+                    type="checkbox"
+                    checked={paginatedResidents.length > 0 && selectedIds.size === paginatedResidents.length}
+                    onChange={(e) => {
+                      if (e.target.checked) setSelectedIds(new Set(paginatedResidents.map((r: any) => r.id)))
+                      else setSelectedIds(new Set())
+                    }}
+                    className="w-3.5 h-3.5 accent-emerald-500 rounded cursor-pointer"
+                  />
+                </th>
                 <th className="px-4 py-3">Permanent Reg #</th>
                 <th className="px-4 py-3">Tenant Name & Contact</th>
                 <th className="px-4 py-3">Assigned PG & Room</th>
@@ -173,19 +259,32 @@ export default function ResidentsTab({ initialSearch = '' }: ResidentsTabProps) 
             <tbody className="divide-y divide-slate-800/60">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12">
+                  <td colSpan={8} className="text-center py-12">
                     <Loader2 className="w-6 h-6 text-emerald-500 animate-spin mx-auto" />
                   </td>
                 </tr>
               ) : residents.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-slate-500 text-xs">
+                  <td colSpan={8} className="text-center py-12 text-slate-500 text-xs">
                     No residents matching search or filter.
                   </td>
                 </tr>
               ) : (
-                residents.map((r) => (
+                paginatedResidents.map((r) => (
                   <tr key={r.id} className="hover:bg-slate-800/40 transition">
+                    <td className="px-3 py-3.5 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(r.id)}
+                        onChange={(e) => {
+                          const next = new Set(selectedIds)
+                          if (e.target.checked) next.add(r.id)
+                          else next.delete(r.id)
+                          setSelectedIds(next)
+                        }}
+                        className="w-3.5 h-3.5 accent-emerald-500 rounded cursor-pointer"
+                      />
+                    </td>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-1.5">
                         <span className="font-mono font-bold text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded text-[11px]">
@@ -265,6 +364,36 @@ export default function ResidentsTab({ initialSearch = '' }: ResidentsTabProps) 
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Bar */}
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+            <div>
+              Showing <span className="font-bold text-white">{(page - 1) * PAGE_SIZE + 1}</span> to{' '}
+              <span className="font-bold text-white">{Math.min(page * PAGE_SIZE, residents.length)}</span> of{' '}
+              <span className="font-bold text-white">{residents.length}</span> residents
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl text-white font-medium transition cursor-pointer"
+              >
+                Previous
+              </button>
+              <span className="px-2 font-mono">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl text-white font-medium transition cursor-pointer"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 360 Profile Slide-Over Drawer */}

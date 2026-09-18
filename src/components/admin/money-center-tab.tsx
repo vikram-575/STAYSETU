@@ -4,20 +4,25 @@ import React, { useState, useEffect } from 'react'
 import {
   Landmark, DollarSign, ShieldCheck, AlertCircle,
   RotateCcw, Search, Filter, ArrowUpRight, CheckCircle2,
-  XCircle, Clock, Loader2, FileText, AlertTriangle
+  XCircle, Clock, Loader2, FileText, AlertTriangle, Download
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/money'
 import { formatDate, formatDateTime } from '@/lib/utils'
 
 interface MoneyCenterTabProps {
   initialSearch?: string
+  onNavigateTab?: (tab: any, extraData?: any) => void
 }
 
-export default function MoneyCenterTab({ initialSearch = '' }: MoneyCenterTabProps) {
+export default function MoneyCenterTab({ initialSearch = '', onNavigateTab }: MoneyCenterTabProps) {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<any>(null)
   const [searchQuery, setSearchQuery] = useState(initialSearch)
   const [statusFilter, setStatusFilter] = useState('all')
+
+  // Pagination
+  const PAGE_SIZE = 25
+  const [page, setPage] = useState(1)
 
   // Reversal Modal
   const [reversalPayment, setReversalPayment] = useState<any>(null)
@@ -89,6 +94,39 @@ export default function MoneyCenterTab({ initialSearch = '' }: MoneyCenterTabPro
       p.org_name?.toLowerCase().includes(q)
     )
   })
+
+  useEffect(() => {
+    setPage(1)
+  }, [statusFilter, searchQuery])
+
+  const paginatedPayments = filteredPayments.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const totalPages = Math.ceil(filteredPayments.length / PAGE_SIZE)
+
+  // CSV Export
+  const downloadCSV = () => {
+    const headers = ['Receipt No', 'Transaction ID', 'Tenant Name', 'Registration #', 'PG Org', 'Amount (INR)', 'Payment Method', 'Status', 'Date']
+    const rows = filteredPayments.map((p: any) => [
+      p.payment_number || '',
+      p.transaction_id || '',
+      p.resident_name || '',
+      p.registration_number || '',
+      p.org_name || '',
+      ((p.amount_paise || 0) / 100).toFixed(2),
+      p.payment_method || '',
+      p.is_reversed ? 'Reversed' : 'Completed',
+      p.payment_date ? new Date(p.payment_date).toLocaleDateString('en-IN') : '',
+    ])
+    const csv = [headers, ...rows].map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `payments-${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <div className="space-y-6">
@@ -191,6 +229,16 @@ export default function MoneyCenterTab({ initialSearch = '' }: MoneyCenterTabPro
               <option value="completed">Completed Settlements</option>
               <option value="reversed">Reversed Entries</option>
             </select>
+
+            <button
+              onClick={downloadCSV}
+              disabled={filteredPayments.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 hover:text-white text-xs font-semibold rounded-xl border border-slate-700 transition cursor-pointer"
+              title="Export all filtered transactions to CSV"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Export CSV</span>
+            </button>
           </div>
         </div>
 
@@ -221,7 +269,7 @@ export default function MoneyCenterTab({ initialSearch = '' }: MoneyCenterTabPro
                   </td>
                 </tr>
               ) : (
-                filteredPayments.map((pmt: any) => (
+                paginatedPayments.map((pmt: any) => (
                   <tr key={pmt.id} className="hover:bg-slate-800/40 transition">
                     <td className="px-4 py-3.5">
                       <span className="font-bold text-slate-100 block font-mono">
@@ -266,16 +314,28 @@ export default function MoneyCenterTab({ initialSearch = '' }: MoneyCenterTabPro
                     </td>
 
                     <td className="px-4 py-3.5 text-right">
-                      {!pmt.is_reversed ? (
-                        <button
-                          onClick={() => setReversalPayment(pmt)}
-                          className="px-2.5 py-1 bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-400 rounded-lg text-xs font-semibold border border-slate-700 transition"
-                        >
-                          Reverse Entry
-                        </button>
-                      ) : (
-                        <span className="text-[11px] text-slate-500 italic">Reversal Audited</span>
-                      )}
+                      <div className="flex items-center justify-end gap-1.5">
+                        {onNavigateTab && (
+                          <button
+                            onClick={() => onNavigateTab('residents', { search: pmt.registration_number || pmt.resident_name })}
+                            className="px-2 py-1 bg-slate-800 hover:bg-emerald-950/60 text-slate-300 hover:text-emerald-400 rounded-lg text-xs font-semibold border border-slate-700 transition flex items-center gap-1 cursor-pointer"
+                            title="Inspect Resident Passbook"
+                          >
+                            <FileText className="w-3 h-3 text-emerald-400" />
+                            <span>Passbook</span>
+                          </button>
+                        )}
+                        {!pmt.is_reversed ? (
+                          <button
+                            onClick={() => setReversalPayment(pmt)}
+                            className="px-2 py-1 bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-400 rounded-lg text-xs font-semibold border border-slate-700 transition cursor-pointer"
+                          >
+                            Reverse
+                          </button>
+                        ) : (
+                          <span className="text-[11px] text-slate-500 italic">Reversed</span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -283,6 +343,34 @@ export default function MoneyCenterTab({ initialSearch = '' }: MoneyCenterTabPro
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Bar */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between p-4 border-t border-slate-800 bg-slate-950/40">
+            <p className="text-xs text-slate-400">
+              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredPayments.length)} of {filteredPayments.length} transactions
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-1 text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg border border-slate-700 transition cursor-pointer"
+              >
+                ← Prev
+              </button>
+              <span className="text-xs text-slate-400 font-mono">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="px-3 py-1 text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg border border-slate-700 transition cursor-pointer"
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Non-Destructive Payment Reversal Modal */}

@@ -7,7 +7,7 @@ import {
   Building2, Search, ShieldCheck, ShieldAlert, KeyRound,
   ExternalLink, Phone, Mail, MapPin, CheckCircle2,
   Clock, AlertTriangle, ChevronRight, X, Loader2, Edit3, Sparkles, Plus,
-  Lock, User, Check, RefreshCw
+  Lock, User, Check, RefreshCw, Download
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/money'
 import { formatDate } from '@/lib/utils'
@@ -23,6 +23,8 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
   const [searchQuery, setSearchQuery] = useState(initialSearch)
   const [statusFilter, setStatusFilter] = useState('all')
   const [totalWebsiteProperties, setTotalWebsiteProperties] = useState(0)
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 25
 
   // Tab View Mode: 'organizations' | 'pending'
   const [viewMode, setViewMode] = useState<'organizations' | 'pending'>('organizations')
@@ -253,6 +255,52 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
       org.owner?.full_name?.toLowerCase().includes(q)
     )
   })
+
+  useEffect(() => {
+    setPage(1)
+  }, [statusFilter, searchQuery])
+
+  const paginatedOrgs = filteredOrgs.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const totalPages = Math.ceil(filteredOrgs.length / PAGE_SIZE)
+
+  const downloadCSV = () => {
+    if (filteredOrgs.length === 0) return
+    const headers = [
+      'Organization Name',
+      'Owner Name',
+      'Phone',
+      'Email',
+      'City',
+      'Address',
+      'Total Rooms',
+      'Total Beds',
+      'Subscription Tier',
+      'Verification Status',
+      'Created At'
+    ]
+    const rows = filteredOrgs.map((org) => [
+      `"${(org.name || '').replace(/"/g, '""')}"`,
+      `"${(org.owner?.full_name || '').replace(/"/g, '""')}"`,
+      `"${(org.phone || org.owner?.phone || '').replace(/"/g, '""')}"`,
+      `"${(org.email || org.owner?.email || '').replace(/"/g, '""')}"`,
+      `"${(org.city || '').replace(/"/g, '""')}"`,
+      `"${(org.address || '').replace(/"/g, '""')}"`,
+      org.total_rooms || 0,
+      org.total_beds || 0,
+      org.subscription_tier || 'standard',
+      org.is_verified ? 'verified' : (org.verification_status || 'unverified'),
+      `"${org.created_at || ''}"`
+    ])
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.setAttribute('href', url)
+    link.setAttribute('download', `pg-setu-organizations-${new Date().toISOString().split('T')[0]}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
 
   const filteredPendingOwners = pendingOwners.filter((o) => {
     if (!searchQuery) return true
@@ -614,9 +662,20 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
               className="w-full bg-slate-800/80 border border-slate-700 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none font-medium"
             />
           </div>
-          <span className="text-xs text-slate-400">
-            Total: <span className="text-white font-bold">{filteredOrgs.length}</span> partners
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400">
+              Total: <span className="text-white font-bold">{filteredOrgs.length}</span> partners
+            </span>
+            <button
+              onClick={downloadCSV}
+              disabled={filteredOrgs.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 hover:text-white text-xs font-semibold rounded-xl border border-slate-700 transition cursor-pointer"
+              title="Export filtered organizations to CSV"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Export CSV</span>
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -654,7 +713,7 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
                   </td>
                 </tr>
               ) : (
-                filteredOrgs.map((org) => (
+                paginatedOrgs.map((org) => (
                   <tr key={org.id} className="hover:bg-slate-800/40 transition">
                     <td className="px-4 py-3.5">
                       <div className="font-bold text-slate-100 flex items-center gap-1.5">
@@ -758,6 +817,36 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+            <div>
+              Showing <span className="font-bold text-white">{(page - 1) * PAGE_SIZE + 1}</span> to{' '}
+              <span className="font-bold text-white">{Math.min(page * PAGE_SIZE, filteredOrgs.length)}</span> of{' '}
+              <span className="font-bold text-white">{filteredOrgs.length}</span> partners
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl text-white font-medium transition cursor-pointer"
+              >
+                Previous
+              </button>
+              <span className="px-2 font-mono">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl text-white font-medium transition cursor-pointer"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
       )}
 

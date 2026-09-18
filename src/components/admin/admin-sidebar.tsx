@@ -27,6 +27,7 @@ export type AdminTabId =
   | 'onboard'
   | 'website-cms'
   | 'profiles'
+  | 'kyc'
 
 interface NavItem {
   id: AdminTabId
@@ -90,9 +91,14 @@ export default function AdminSidebar({
         },
         {
           id: 'owners',
-          label: 'Owners CRM & KYC',
+          label: 'Owners CRM & Fleet',
           icon: Building2,
-          badge: badges.pendingKyc ? `${badges.pendingKyc} kyc` : undefined,
+        },
+        {
+          id: 'kyc',
+          label: 'Aadhaar KYC Queue',
+          icon: UserCheck,
+          badge: badges.pendingKyc ? `${badges.pendingKyc} pending` : undefined,
           badgeVariant: 'amber',
         },
         {
@@ -185,8 +191,8 @@ export default function AdminSidebar({
           id: 'website-cms',
           label: 'Website CMS & Live Editor',
           icon: Globe,
-          badge: 'Live CMS',
-          badgeVariant: 'amber',
+          badge: 'Shared',
+          badgeVariant: 'slate',
         },
       ],
     },
@@ -203,15 +209,15 @@ export default function AdminSidebar({
           id: 'users',
           label: 'All Users & Profiles',
           icon: Users2,
-          badge: 'Owners+Tenants',
+          badge: 'Platform',
           badgeVariant: 'emerald',
         },
         {
-          id: 'profiles',
-          label: 'Tenant & Owner Profiles',
+          id: 'kyc',
+          label: 'Aadhaar KYC Queue',
           icon: UserCheck,
-          badge: 'ID Registry',
-          badgeVariant: 'emerald',
+          badge: badges.pendingKyc ? `${badges.pendingKyc} pending` : undefined,
+          badgeVariant: 'amber',
         },
       ],
     },

@@ -18,6 +18,13 @@ interface AdminHeaderProps {
   onQuickAction?: (action: string) => void
   erpBadge?: number | string
   rentingBadge?: number | string
+  notifications?: {
+    pendingListings?: number
+    openComplaints?: number
+    pendingKyc?: number
+    activeEnquiries?: number
+  }
+  onSelectTab?: (tab: any) => void
 }
 
 export default function AdminHeader({
@@ -27,7 +34,27 @@ export default function AdminHeader({
   onQuickAction,
   erpBadge,
   rentingBadge,
+  notifications,
+  onSelectTab,
 }: AdminHeaderProps) {
+  const [showNotifications, setShowNotifications] = React.useState(false)
+  const notifRef = React.useRef<HTMLDivElement>(null)
+
+  React.useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setShowNotifications(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const pendingListings = Number(notifications?.pendingListings) || 0
+  const openComplaints = Number(notifications?.openComplaints) || 0
+  const pendingKyc = Number(notifications?.pendingKyc) || 0
+  const activeEnquiries = Number(notifications?.activeEnquiries) || 0
+  const totalAlerts = pendingListings + openComplaints + pendingKyc + activeEnquiries
   return (
     <header className="border-b border-slate-800 bg-slate-900/95 backdrop-blur-md sticky top-0 z-40">
       <div className="max-w-[1600px] mx-auto px-4 py-2.5 flex items-center justify-between gap-3 sm:gap-4">
@@ -149,6 +176,124 @@ export default function AdminHeader({
             >
               <ExternalLink className="w-4 h-4" />
             </Link>
+          </div>
+
+          {/* Notification Bell Dropdown */}
+          <div className="relative" ref={notifRef}>
+            <button
+              onClick={() => setShowNotifications((prev) => !prev)}
+              className="relative p-2 text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-800 rounded-xl border border-slate-700/80 transition cursor-pointer"
+              title="Platform Alerts & Notification Queue"
+            >
+              <Bell className="w-4 h-4" />
+              {totalAlerts > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white rounded-full text-[10px] font-black flex items-center justify-center border-2 border-slate-900 animate-pulse">
+                  {totalAlerts}
+                </span>
+              )}
+            </button>
+
+            {showNotifications && (
+              <div className="absolute right-0 top-full mt-2 w-72 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-50 overflow-hidden">
+                <div className="p-3 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+                  <span className="text-xs font-black text-white uppercase tracking-wider">
+                    Action Required
+                  </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">
+                    {totalAlerts} items
+                  </span>
+                </div>
+
+                <div className="divide-y divide-slate-800/60 max-h-80 overflow-y-auto">
+                  {pendingListings > 0 && (
+                    <button
+                      onClick={() => {
+                        onSelectTab?.('marketplace')
+                        setShowNotifications(false)
+                      }}
+                      className="w-full flex items-center gap-3 px-3.5 py-3 hover:bg-slate-800/60 text-left transition cursor-pointer"
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center shrink-0">
+                        <Store className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-slate-200">
+                          {pendingListings} Listing{pendingListings > 1 ? 's' : ''} Awaiting Review
+                        </p>
+                        <p className="text-[10px] text-slate-400">Review and publish to marketplace</p>
+                      </div>
+                    </button>
+                  )}
+
+                  {openComplaints > 0 && (
+                    <button
+                      onClick={() => {
+                        onSelectTab?.('safety')
+                        setShowNotifications(false)
+                      }}
+                      className="w-full flex items-center gap-3 px-3.5 py-3 hover:bg-slate-800/60 text-left transition cursor-pointer"
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-rose-500/20 text-rose-300 flex items-center justify-center shrink-0">
+                        <Activity className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-slate-200">
+                          {openComplaints} Open Complaint{openComplaints > 1 ? 's' : ''}
+                        </p>
+                        <p className="text-[10px] text-slate-400">Requires superadmin resolution</p>
+                      </div>
+                    </button>
+                  )}
+
+                  {pendingKyc > 0 && (
+                    <button
+                      onClick={() => {
+                        onSelectTab?.('kyc')
+                        setShowNotifications(false)
+                      }}
+                      className="w-full flex items-center gap-3 px-3.5 py-3 hover:bg-slate-800/60 text-left transition cursor-pointer"
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-300 flex items-center justify-center shrink-0">
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-slate-200">
+                          {pendingKyc} Pending Aadhaar KYC
+                        </p>
+                        <p className="text-[10px] text-slate-400">Verify government identity</p>
+                      </div>
+                    </button>
+                  )}
+
+                  {activeEnquiries > 0 && (
+                    <button
+                      onClick={() => {
+                        onSelectTab?.('enquiries')
+                        setShowNotifications(false)
+                      }}
+                      className="w-full flex items-center gap-3 px-3.5 py-3 hover:bg-slate-800/60 text-left transition cursor-pointer"
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center shrink-0">
+                        <Zap className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-slate-200">
+                          {activeEnquiries} Active Lead{activeEnquiries > 1 ? 's' : ''}
+                        </p>
+                        <p className="text-[10px] text-slate-400">Tenant inquiries awaiting dispatch</p>
+                      </div>
+                    </button>
+                  )}
+
+                  {totalAlerts === 0 && (
+                    <div className="py-8 text-center px-4">
+                      <p className="text-xs font-bold text-slate-300">All caught up! 🎉</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">No pending admin approvals or escalations.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Single Primary Action: + Onboard PG */}

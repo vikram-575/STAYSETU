@@ -70,6 +70,23 @@ export default function SafetyTab() {
       })
       const data = await res.json()
       if (data.success) {
+        // If escalated, notify the PG owner via WhatsApp
+        if (resolutionStatus === 'escalated' && selectedComplaint?.property_name) {
+          try {
+            await fetch('/api/admin/broadcast', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                title: '⚠️ Complaint Escalated by Super Admin',
+                message: `A complaint at your property "${selectedComplaint.property_name}" has been escalated. Complaint: "${selectedComplaint.title || selectedComplaint.description || 'See dashboard'}". Please address this urgently. Log in to your dashboard for details.`,
+                target_city: selectedComplaint.city || 'all',
+                channel: 'whatsapp',
+              }),
+            })
+          } catch {
+            // Non-blocking — escalation still succeeds even if notification fails
+          }
+        }
         setSelectedComplaint(null)
         setResolutionNotes('')
         loadSafetyData()

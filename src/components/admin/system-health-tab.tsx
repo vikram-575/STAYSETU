@@ -8,6 +8,23 @@ import {
 } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
 
+interface ApiHealthResult {
+  endpoint: string
+  label: string
+  status: 'ok' | 'error' | 'checking'
+  statusCode?: number
+  latencyMs?: number
+  lastChecked?: string
+}
+
+const API_ENDPOINTS_TO_CHECK: { endpoint: string; label: string }[] = [
+  { endpoint: '/api/admin/stats', label: 'Admin Stats API' },
+  { endpoint: '/api/portal/auth', label: 'Resident Portal Auth' },
+  { endpoint: '/api/billing/invoice', label: 'Billing Invoice API' },
+  { endpoint: '/api/admin/system?action=health', label: 'System Health API' },
+  { endpoint: '/api/admin/broadcast', label: 'Broadcast API' },
+]
+
 export default function SystemHealthTab() {
   const [subTab, setSubTab] = useState<'health' | 'audit'>('health')
   const [loading, setLoading] = useState(true)
@@ -17,6 +34,51 @@ export default function SystemHealthTab() {
   // Audit filters
   const [entityFilter, setEntityFilter] = useState('all')
   const [actionFilter, setActionFilter] = useState('all')
+
+  // Live API Health Probe
+  const [apiHealth, setApiHealth] = useState<ApiHealthResult[]>(
+    API_ENDPOINTS_TO_CHECK.map(e => ({ ...e, status: 'checking' }))
+  )
+  const [checkingApi, setCheckingApi] = useState(false)
+
+  const checkApiHealth = async () => {
+    setCheckingApi(true)
+    setApiHealth(prev => prev.map(p => ({ ...p, status: 'checking' })))
+    const results = await Promise.allSettled(
+      API_ENDPOINTS_TO_CHECK.map(async (item) => {
+        const start = Date.now()
+        try {
+          const res = await fetch(item.endpoint, { method: 'GET' })
+          const latencyMs = Date.now() - start
+          // 200, 401, 403, 405 all prove the route handler is responsive and online
+          const isHealthy = res.status < 500
+          return {
+            ...item,
+            status: isHealthy ? ('ok' as const) : ('error' as const),
+            statusCode: res.status,
+            latencyMs,
+            lastChecked: new Date().toISOString(),
+          }
+        } catch {
+          return {
+            ...item,
+            status: 'error' as const,
+            latencyMs: Date.now() - start,
+            lastChecked: new Date().toISOString(),
+          }
+        }
+      })
+    )
+
+    setApiHealth(
+      results.map((r, i) =>
+        r.status === 'fulfilled'
+          ? r.value
+          : { ...API_ENDPOINTS_TO_CHECK[i], status: 'error' as const, lastChecked: new Date().toISOString() }
+      )
+    )
+    setCheckingApi(false)
+  }
 
   const loadData = async () => {
     setLoading(true)
@@ -40,6 +102,7 @@ export default function SystemHealthTab() {
 
   useEffect(() => {
     loadData()
+    checkApiHealth()
   }, [entityFilter, actionFilter])
 
   return (
@@ -131,6 +194,60 @@ export default function SystemHealthTab() {
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Live API Health Monitor */}
+          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-3 shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                  <Activity className="w-3.5 h-3.5 text-emerald-400" /> Live Endpoint Latency & Status Probes
+                </h4>
+                <p className="text-[11px] text-slate-500 mt-0.5">Direct edge response times measured against critical platform routing pipelines.</p>
+              </div>
+              <button
+                onClick={checkApiHealth}
+                disabled={checkingApi}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 hover:text-white rounded-xl text-xs font-bold border border-slate-700 transition cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${checkingApi ? 'animate-spin' : ''}`} />
+                {checkingApi ? 'Probing...' : 'Re-check APIs'}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
+              {apiHealth.map((h) => (
+                <div
+                  key={h.endpoint}
+                  className="flex items-center justify-between p-3 bg-slate-950/70 border border-slate-800/80 rounded-xl"
+                >
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-white truncate">{h.label}</p>
+                    <p className="text-[10px] text-slate-500 font-mono truncate">{h.endpoint}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 ml-3">
+                    {h.latencyMs !== undefined && (
+                      <span className="text-[10px] text-slate-400 font-mono">{h.latencyMs}ms</span>
+                    )}
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                        h.status === 'ok'
+                          ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
+                          : h.status === 'error'
+                          ? 'text-rose-400 bg-rose-500/10 border-rose-500/30'
+                          : 'text-amber-400 bg-amber-500/10 border-amber-500/30'
+                      }`}
+                    >
+                      {h.status === 'checking'
+                        ? 'Probing'
+                        : h.statusCode
+                        ? `HTTP ${h.statusCode}`
+                        : h.status.toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}

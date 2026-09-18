@@ -18,7 +18,7 @@ const ADMIN_SECRET =
   'pgsetu-master-superadmin-secret-key-2026'
 
 export const SUPER_ADMIN_EMAIL = (process.env.SUPER_ADMIN_EMAIL || 'vikramtomar0505@gmail.com').toLowerCase().trim()
-export const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD || 'qwerty123'
+export const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD || ''
 
 /**
  * Web Crypto SHA-256 HMAC helper compatible with Edge Runtime & Node.js

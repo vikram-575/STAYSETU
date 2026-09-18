@@ -8,16 +8,17 @@ import {
   Calendar, Phone, MapPin, ArrowUpRight, MessageSquare, Loader2,
   Zap, Plus, ExternalLink, ArrowRight, User, Users, RefreshCw,
   Edit3, Trash2, Check, X, Building2, ChevronRight, Bed, DollarSign,
-  Tag, Award, Star
+  Tag, Award, Star, Send
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/money'
 import { formatDate } from '@/lib/utils'
 
 interface MarketplaceTabProps {
   initialSubTab?: 'listings' | 'instant_pg' | 'enquiries' | 'visits'
+  initialBadgeFilter?: 'all' | 'verified' | 'featured'
 }
 
-export default function MarketplaceTab({ initialSubTab = 'listings' }: MarketplaceTabProps) {
+export default function MarketplaceTab({ initialSubTab = 'listings', initialBadgeFilter = 'all' }: MarketplaceTabProps) {
   const [subTab, setSubTab] = useState<'listings' | 'instant_pg' | 'enquiries' | 'visits'>(initialSubTab)
   const [loading, setLoading] = useState(true)
   const [listings, setListings] = useState<any[]>([])
@@ -30,7 +31,7 @@ export default function MarketplaceTab({ initialSubTab = 'listings' }: Marketpla
   const [statusFilter, setStatusFilter] = useState('all')
   const [cityFilter, setCityFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
-  const [badgeFilter, setBadgeFilter] = useState('all') // all, verified, featured
+  const [badgeFilter, setBadgeFilter] = useState(initialBadgeFilter) // all, verified, featured
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState<'newest' | 'pending_first' | 'rent_asc' | 'rent_desc'>('newest')
 
@@ -59,6 +60,13 @@ export default function MarketplaceTab({ initialSubTab = 'listings' }: Marketpla
   const [newLeadBudget, setNewLeadBudget] = useState('₹8,000 - ₹12,000')
   const [newLeadNotes, setNewLeadNotes] = useState('')
   const [creatingLead, setCreatingLead] = useState(false)
+
+  // Super Admin Dispatch Lead to Owner Modal
+  const [dispatchLead, setDispatchLead] = useState<any>(null)
+  const [dispatchOwners, setDispatchOwners] = useState<any[]>([])
+  const [selectedOwnerId, setSelectedOwnerId] = useState<string>('')
+  const [loadingDispatchOwners, setLoadingDispatchOwners] = useState(false)
+  const [dispatchingLead, setDispatchingLead] = useState(false)
 
   const loadMarketplaceData = async () => {
     setLoading(true)
@@ -265,6 +273,63 @@ export default function MarketplaceTab({ initialSubTab = 'listings' }: Marketpla
       console.error('Create lead failed:', err)
     } finally {
       setCreatingLead(false)
+    }
+  }
+
+  // Open Dispatch Modal and load relevant owners
+  const handleOpenDispatchModal = async (lead: any) => {
+    setDispatchLead(lead)
+    setSelectedOwnerId('')
+    setLoadingDispatchOwners(true)
+    try {
+      const res = await fetch('/api/admin/organizations')
+      const data = await res.json()
+      if (data.success && data.organizations) {
+        const leadCity = lead.property_city || ''
+        const matched = data.organizations.filter((o: any) =>
+          !leadCity || leadCity === 'all'
+            ? true
+            : (o.city || '').toLowerCase().includes(leadCity.toLowerCase())
+        )
+        const list = matched.length > 0 ? matched : data.organizations
+        setDispatchOwners(list)
+        if (list.length > 0) setSelectedOwnerId(list[0].id)
+      }
+    } catch (err) {
+      console.error('Failed to load owners for dispatch', err)
+    } finally {
+      setLoadingDispatchOwners(false)
+    }
+  }
+
+  // Confirm Dispatch and notify owner via WhatsApp
+  const handleConfirmDispatch = async () => {
+    if (!dispatchLead || !selectedOwnerId) return
+    const owner = dispatchOwners.find((o) => o.id === selectedOwnerId)
+    setDispatchingLead(true)
+    try {
+      // 1. Dispatch WhatsApp & In-app broadcast alert
+      await fetch('/api/admin/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: '⚡ New Instant PG Lead Dispatched to You',
+          message: `High-intent prospect: ${dispatchLead.tenant_name || dispatchLead.user_name || 'Prospective Tenant'} (+91 ${dispatchLead.tenant_phone || dispatchLead.user_phone || ''}) is looking for a ${dispatchLead.sharing_choice || 'room'} in ${dispatchLead.property_city || 'your city'}. Budget: ${dispatchLead.budget_range || 'Standard'}. Please contact them immediately! — PG-SETU Admin`,
+          target_city: dispatchLead.property_city || 'all',
+          channel: 'whatsapp',
+        }),
+      })
+
+      // 2. Update status to 'dispatched'
+      await handleUpdateEnquiry(dispatchLead.id, 'dispatched', {
+        assigned_property_name: owner?.name || 'Dispatched to Owner',
+      })
+
+      setDispatchLead(null)
+    } catch (err) {
+      console.error('Failed to dispatch lead', err)
+    } finally {
+      setDispatchingLead(false)
     }
   }
 
@@ -509,7 +574,7 @@ export default function MarketplaceTab({ initialSubTab = 'listings' }: Marketpla
               {/* Badge Filter */}
               <select
                 value={badgeFilter}
-                onChange={(e) => setBadgeFilter(e.target.value)}
+                onChange={(e) => setBadgeFilter(e.target.value as 'all' | 'verified' | 'featured')}
                 className="w-full md:w-auto bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-slate-300 focus:outline-none focus:border-amber-500"
               >
                 <option value="all">All Listings</option>
@@ -839,6 +904,8 @@ export default function MarketplaceTab({ initialSubTab = 'listings' }: Marketpla
                         className={`text-[10px] font-bold rounded-lg px-2 py-1 border focus:outline-none ${
                           lead.status === 'new'
                             ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                            : lead.status === 'dispatched'
+                            ? 'bg-purple-500/20 border-purple-500/40 text-purple-300'
                             : lead.status === 'contacted'
                             ? 'bg-blue-500/20 border-blue-500/40 text-blue-300'
                             : lead.status === 'allotted'
@@ -847,6 +914,7 @@ export default function MarketplaceTab({ initialSubTab = 'listings' }: Marketpla
                         }`}
                       >
                         <option value="new">🟡 New Lead</option>
+                        <option value="dispatched">🟣 Dispatched</option>
                         <option value="contacted">🔵 Contacted</option>
                         <option value="allotted">🟢 Allotted (Converted)</option>
                         <option value="closed">⚪ Closed / Lost</option>
@@ -900,13 +968,13 @@ export default function MarketplaceTab({ initialSubTab = 'listings' }: Marketpla
                     {/* Assigned PG Allotment info */}
                     {lead.assigned_property_name && (
                       <div className="p-2 bg-emerald-950/60 rounded-xl border border-emerald-500/30 text-[10px] text-emerald-300 flex items-center justify-between">
-                        <span>Allotted PG: <strong>{lead.assigned_property_name}</strong></span>
+                        <span>Assignment: <strong>{lead.assigned_property_name}</strong></span>
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                       </div>
                     )}
 
-                    {/* Action Bar: Call, WhatsApp, Allot */}
-                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+                    {/* Action Bar: Call, WhatsApp, Dispatch, Allot */}
+                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-1.5 flex-wrap">
                       <div className="flex items-center gap-1.5">
                         <a
                           href={`tel:${lead.tenant_phone || lead.user_phone}`}
@@ -929,6 +997,15 @@ export default function MarketplaceTab({ initialSubTab = 'listings' }: Marketpla
                           <MessageSquare className="w-3 h-3 text-emerald-400" />
                           <span>WhatsApp</span>
                         </a>
+
+                        <button
+                          onClick={() => handleOpenDispatchModal(lead)}
+                          className="px-2.5 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 text-[11px] font-bold rounded-lg border border-indigo-500/30 flex items-center gap-1 transition cursor-pointer"
+                          title="Dispatch lead to verified PG owner via WhatsApp"
+                        >
+                          <Sparkles className="w-3 h-3 text-indigo-400" />
+                          <span>Dispatch</span>
+                        </button>
                       </div>
 
                       {/* 1-Click Allot Dropdown */}
@@ -1600,6 +1677,87 @@ export default function MarketplaceTab({ initialSubTab = 'listings' }: Marketpla
                 className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold"
               >
                 Confirm Rejection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dispatch Lead to Verified Owner Modal */}
+      {dispatchLead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl p-5 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-indigo-400" />
+                <h3 className="text-sm font-black text-white">
+                  Dispatch Lead to Verified PG Owner
+                </h3>
+              </div>
+              <button
+                onClick={() => setDispatchLead(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 space-y-1 text-xs">
+              <p className="font-bold text-slate-200">
+                {dispatchLead.tenant_name || dispatchLead.user_name} (+91 {dispatchLead.tenant_phone || dispatchLead.user_phone})
+              </p>
+              <p className="text-slate-400">
+                Looking for: {dispatchLead.gender || 'Coed'} · {dispatchLead.sharing_choice || 'Room'} in {dispatchLead.property_city || 'India'}
+              </p>
+              <p className="text-emerald-400 font-mono font-bold">
+                Budget: {dispatchLead.budget_range || 'Standard'} · Move-in: {dispatchLead.move_in_date || 'Immediate'}
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-300">
+                Select Destination PG Partner ({dispatchOwners.length} in {dispatchLead.property_city || 'City'})
+              </label>
+              {loadingDispatchOwners ? (
+                <div className="py-4 text-center">
+                  <Loader2 className="w-4 h-4 animate-spin text-indigo-400 mx-auto" />
+                </div>
+              ) : dispatchOwners.length === 0 ? (
+                <p className="text-xs text-amber-400 italic">No registered PG owners found in this city.</p>
+              ) : (
+                <select
+                  value={selectedOwnerId}
+                  onChange={(e) => setSelectedOwnerId(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                >
+                  {dispatchOwners.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.name} ({o.city || 'City'}) — Owner: {o.owner_name || o.email || 'Verified'}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <p className="text-[11px] text-slate-400 leading-relaxed bg-indigo-950/30 p-2.5 rounded-xl border border-indigo-500/20">
+              💡 Confirming will immediately dispatch an automated WhatsApp & in-app priority lead notification to this owner, and transition the enquiry status to <strong className="text-indigo-300">Dispatched</strong>.
+            </p>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                onClick={() => setDispatchLead(null)}
+                disabled={dispatchingLead}
+                className="px-3.5 py-1.5 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold hover:bg-slate-700 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDispatch}
+                disabled={dispatchingLead || !selectedOwnerId || dispatchOwners.length === 0}
+                className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md shadow-indigo-600/30"
+              >
+                {dispatchingLead ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                <span>{dispatchingLead ? 'Dispatching...' : 'Confirm & Notify Owner'}</span>
               </button>
             </div>
           </div>

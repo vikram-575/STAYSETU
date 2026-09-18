@@ -20,8 +20,13 @@ async function handleInitSuperAdmin(request: NextRequest) {
   const bootstrapSecret = process.env.BOOTSTRAP_SECRET
   const providedSecret = request.headers.get('x-bootstrap-secret') || request.nextUrl.searchParams.get('secret')
 
-  if (bootstrapSecret && providedSecret !== bootstrapSecret) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (process.env.NODE_ENV === 'production') {
+    if (!bootstrapSecret || providedSecret !== bootstrapSecret) {
+      return NextResponse.json(
+        { error: 'This endpoint is disabled in production. Set BOOTSTRAP_SECRET env var to enable one-time provisioning.' },
+        { status: 403 }
+      )
+    }
   }
 
   const superAdminEmail = process.env.SUPER_ADMIN_EMAIL || 'vikramtomar0505@gmail.com'

@@ -291,10 +291,64 @@ export async function POST(request: NextRequest) {
         .update({ is_active: true })
         .eq('id', targetUser.id)
 
+      // Ensure Organization exists
+      let userOrgId = targetUser.organization_id
+      if (!userOrgId || userOrgId === 'edd624d8-f3a0-4f92-b8b9-515c50ed8e98') {
+        const orgName = `${targetUser.full_name || 'PG'} Stays`
+        const { data: newOrg } = await serviceClient
+          .from('organizations')
+          .insert({
+            name: orgName,
+            slug: `${slugify(orgName)}-${Date.now().toString(36)}`,
+            owner_user_id: targetUser.id,
+            phone: targetUser.phone,
+            email: targetUser.email,
+            city: city || 'Bengaluru',
+            currency_code: 'INR',
+            timezone: 'Asia/Kolkata',
+            settings: { plan: 'growth', subscription_status: 'active', is_verified: true },
+          })
+          .select('id')
+          .single()
+        if (newOrg) {
+          userOrgId = newOrg.id
+          await serviceClient.from('users').update({ organization_id: userOrgId }).eq('id', targetUser.id)
+        }
+      }
+
+      // Check if property exists; if not, create draft pending listing so it syncs to Marketplace tab
+      if (userOrgId) {
+        const { data: existingProps } = await serviceClient
+          .from('properties')
+          .select('id')
+          .eq('organization_id', userOrgId)
+          .limit(1)
+
+        if (!existingProps || existingProps.length === 0) {
+          const draftName = `${targetUser.full_name || 'Verified'} PG Residence`
+          await serviceClient.from('properties').insert({
+            organization_id: userOrgId,
+            name: draftName,
+            city: city || 'Bengaluru',
+            address: address || 'Main Road, City Center',
+            phone: targetUser.phone,
+            email: targetUser.email,
+            starting_rent_paise: 800000,
+            is_active: false, // draft pending approval in marketplace
+            settings: {
+              status: 'pending',
+              pg_type: 'coliving',
+              amenities: ['High-Speed WiFi', 'Power Backup', 'RO Water', 'CCTV Security'],
+              rules: ['No smoking', 'Gate closes at 11:00 PM'],
+            },
+          })
+        }
+      }
+
       return NextResponse.json({
         success: true,
         status: 'unlocked_pending_pg',
-        message: `ERP access unlocked for ${targetUser.full_name || 'Owner'}. Click "Onboard PG" to configure their property fleet.`,
+        message: `ERP access unlocked for ${targetUser.full_name || 'Owner'}. A draft listing has been submitted to the Marketplace for review.`,
       })
     }
 

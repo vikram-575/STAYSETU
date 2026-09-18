@@ -18,6 +18,7 @@ import SystemHealthTab from '@/components/admin/system-health-tab'
 import UsersTab from '@/components/admin/users-tab'
 import WebsiteCmsTab from '@/components/admin/website-cms-tab'
 import ProfilesTab from '@/components/admin/profiles-tab'
+import KycTab from '@/components/admin/kyc-tab'
 import { Loader2 } from 'lucide-react'
 
 function AdminContent() {
@@ -115,6 +116,8 @@ function AdminContent() {
         onOpenSearch={() => setIsSearchOpen(true)}
         erpBadge={erpBadge}
         rentingBadge={rentingBadge}
+        notifications={badges}
+        onSelectTab={handleSelectTab}
       />
 
       {/* Main Body with Sidebar + Tab Content */}
@@ -152,13 +155,15 @@ function AdminContent() {
           {currentTab === 'marketplace' && <MarketplaceTab initialSubTab="listings" />}
           {currentTab === 'enquiries' && <MarketplaceTab initialSubTab="enquiries" />}
           {currentTab === 'visits' && <MarketplaceTab initialSubTab="visits" />}
-          {currentTab === 'promotions' && <MarketplaceTab initialSubTab="listings" />}
+          {currentTab === 'promotions' && <MarketplaceTab initialSubTab="listings" initialBadgeFilter="featured" />}
 
           {/* ERP Specific Views */}
-          {currentTab === 'structure' && <StructureTab />}
+          {currentTab === 'structure' && <StructureTab initialSearch={extraSearchQuery} />}
           {currentTab === 'residents' && <ResidentsTab initialSearch={extraSearchQuery} />}
           {currentTab === 'owners' && <OwnersTab initialSearch={extraSearchQuery} />}
-          {currentTab === 'money-center' && <MoneyCenterTab initialSearch={extraSearchQuery} />}
+          {currentTab === 'money-center' && (
+            <MoneyCenterTab initialSearch={extraSearchQuery} onNavigateTab={handleSelectTab} />
+          )}
           {currentTab === 'users' && <UsersTab />}
 
           {/* Common Cross-Platform Support & Governance */}
@@ -169,6 +174,7 @@ function AdminContent() {
             <WebsiteCmsTab initialSection={searchParams.get('section') || undefined} />
           )}
           {currentTab === 'profiles' && <ProfilesTab />}
+          {currentTab === 'kyc' && <KycTab />}
         </main>
       </div>
 
