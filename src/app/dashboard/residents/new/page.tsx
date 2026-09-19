@@ -7,7 +7,8 @@ import {
   UserPlus, ArrowLeft, ArrowRight, CheckCircle2,
   Building2, BedDouble, Shield, FileText, Loader2, DollarSign,
   Phone, Lock, Sparkles, RefreshCw, KeyRound, AlertCircle, Check,
-  UserCheck, ShieldCheck, MapPin, Contact, ScanFace, ExternalLink
+  UserCheck, ShieldCheck, MapPin, Contact, ScanFace, ExternalLink,
+  AlertTriangle
 } from 'lucide-react'
 import { formatCurrency, rupeesToPaise } from '@/lib/money'
 import { FirebaseFileUploader } from '@/components/ui/firebase-file-uploader'
@@ -26,6 +27,10 @@ export default function CheckInResidentPage() {
   const [sendingOtp, setSendingOtp] = useState(false)
   const [verifyingOtp, setVerifyingOtp] = useState(false)
   const [otpError, setOtpError] = useState('')
+
+  // Active Stay & PG Conflict Verification State
+  const [activeStayWarning, setActiveStayWarning] = useState<any | null>(null)
+  const [checkingMobile, setCheckingMobile] = useState(false)
 
   // Form & Wizard Navigation
   const [currentStep, setCurrentStep] = useState(1)
@@ -237,6 +242,36 @@ export default function CheckInResidentPage() {
     }))
   }
 
+  // Live verification when 10-digit mobile number is entered
+  useEffect(() => {
+    const clean = cleanPhoneDigits(verifyMobile)
+    if (clean.length === 10) {
+      let active = true
+      setCheckingMobile(true)
+      fetch(`/api/tenants/lookup?phone=${clean}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (!active) return
+          if (data?.is_currently_checked_in && data?.active_stay) {
+            setActiveStayWarning(data.active_stay)
+          } else {
+            setActiveStayWarning(null)
+          }
+        })
+        .catch((err) => console.error('Error verifying active resident stay:', err))
+        .finally(() => {
+          if (active) setCheckingMobile(false)
+        })
+
+      return () => {
+        active = false
+      }
+    } else {
+      setActiveStayWarning(null)
+      setCheckingMobile(false)
+    }
+  }, [verifyMobile])
+
   // ─────────────────────────────────────────────────────────────
   // 1. SEND OTP TO RESIDENT MOBILE
   // ─────────────────────────────────────────────────────────────
@@ -252,6 +287,17 @@ export default function CheckInResidentPage() {
 
     setSendingOtp(true)
     try {
+      // Step 0: Check if resident already exists and is actively checked in at any PG
+      const lookupRes = await fetch(`/api/tenants/lookup?phone=${clean}`)
+      if (lookupRes.ok) {
+        const lookupData = await lookupRes.json()
+        if (lookupData?.is_currently_checked_in && lookupData?.active_stay) {
+          setActiveStayWarning(lookupData.active_stay)
+        } else {
+          setActiveStayWarning(null)
+        }
+      }
+
       const res = await fetch('/api/auth/mobile-flow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -318,6 +364,9 @@ export default function CheckInResidentPage() {
       if (lookupData?.found) {
         setExistingTenant(lookupData)
         setSuggestedTenantId(lookupData.tenant_id)
+        if (lookupData.is_currently_checked_in && lookupData.active_stay) {
+          setActiveStayWarning(lookupData.active_stay)
+        }
 
         // Automatically fill all available fields from database
         const newFormValues = {
@@ -390,6 +439,7 @@ export default function CheckInResidentPage() {
     setDevOtp('')
     setOtpError('')
     setExistingTenant(null)
+    setActiveStayWarning(null)
     setAutoFilledFields(new Set())
   }
 
@@ -415,8 +465,18 @@ export default function CheckInResidentPage() {
   }
 
   const handleSubmit = async () => {
-    setLoading(true)
     setError('')
+
+    if (activeStayWarning && !activeStayWarning.is_same_pg) {
+      setError(`Cannot complete check-in: Resident is already actively checked in at ${activeStayWarning.pg_name} (PG Contact: ${activeStayWarning.pg_mobile}). They must check out from their current PG first.`)
+      return
+    }
+    if (activeStayWarning && activeStayWarning.is_same_pg) {
+      setError(`Resident is already actively checked in at your property in Room ${activeStayWarning.room_number || 'assigned'}, Bed ${activeStayWarning.bed_label || 'assigned'}.`)
+      return
+    }
+
+    setLoading(true)
 
     try {
       const res = await fetch('/api/residents/checkin', {
@@ -468,6 +528,173 @@ export default function CheckInResidentPage() {
       )
     }
     return null
+  }
+
+  // Render Active Stay & Cross-PG Conflict Notification Banner
+  const renderActiveStayBanner = () => {
+    if (!activeStayWarning) return null
+
+    const isSamePg = activeStayWarning.is_same_pg
+    const cleanMobile = activeStayWarning.pg_mobile ? cleanPhoneDigits(activeStayWarning.pg_mobile) : ''
+
+    if (isSamePg) {
+      return (
+        <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-50/90 p-4 sm:p-5 shadow-xs space-y-3">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-xs">
+              <Building2 className="h-5 w-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-emerald-200 px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wide text-emerald-950">
+                  Already Checked In at Your Property
+                </span>
+                <span className="text-xs font-semibold text-emerald-800">
+                  Universal ID: <span className="font-mono font-bold">{activeStayWarning.registration_number || 'Registered'}</span>
+                </span>
+              </div>
+              <h3 className="text-sm font-bold text-gray-900 mt-1">
+                {activeStayWarning.resident_name || 'This resident'} is already an active resident in your PG.
+              </h3>
+              <p className="text-xs text-gray-600 mt-0.5">
+                Current Stay: Room <span className="font-bold text-gray-900">{activeStayWarning.room_number || 'Assigned'}</span>
+                {activeStayWarning.bed_label ? `, Bed ${activeStayWarning.bed_label}` : ''}
+                {activeStayWarning.check_in_date ? ` (Since ${activeStayWarning.check_in_date})` : ''}.
+              </p>
+            </div>
+            <Link
+              href={`/dashboard/residents/${activeStayWarning.resident_id}`}
+              className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#14532D] hover:bg-[#166534] text-white text-xs font-bold rounded-xl shadow-xs transition"
+            >
+              <span>View Profile</span>
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="rounded-2xl border-2 border-amber-400 bg-gradient-to-br from-amber-50 via-orange-50/60 to-amber-50 p-4 sm:p-5 shadow-xs space-y-4">
+        <div className="flex items-start gap-3.5">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-sm ring-4 ring-amber-100">
+            <AlertTriangle className="h-5 w-5 stroke-[2.5]" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-amber-500 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white shadow-xs">
+                Already Exists &amp; Checked In
+              </span>
+              <span className="rounded-full bg-red-100 border border-red-200 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-800">
+                Active in Another PG
+              </span>
+            </div>
+            <h3 className="text-sm font-black text-gray-900 mt-1">
+              Resident already has an active stay in another PG property
+            </h3>
+            <p className="text-xs text-gray-700 mt-0.5 leading-relaxed">
+              <strong>{activeStayWarning.resident_name || 'This resident'}</strong> (Tenant ID:{' '}
+              <span className="font-mono font-bold text-gray-900">{activeStayWarning.registration_number || 'N/A'}</span>)
+              is currently marked as <span className="font-bold text-emerald-800">Active</span> in the PG-Setu network.
+              Simultaneous check-in across multiple PGs is prohibited.
+            </p>
+          </div>
+        </div>
+
+        {/* Current PG & Location Details Card */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white/90 backdrop-blur-xs rounded-xl border border-amber-200/80 p-3.5 text-xs shadow-2xs">
+          {/* Current PG Info */}
+          <div className="space-y-1.5 border-b sm:border-b-0 sm:border-r border-amber-100 pb-2 sm:pb-0 sm:pr-3">
+            <div className="flex items-center gap-1.5 text-gray-500 font-bold uppercase tracking-wider text-[10px]">
+              <Building2 className="h-3.5 w-3.5 text-amber-700" />
+              <span>Current PG Name</span>
+            </div>
+            <div className="font-extrabold text-sm text-gray-900">
+              {activeStayWarning.pg_name || 'PG Partner Property'}
+            </div>
+            {activeStayWarning.property_name && activeStayWarning.property_name !== activeStayWarning.pg_name && (
+              <div className="text-[11px] text-gray-600 font-medium">
+                Branch/Building: {activeStayWarning.property_name}
+              </div>
+            )}
+            
+            {/* PG Mobile & Direct Actions */}
+            <div className="pt-1 space-y-1">
+              <div className="flex items-center gap-1.5 text-gray-500 font-bold uppercase tracking-wider text-[10px]">
+                <Phone className="h-3.5 w-3.5 text-amber-700" />
+                <span>PG Contact / Mobile</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                {activeStayWarning.pg_mobile ? (
+                  <>
+                    <span className="font-mono font-bold text-gray-900 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                      +91 {cleanPhoneDigits(activeStayWarning.pg_mobile)}
+                    </span>
+                    <a
+                      href={`tel:${cleanPhoneDigits(activeStayWarning.pg_mobile)}`}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-bold rounded-lg shadow-2xs transition"
+                    >
+                      <Phone className="h-3 w-3" />
+                      <span>Call PG</span>
+                    </a>
+                    {cleanMobile.length === 10 && (
+                      <a
+                        href={`https://wa.me/91${cleanMobile}?text=${encodeURIComponent(
+                          `Hi, inquiring regarding resident ${activeStayWarning.resident_name} (${activeStayWarning.registration_number}) currently checked in at ${activeStayWarning.pg_name}.`
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#25D366] hover:bg-[#1EBE5D] text-white text-[11px] font-bold rounded-lg shadow-2xs transition"
+                      >
+                        <span>WhatsApp</span>
+                      </a>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-gray-500 italic">No mobile phone listed for this PG</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Stay & Room Details */}
+          <div className="space-y-1.5 sm:pl-1">
+            <div className="flex items-center gap-1.5 text-gray-500 font-bold uppercase tracking-wider text-[10px]">
+              <MapPin className="h-3.5 w-3.5 text-amber-700" />
+              <span>Where Resident is Staying</span>
+            </div>
+            <div className="text-xs font-semibold text-gray-900">
+              {[activeStayWarning.pg_city, activeStayWarning.pg_address].filter(Boolean).join(' • ') || 'Location on file'}
+            </div>
+
+            <div className="flex items-center gap-1.5 text-gray-500 font-bold uppercase tracking-wider text-[10px] pt-1">
+              <BedDouble className="h-3.5 w-3.5 text-amber-700" />
+              <span>Room &amp; Bed Allotment</span>
+            </div>
+            <div className="text-xs font-medium text-gray-800">
+              Room: <span className="font-bold text-gray-900">{activeStayWarning.room_number || 'Allocated'}</span>
+              {activeStayWarning.bed_label ? (
+                <> • Bed: <span className="font-bold text-gray-900">{activeStayWarning.bed_label}</span></>
+              ) : null}
+              {activeStayWarning.check_in_date ? (
+                <span className="text-gray-500 block text-[11px] mt-0.5">
+                  Checked in since: <span className="font-semibold text-gray-700">{activeStayWarning.check_in_date}</span>
+                </span>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        {/* Required Action Callout */}
+        <div className="rounded-xl bg-amber-100/70 border border-amber-300 p-2.5 text-[11px] font-medium text-amber-950 flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 shrink-0 text-amber-800" />
+          <span>
+            <strong>Required Action:</strong> This resident must first be <strong>checked out</strong> by{' '}
+            <span className="font-bold">{activeStayWarning.pg_name}</span> in PG-Setu before you can check them in.
+          </span>
+        </div>
+      </div>
+    )
   }
 
   if (successData) {
@@ -553,6 +780,9 @@ export default function CheckInResidentPage() {
             </div>
           </div>
 
+          {/* Active Resident Stay Warning across all PGs */}
+          {renderActiveStayBanner()}
+
           {otpError && (
             <div className="rounded-xl border border-red-200 bg-red-50 p-3.5 text-xs font-medium text-red-700 flex items-center gap-2">
               <AlertCircle className="h-4 w-4 shrink-0" />
@@ -581,9 +811,17 @@ export default function CheckInResidentPage() {
           {!otpSent ? (
             <form onSubmit={handleSendOtp} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1.5">
-                  Resident Mobile Number <span className="text-red-500">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
+                    Resident Mobile Number <span className="text-red-500">*</span>
+                  </label>
+                  {checkingMobile && (
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                      <Loader2 className="h-3 w-3 animate-spin text-emerald-600" />
+                      <span>Checking PG network...</span>
+                    </span>
+                  )}
+                </div>
                 <div className="relative flex items-center rounded-xl border border-gray-300 bg-white shadow-xs focus-within:border-[#16A34A] focus-within:ring-2 focus-within:ring-[#16A34A]/20">
                   <span className="pl-3.5 pr-2 text-xs font-bold text-gray-500 select-none">+91</span>
                   <input
@@ -745,6 +983,9 @@ export default function CheckInResidentPage() {
               </div>
             </div>
           </div>
+
+          {/* Active Resident Stay Warning across all PGs */}
+          {renderActiveStayBanner()}
 
           {/* Step Indicators */}
           {/* 1. Mobile Step Bar */}
@@ -1405,6 +1646,22 @@ export default function CheckInResidentPage() {
                     <span className="font-bold text-emerald-800">₹{form.deposit_amount_rupees.toLocaleString('en-IN')} ({form.deposit_payment_method.toUpperCase()})</span>
                   </div>
                 </div>
+
+                {/* Active Stay Conflict Warning Blocking Final Submission */}
+                {activeStayWarning && !activeStayWarning.is_same_pg && (
+                  <div className="p-4 bg-red-50 border-2 border-red-300 rounded-2xl text-xs text-red-900 space-y-2">
+                    <div className="flex items-center gap-2 font-bold text-red-800">
+                      <AlertTriangle className="h-4 w-4 text-red-600 shrink-0" />
+                      <span>Check-In Blocked: Resident Active at Another PG</span>
+                    </div>
+                    <p className="text-[11px] text-red-700 leading-relaxed">
+                      Resident is currently active at <strong>{activeStayWarning.pg_name}</strong>
+                      {activeStayWarning.pg_mobile ? ` (PG Contact: +91 ${cleanPhoneDigits(activeStayWarning.pg_mobile)})` : ''}.
+                      Simultaneous active stays are restricted to prevent duplicate billing and unreleased security deposits.
+                      The resident must first be checked out from <strong>{activeStayWarning.pg_name}</strong>.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1431,9 +1688,9 @@ export default function CheckInResidentPage() {
               ) : (
                 <button
                   type="button"
-                  disabled={loading}
+                  disabled={loading || Boolean(activeStayWarning && !activeStayWarning.is_same_pg)}
                   onClick={handleSubmit}
-                  className="flex items-center justify-center gap-2 px-6 py-2.5 bg-[#14532D] hover:bg-[#166534] active:scale-95 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition shadow-xs"
+                  className="flex items-center justify-center gap-2 px-6 py-2.5 bg-[#14532D] hover:bg-[#166534] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition shadow-xs"
                 >
                   {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                   {loading ? 'Checking in...' : 'Confirm & Complete Check-In'}

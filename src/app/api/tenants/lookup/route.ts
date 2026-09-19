@@ -1,13 +1,14 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getAuthenticatedUser } from '@/lib/auth-session'
+import { resolveEffectiveOrgId } from '@/lib/org-helper'
 import { cleanMobile, isValidMobile, generateTenantId } from '@/lib/profiles'
 import { queryCollection } from '@/lib/firebase/firestore'
 
 /**
  * GET /api/tenants/lookup?phone=9876543210
  * Unifies tenant identity across self-registered profiles and PG owner check-ins.
- * Returns pre-fillable tenant details, stay history, and their single permanent Unique Tenant ID.
+ * Returns pre-fillable tenant details, active stay verification (PG name, PG mobile no), stay history, and single permanent Unique Tenant ID.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -15,6 +16,8 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const currentOrgId = (await resolveEffectiveOrgId(user)) || user.organization_id
 
     const rawPhone = request.nextUrl.searchParams.get('phone') || ''
     const cleanedPhone = cleanMobile(rawPhone)
@@ -110,25 +113,144 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // ── CHECK IF RESIDENT IS CURRENTLY ACTIVELY CHECKED IN AT ANY PG ──
+    const activeResident = residents?.find((r) => r.status === 'active' || r.status === 'temporarily_absent')
+    let activeStay: any = null
+
+    if (activeResident) {
+      const [
+        { data: orgData },
+        { data: activeAssignment }
+      ] = await Promise.all([
+        serviceClient
+          .from('organizations')
+          .select('id, name, slug, phone, email, address, city, state, pincode, owner_user_id')
+          .eq('id', activeResident.organization_id)
+          .maybeSingle(),
+        serviceClient
+          .from('resident_assignments')
+          .select(`
+            id,
+            check_in_date,
+            monthly_rent_paise,
+            beds(
+              id,
+              bed_label,
+              rooms(
+                id,
+                room_number,
+                name,
+                floor_id,
+                floors(
+                  id,
+                  name,
+                  building_id,
+                  buildings(
+                    id,
+                    name,
+                    property_id,
+                    properties(
+                      id,
+                      name,
+                      phone,
+                      address,
+                      city,
+                      state
+                    )
+                  )
+                )
+              )
+            )
+          `)
+          .eq('resident_id', activeResident.id)
+          .is('check_out_date', null)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      ])
+
+      // Fallback: if organization phone is missing, lookup owner user's mobile number
+      let pgContactMobile = orgData?.phone || ''
+      if (!pgContactMobile && orgData?.owner_user_id) {
+        const { data: ownerUser } = await serviceClient
+          .from('users')
+          .select('phone, full_name')
+          .eq('id', orgData.owner_user_id)
+          .maybeSingle()
+        if (ownerUser?.phone) {
+          pgContactMobile = ownerUser.phone
+        }
+      }
+      if (!pgContactMobile) {
+        const { data: anyOwner } = await serviceClient
+          .from('users')
+          .select('phone, full_name')
+          .eq('organization_id', activeResident.organization_id)
+          .eq('role', 'owner')
+          .not('phone', 'is', null)
+          .limit(1)
+          .maybeSingle()
+        if (anyOwner?.phone) {
+          pgContactMobile = anyOwner.phone
+        }
+      }
+
+      const bedData = (activeAssignment as any)?.beds
+      const roomData = bedData?.rooms
+      const floorData = roomData?.floors
+      const buildingData = floorData?.buildings
+      const propertyData = buildingData?.properties
+
+      const finalPgName = orgData?.name || propertyData?.name || 'PG Partner'
+      const finalPgPhone = pgContactMobile || propertyData?.phone || ''
+      const isSameOrg = Boolean(currentOrgId && currentOrgId === activeResident.organization_id)
+
+      activeStay = {
+        is_active: true,
+        resident_id: activeResident.id,
+        resident_name: activeResident.full_name,
+        registration_number: activeResident.registration_number,
+        check_in_date: activeAssignment?.check_in_date || (activeResident.created_at ? activeResident.created_at.split('T')[0] : null),
+        organization_id: activeResident.organization_id,
+        pg_name: finalPgName,
+        pg_mobile: finalPgPhone,
+        pg_email: orgData?.email || '',
+        pg_city: orgData?.city || propertyData?.city || '',
+        pg_address: orgData?.address || propertyData?.address || '',
+        property_name: propertyData?.name || finalPgName,
+        building_name: buildingData?.name || '',
+        floor_name: floorData?.name || '',
+        room_number: roomData?.room_number || null,
+        bed_label: bedData?.bed_label || null,
+        monthly_rent_paise: activeAssignment?.monthly_rent_paise || null,
+        is_same_pg: isSameOrg,
+      }
+    }
+
     // Fetch details of previous stays if residents exist
     let stays: any[] = []
     if (residents && residents.length > 0) {
       const orgIds = Array.from(new Set(residents.map((r) => r.organization_id)))
       const { data: orgs } = await serviceClient
         .from('organizations')
-        .select('id, name')
+        .select('id, name, phone, city, address')
         .in('id', orgIds)
 
-      const orgMap = new Map((orgs || []).map((o) => [o.id, o.name]))
+      const orgMap = new Map((orgs || []).map((o) => [o.id, o]))
 
-      stays = residents.map((r) => ({
-        resident_id: r.id,
-        organization_id: r.organization_id,
-        organization_name: orgMap.get(r.organization_id) || 'PG Property',
-        registration_number: r.registration_number,
-        status: r.status,
-        check_in_date: r.created_at ? r.created_at.split('T')[0] : null,
-      }))
+      stays = residents.map((r) => {
+        const orgInfo = orgMap.get(r.organization_id)
+        return {
+          resident_id: r.id,
+          organization_id: r.organization_id,
+          organization_name: orgInfo?.name || 'PG Property',
+          organization_phone: orgInfo?.phone || '',
+          organization_city: orgInfo?.city || '',
+          registration_number: r.registration_number,
+          status: r.status,
+          check_in_date: r.created_at ? r.created_at.split('T')[0] : null,
+        }
+      })
     }
 
     const isFound = Boolean(latestResident || primaryProfile || userRecord)
@@ -136,6 +258,9 @@ export async function GET(request: NextRequest) {
     // Build the resolved data object
     const result = {
       found: isFound,
+      already_exists: isFound,
+      is_currently_checked_in: Boolean(activeStay),
+      active_stay: activeStay,
       tenant_id: unifiedTenantId,
       full_name: latestResident?.full_name || primaryProfile?.full_name || userRecord?.full_name || '',
       phone: cleanedPhone,

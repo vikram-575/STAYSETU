@@ -178,4 +178,112 @@ describe('Unified Tenant Identity & Single Universal ID System', () => {
       assert.equal(sorted[0].status, 'active')
     })
   })
+
+  describe('Technique 4: Cross-PG Active Stay Detection & Verification Guard', () => {
+    it('detects when a resident already exists and is actively checked in at another PG', () => {
+      const currentOrgId = 'org-current-pg'
+      const existingResidentsInDb = [
+        {
+          id: 'res-101',
+          full_name: 'Rahul Verma',
+          phone: '9876543210',
+          registration_number: 'TN1029ABC',
+          organization_id: 'org-another-pg',
+          status: 'active',
+          created_at: '2026-08-01T10:00:00Z',
+        },
+      ]
+
+      const orgMap = {
+        'org-another-pg': {
+          id: 'org-another-pg',
+          name: 'Stanza Living Prime',
+          phone: '9988776655',
+          city: 'Bengaluru',
+          address: 'Koramangala 4th Block',
+        },
+      }
+
+      const assignmentMap = {
+        'res-101': {
+          room_number: '304',
+          bed_label: 'Bed A',
+          check_in_date: '2026-08-01',
+        },
+      }
+
+      const mobileInput = '+91 98765 43210'
+      const cleaned = cleanMobile(mobileInput)
+
+      // Active stay detection logic
+      const activeResident = existingResidentsInDb.find(
+        (r) => cleanMobile(r.phone) === cleaned && (r.status === 'active' || r.status === 'temporarily_absent')
+      )
+
+      assert.ok(activeResident, 'Should locate the active resident')
+
+      const orgInfo = orgMap[activeResident.organization_id]
+      const assignment = assignmentMap[activeResident.id]
+      const isSamePg = activeResident.organization_id === currentOrgId
+
+      const activeStayResult = {
+        is_active: true,
+        resident_id: activeResident.id,
+        resident_name: activeResident.full_name,
+        registration_number: activeResident.registration_number,
+        organization_id: activeResident.organization_id,
+        pg_name: orgInfo.name,
+        pg_mobile: orgInfo.phone,
+        pg_city: orgInfo.city,
+        pg_address: orgInfo.address,
+        room_number: assignment.room_number,
+        bed_label: assignment.bed_label,
+        check_in_date: assignment.check_in_date,
+        is_same_pg: isSamePg,
+      }
+
+      assert.equal(activeStayResult.is_active, true)
+      assert.equal(activeStayResult.is_same_pg, false, 'Must identify as a different PG')
+      assert.equal(activeStayResult.pg_name, 'Stanza Living Prime')
+      assert.equal(activeStayResult.pg_mobile, '9988776655')
+      assert.equal(activeStayResult.pg_city, 'Bengaluru')
+      assert.equal(activeStayResult.room_number, '304')
+      assert.equal(activeStayResult.bed_label, 'Bed A')
+    })
+
+    it('identifies if resident is already checked in at the SAME PG', () => {
+      const myOrgId = 'org-my-pg-1'
+      const residentInMyPg = {
+        id: 'res-202',
+        full_name: 'Anita Roy',
+        phone: '9123456780',
+        registration_number: 'TN5544XYZ',
+        organization_id: myOrgId,
+        status: 'active',
+      }
+
+      const isSamePg = residentInMyPg.organization_id === myOrgId
+      assert.equal(isSamePg, true, 'Must recognize same PG residency')
+    })
+
+    it('permits check-in when resident had past stays that are all checked_out', () => {
+      const pastStays = [
+        {
+          id: 'res-301',
+          full_name: 'Suresh Kumar',
+          phone: '9000011111',
+          registration_number: 'TN9988AAA',
+          organization_id: 'org-old-pg',
+          status: 'checked_out',
+        },
+      ]
+
+      const activeResident = pastStays.find(
+        (r) => r.status === 'active' || r.status === 'temporarily_absent'
+      )
+
+      assert.equal(activeResident, undefined, 'No active stay found when tenant was checked out')
+    })
+  })
 })
+

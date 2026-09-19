@@ -264,7 +264,27 @@ export async function POST(request: NextRequest) {
       registrationNumber = generateTenantId()
     }
 
-    // 1. Create or Reactivate Resident in this Organization
+    // 1. Check if resident is already actively checked in at ANOTHER PG organization
+    const { data: activeElsewhere } = await serviceClient
+      .from('residents')
+      .select('id, full_name, organization_id, organizations(id, name, phone, city)')
+      .or(`phone.ilike.%${cleanedPhone}%,alternate_phone.ilike.%${cleanedPhone}%,registration_number.eq.${registrationNumber}`)
+      .eq('status', 'active')
+      .neq('organization_id', orgId)
+      .limit(1)
+      .maybeSingle()
+
+    if (activeElsewhere) {
+      const otherOrg = (activeElsewhere as any)?.organizations
+      const otherPgName = otherOrg?.name || 'another PG'
+      const otherPgPhone = otherOrg?.phone || 'contact not listed'
+      const otherPgCity = otherOrg?.city ? ` in ${otherOrg.city}` : ''
+      return NextResponse.json({
+        error: `Resident ${activeElsewhere.full_name} is already actively checked in at ${otherPgName}${otherPgCity} (PG Contact: ${otherPgPhone}). A resident cannot be checked in to multiple PGs simultaneously. They must first be checked out from their current PG.`
+      }, { status: 400 })
+    }
+
+    // 2. Create or Reactivate Resident in this Organization
     let resident: any = null
 
     // Check if resident already exists in this specific organization
