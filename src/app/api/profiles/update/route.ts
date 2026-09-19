@@ -159,7 +159,7 @@ export async function PATCH(request: NextRequest) {
         registration_number: tenantRegId,
         full_name: full_name?.trim() || user.full_name || 'PG-Setu Resident',
         phone: cleanedMobile,
-        email: email?.trim().toLowerCase() || user.email || `${cleanedMobile}@user.pgsetu.com`,
+        email: (email && email.trim()) ? email.trim().toLowerCase() : ((user.email && !user.email.includes('@user.pgsetu.') && !user.email.includes('@owner.pgsetu.')) ? user.email : null),
         gender: gender || 'male',
         emergency_name: emergency_name?.trim() || null,
         emergency_phone: emergency_phone ? cleanMobile(emergency_phone) : null,

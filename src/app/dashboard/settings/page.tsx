@@ -80,7 +80,20 @@ export default function SettingsPage() {
               id: data.organization.id,
               name: data.organization.name || '',
               phone: data.organization.phone || data.user.phone || '',
-              email: data.organization.email || (data.user.email?.includes('@pgsetu.local') ? '' : data.user.email) || '',
+              email: (() => {
+                const raw = data.organization.email || data.user.email || ''
+                if (
+                  raw.includes('@owner.pgsetu.') ||
+                  raw.includes('@user.pgsetu.') ||
+                  raw.includes('@resident.pgsetu.') ||
+                  raw.includes('@pgsetu.online') ||
+                  raw.includes('@pgsetu.local') ||
+                  (raw.includes('@pgsetu.com') && !raw.includes('contact@') && !raw.includes('support@'))
+                ) {
+                  return ''
+                }
+                return raw
+              })(),
               address: data.organization.address || '',
               city: data.organization.city || '',
               state: data.organization.state || '',
@@ -233,9 +246,13 @@ export default function SettingsPage() {
     ? userProfile.full_name
     : (userProfile.phone ? `Host (+91 ${userProfile.phone.slice(-10)})` : 'PG Host & Owner')
 
-  const isLocalEmail = userProfile.email?.includes('@pgsetu.local')
-  const displayIdentifier = isLocalEmail
-    ? `Phone Auth: +91 ${userProfile.phone || userProfile.email.split('@')[0]}`
+  const isSynthetic = !userProfile.email ||
+    userProfile.email.includes('@pgsetu.') ||
+    userProfile.email.includes('@owner.pgsetu.') ||
+    userProfile.email.includes('@user.pgsetu.') ||
+    userProfile.email.includes('@resident.pgsetu.')
+  const displayIdentifier = isSynthetic
+    ? (userProfile.phone ? `+91 ${userProfile.phone.slice(-10)}` : 'Host Account')
     : userProfile.email
 
   if (loading) {

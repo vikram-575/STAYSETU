@@ -1,11 +1,12 @@
 'use client'
 
-import { formatCurrency, formatCurrencyCompact } from '@/lib/money'
+import Link from 'next/link'
+import { formatCurrency } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import {
   TrendingUp, TrendingDown, BedDouble, Users,
   CreditCard, AlertCircle, DollarSign, BarChart2,
-  ShieldCheck, Sparkles, CheckCircle2, Zap
+  ShieldCheck, ArrowUpRight
 } from 'lucide-react'
 
 interface KPIs {
@@ -39,20 +40,25 @@ interface KPICardProps {
     variant: 'positive' | 'negative' | 'neutral' | 'info'
   }
   highlight?: boolean
+  href: string
 }
 
-function KPICard({ label, value, sub, icon: Icon, iconBg, iconColor, badge, highlight }: KPICardProps) {
+function KPICard({ label, value, sub, icon: Icon, iconBg, iconColor, badge, highlight, href }: KPICardProps) {
   return (
-    <div className={cn(
-      'bg-white rounded-2xl border p-4 sm:p-5 flex flex-col justify-between transition-all duration-200',
+    <Link href={href} className={cn(
+      'group relative bg-white rounded-2xl border p-4 sm:p-5 flex flex-col justify-between',
+      'transition-all duration-200 cursor-pointer no-underline',
       highlight
-        ? 'border-[#16A34A]/40 shadow-xs bg-gradient-to-b from-[#DCFCE7]/30 to-white'
-        : 'border-gray-200/90 shadow-2xs hover:shadow-md hover:border-[#16A34A]/40'
+        ? 'border-[#16A34A]/40 shadow-xs bg-gradient-to-b from-[#DCFCE7]/30 to-white hover:shadow-md hover:border-[#16A34A]/60 hover:-translate-y-0.5'
+        : 'border-gray-200/90 shadow-2xs hover:shadow-md hover:border-[#16A34A]/40 hover:-translate-y-0.5'
     )}>
+      {/* Arrow hint on hover */}
+      <ArrowUpRight className="absolute top-3 right-3 w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+
       {/* Header with Title and Icon */}
       <div className="flex items-center justify-between gap-2 mb-3">
-        <span className="text-xs font-semibold text-slate-500 tracking-tight leading-none">{label}</span>
-        <div className={cn('w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0', iconBg, iconColor)}>
+        <span className="text-xs font-semibold text-slate-500 tracking-tight leading-none pr-4">{label}</span>
+        <div className={cn('w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-110', iconBg, iconColor)}>
           <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.2]" />
         </div>
       </div>
@@ -83,15 +89,16 @@ function KPICard({ label, value, sub, icon: Icon, iconBg, iconColor, badge, high
           </span>
         </div>
       )}
-    </div>
+    </Link>
   )
 }
 
 export default function DashboardKPICards({ kpis }: Props) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
-      {/* 1. Expected */}
+      {/* 1. Expected Revenue → Billing page */}
       <KPICard
+        href="/dashboard/billing"
         label="Expected Revenue"
         value={formatCurrency(kpis.monthExpectedPaise)}
         sub="Monthly billable target"
@@ -105,8 +112,9 @@ export default function DashboardKPICards({ kpis }: Props) {
         }}
       />
 
-      {/* 2. Collected */}
+      {/* 2. Total Collected → Payments page */}
       <KPICard
+        href="/dashboard/payments"
         label="Total Collected"
         value={formatCurrency(kpis.monthCollectedPaise)}
         sub={`${kpis.collectionRate}% of expected`}
@@ -119,8 +127,9 @@ export default function DashboardKPICards({ kpis }: Props) {
         }}
       />
 
-      {/* 3. Outstanding */}
+      {/* 3. Total Outstanding → Billing page (outstanding tab) */}
       <KPICard
+        href="/dashboard/billing?tab=outstanding"
         label="Total Outstanding"
         value={formatCurrency(kpis.totalOutstandingPaise)}
         sub="Pending resident dues"
@@ -133,8 +142,9 @@ export default function DashboardKPICards({ kpis }: Props) {
         }}
       />
 
-      {/* 4. Overdue */}
+      {/* 4. Overdue Amount → Billing page (overdue tab) */}
       <KPICard
+        href="/dashboard/billing?tab=overdue"
         label="Overdue Amount"
         value={formatCurrency(kpis.totalOverduePaise)}
         sub="Past due date"
@@ -147,8 +157,9 @@ export default function DashboardKPICards({ kpis }: Props) {
         }}
       />
 
-      {/* 5. Today's Cash */}
+      {/* 5. Today's Collection → Payments page (today filter) */}
       <KPICard
+        href="/dashboard/payments?tab=today"
         label="Today's Collection"
         value={formatCurrency(kpis.todayCollectedPaise)}
         sub="Processed today"
@@ -161,8 +172,9 @@ export default function DashboardKPICards({ kpis }: Props) {
         }}
       />
 
-      {/* 6. Occupancy */}
+      {/* 6. Bed Occupancy → Rooms page */}
       <KPICard
+        href="/dashboard/rooms"
         label="Bed Occupancy"
         value={`${kpis.occupancyRate}%`}
         sub={`${kpis.occupiedBeds} of ${kpis.totalBeds} beds filled`}
@@ -175,8 +187,9 @@ export default function DashboardKPICards({ kpis }: Props) {
         }}
       />
 
-      {/* 7. Active Residents */}
+      {/* 7. Active Residents → Residents page */}
       <KPICard
+        href="/dashboard/residents"
         label="Active Residents"
         value={String(kpis.activeResidents)}
         sub="Registered occupants"
@@ -189,8 +202,9 @@ export default function DashboardKPICards({ kpis }: Props) {
         }}
       />
 
-      {/* 8. Deposits Held */}
+      {/* 8. Deposits Held → Billing page (deposits tab) */}
       <KPICard
+        href="/dashboard/billing?tab=deposits"
         label="Deposits Held"
         value={formatCurrency(kpis.depositsHeldPaise)}
         sub="Refundable security"
@@ -203,8 +217,9 @@ export default function DashboardKPICards({ kpis }: Props) {
         }}
       />
 
-      {/* 9. Available Beds */}
+      {/* 9. Available Beds → Rooms page (available filter) */}
       <KPICard
+        href="/dashboard/rooms?filter=available"
         label="Available Beds"
         value={String(kpis.availableBeds)}
         sub="Ready for move-in"
@@ -217,8 +232,9 @@ export default function DashboardKPICards({ kpis }: Props) {
         }}
       />
 
-      {/* 10. Collection Realization */}
+      {/* 10. Realization Rate → Reports / Analytics page */}
       <KPICard
+        href="/dashboard/reports"
         label="Realization Rate"
         value={`${kpis.collectionRate}%`}
         sub="Expected vs cash"

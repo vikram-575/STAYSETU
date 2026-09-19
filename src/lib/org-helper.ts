@@ -120,7 +120,7 @@ export async function resolveEffectiveOrg(
       .insert({
         name: orgName,
         slug,
-        email: user?.email || 'admin@pgsetu.online',
+        email: (user?.email && !user.email.includes('@pgsetu.')) ? user.email : null,
         phone: user?.phone || null,
         owner_user_id: ownerUserId,
         currency_code: 'INR',

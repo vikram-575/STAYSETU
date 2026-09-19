@@ -265,9 +265,12 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
 
         const { data: matchedResident } = await residentQuery.maybeSingle()
         if (matchedResident) {
+          const resEmail = matchedResident.email && !matchedResident.email.includes('@resident.pgsetu.') && !matchedResident.email.includes('@user.pgsetu.')
+            ? matchedResident.email
+            : ''
           return {
             id: matchedResident.id,
-            email: matchedResident.email || `${cleanMob || 'resident'}@resident.pgsetu.com`,
+            email: resEmail,
             full_name: matchedResident.full_name || 'PG-Setu Resident',
             role: 'resident',
             organization_id: matchedResident.organization_id || null,
@@ -281,9 +284,12 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
         if (authMobile) {
           const cookieRole = cookieStore.get('auth_role')?.value
           const isOwnerCookie = cookieRole === 'owner' || cookieRole === 'manager' || cookieRole === 'superadmin'
+          const safeEmail = authEmail && !authEmail.includes('@owner.pgsetu.') && !authEmail.includes('@user.pgsetu.') && !authEmail.includes('@resident.pgsetu.')
+            ? authEmail
+            : ''
           return {
             id: authUserId || `user_${cleanMob}`,
-            email: authEmail || `${cleanMob}@${isOwnerCookie ? 'owner' : 'user'}.pgsetu.com`,
+            email: safeEmail,
             full_name: cookieStore.get('auth_name')?.value || (isOwnerCookie ? 'PG Owner & Host' : 'PG-Setu Member'),
             role: (cookieRole as any) || 'resident',
             organization_id: null,

@@ -234,7 +234,7 @@ export async function POST(request: NextRequest) {
         .insert({
           full_name: property_name ? `${property_name} Owner` : 'PG Owner',
           phone: cleanedMobile,
-          email: `${cleanedMobile}@owner.pgsetu.online`,
+          email: (body.email && body.email.trim()) ? body.email.trim().toLowerCase() : '',
           role: 'owner',
         })
         .select('*')

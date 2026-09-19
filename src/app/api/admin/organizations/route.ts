@@ -201,7 +201,7 @@ export async function POST(request: NextRequest) {
 
     if (orgErr || !org) throw new Error(orgErr?.message || 'Failed to create organization')
 
-    const userEmail = (owner_email || `${slug}@pgsetu.com`).toLowerCase().trim()
+    const userEmail = (owner_email && owner_email.trim()) ? owner_email.toLowerCase().trim() : ''
     await supabase
       .from('users')
       .insert({

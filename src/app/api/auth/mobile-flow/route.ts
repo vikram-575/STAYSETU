@@ -6,8 +6,67 @@ import { cleanMobile, isValidMobile, generateTenantId } from '@/lib/profiles'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-// In-memory OTP cache for instant verification (TTL: 5 minutes)
-const OTP_STORE = new Map<string, { code: string; expiresAt: number }>()
+/**
+ * Strips synthetic / generated fallback emails so we never invent or expose fake emails.
+ * Only returns genuine emails explicitly entered by the user.
+ */
+function cleanUserEmail(email?: string | null): string {
+  if (!email) return ''
+  const trimmed = email.trim().toLowerCase()
+  if (
+    trimmed.includes('@owner.pgsetu.') ||
+    trimmed.includes('@user.pgsetu.') ||
+    trimmed.includes('@resident.pgsetu.') ||
+    trimmed.includes('@pgsetu.online') ||
+    trimmed.includes('@pgsetu.local') ||
+    (trimmed.includes('@pgsetu.com') && !trimmed.includes('contact@') && !trimmed.includes('support@'))
+  ) {
+    return ''
+  }
+  return trimmed
+}
+
+/**
+ * Formats 10-digit Indian phone to E.164 (+91XXXXXXXXXX) required by Supabase Auth / SMS gateways
+ */
+function formatPhoneE164(mobile: string): string {
+  const digits = mobile.replace(/\D/g, '').slice(-10)
+  return `+91${digits}`
+}
+
+/**
+ * Validates Firebase ID Token from client-side Firebase Phone Auth
+ * (Connected via Supabase Third-Party Auth: staysetu-1bf2f)
+ */
+async function verifyFirebaseToken(
+  idToken?: string,
+  targetPhone?: string
+): Promise<{ valid: boolean; uid?: string; phone?: string }> {
+  if (!idToken) return { valid: false }
+  try {
+    const { getAdminAuth } = await import('@/lib/firebase/admin')
+    const adminAuth = getAdminAuth()
+    if (adminAuth) {
+      const decoded = await adminAuth.verifyIdToken(idToken)
+      const tokenPhone = cleanMobile(decoded.phone_number || '')
+      if (!targetPhone || tokenPhone === targetPhone || !tokenPhone) {
+        return { valid: true, uid: decoded.uid, phone: tokenPhone }
+      }
+    } else {
+      const parts = idToken.split('.')
+      if (parts.length === 3) {
+        const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf-8'))
+        const tokenPhone = cleanMobile(payload.phone_number || '')
+        if (payload.aud === 'staysetu-1bf2f' && (!targetPhone || tokenPhone === targetPhone || !tokenPhone)) {
+          return { valid: true, uid: payload.sub || payload.user_id, phone: tokenPhone }
+        }
+      }
+    }
+  } catch (e: any) {
+    console.warn('[Firebase Auth ID Token Verification Warning]:', e?.message)
+  }
+  return { valid: false }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,14 +76,13 @@ export async function POST(request: NextRequest) {
     const cookieStore = await cookies()
 
     // ─────────────────────────────────────────────────────────
-    // 1. ACTION: CHECK MOBILE NUMBER
-    // ─────────────────────────────────────────────────────────
-    // 1. ACTION: CHECK MOBILE NUMBER & DISPATCH OTP
+    // 1. ACTION: CHECK MOBILE NUMBER & DISPATCH REAL SUPABASE OTP
     // ─────────────────────────────────────────────────────────
     if (action === 'check-mobile') {
       const rawMobile = body.mobile || ''
       const cleaned = cleanMobile(rawMobile)
       const requestedRole = body.role === 'owner' ? 'owner' : 'tenant'
+      const skipOtpDispatch = Boolean(body.skipOtpDispatch)
 
       if (!cleaned || cleaned.length < 10) {
         return NextResponse.json(
@@ -33,17 +91,38 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Generate 6-digit OTP upfront so it is ready immediately
-      const otpCode = Math.floor(100000 + Math.random() * 900000).toString()
-      OTP_STORE.set(cleaned, {
-        code: otpCode,
-        expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
-      })
-      console.log(`[PG-SETU OTP]: Generated OTP ${otpCode} for mobile ${cleaned} (Role: ${requestedRole})`)
+      const formattedPhone = formatPhoneE164(cleaned)
+
+      // ── Dispatch REAL OTP via Supabase Phone Auth Provider if not handled by client (e.g. Firebase) ──
+      if (!skipOtpDispatch) {
+        const { error: otpError } = await serviceClient.auth.signInWithOtp({
+          phone: formattedPhone,
+        })
+
+        if (otpError) {
+          console.error('[Supabase signInWithOtp Error]:', otpError.message)
+          if (
+            otpError.code === 'phone_provider_disabled' ||
+            otpError.message?.toLowerCase().includes('unsupported phone provider') ||
+            otpError.message?.toLowerCase().includes('phone provider disabled')
+          ) {
+            return NextResponse.json(
+              {
+                error: 'Supabase Phone Auth is not enabled. Please use Firebase Phone Authentication.',
+                code: 'phone_provider_disabled',
+              },
+              { status: 400 }
+            )
+          }
+          return NextResponse.json(
+            { error: otpError.message || 'Failed to send OTP via SMS. Please verify your mobile number.' },
+            { status: 400 }
+          )
+        }
+      }
 
       if (requestedRole === 'owner') {
         // ── PG OWNER EXISTENCE VERIFICATION ──
-        // 1. Check in Supabase users table for PG Owners / Managers / Staff / Accountants
         let { data: matchedOwnerUser } = await serviceClient
           .from('users')
           .select('id, full_name, email, phone, role, organization_id')
@@ -52,7 +131,6 @@ export async function POST(request: NextRequest) {
           .limit(1)
           .maybeSingle()
 
-        // 2. Check in organizations table by phone
         let { data: matchedOrg } = await serviceClient
           .from('organizations')
           .select('id, name, email, phone, owner_user_id')
@@ -60,7 +138,6 @@ export async function POST(request: NextRequest) {
           .limit(1)
           .maybeSingle()
 
-        // Bidirectional resolution: if user found, fetch org; if org found, fetch user
         if (matchedOwnerUser?.organization_id && !matchedOrg) {
           const { data: orgById } = await serviceClient
             .from('organizations')
@@ -83,15 +160,13 @@ export async function POST(request: NextRequest) {
             userType: 'owner',
             role: matchedOwnerUser?.role || 'owner',
             name: matchedOwnerUser?.full_name || matchedOrg?.name || 'PG Owner',
-            email: matchedOwnerUser?.email || matchedOrg?.email || '',
+            email: cleanUserEmail(matchedOwnerUser?.email || matchedOrg?.email),
             organizationId: matchedOwnerUser?.organization_id || matchedOrg?.id,
             mobile: cleaned,
-            devOtp: otpCode,
-            message: `Welcome back, ${matchedOwnerUser?.full_name || matchedOrg?.name || 'Owner'}! Existing PG owner account verified. OTP sent to your registered mobile.`,
+            message: `Welcome back, ${matchedOwnerUser?.full_name || matchedOrg?.name || 'Owner'}! Real OTP sent to +91 ${cleaned.slice(0, 2)}******${cleaned.slice(-2)}.`,
           })
         }
 
-        // Check if this mobile exists as a resident/tenant instead (helpful cross-check)
         const { data: existingTenant } = await serviceClient
           .from('residents')
           .select('id, full_name')
@@ -105,14 +180,12 @@ export async function POST(request: NextRequest) {
           hasAlternateAccount: existingTenant ? 'tenant' : null,
           alternateName: existingTenant?.full_name || null,
           mobile: cleaned,
-          devOtp: otpCode,
           message: existingTenant
-            ? `No PG Owner account found. This mobile is registered as a Tenant (${existingTenant.full_name}).`
-            : `No existing PG Owner account found for +91 ${cleaned}.`,
+            ? `No PG Owner account found. This mobile is registered as a Tenant (${existingTenant.full_name}). Real OTP sent to your phone.`
+            : `Real OTP sent to +91 ${cleaned.slice(0, 2)}******${cleaned.slice(-2)}.`,
         })
       } else {
         // ── TENANT / RESIDENT EXISTENCE VERIFICATION ──
-        // 1. Check in Supabase residents table
         const { data: matchedResident } = await serviceClient
           .from('residents')
           .select('id, full_name, email, phone, registration_number, status, organization_id')
@@ -121,7 +194,6 @@ export async function POST(request: NextRequest) {
           .limit(1)
           .maybeSingle()
 
-        // 2. Check in Supabase users table where role is resident
         const { data: matchedUser } = await serviceClient
           .from('users')
           .select('id, full_name, email, phone, role, organization_id, resident_id')
@@ -136,15 +208,13 @@ export async function POST(request: NextRequest) {
             userType: 'tenant',
             role: 'resident',
             name: matchedResident?.full_name || matchedUser?.full_name || 'Resident',
-            email: matchedResident?.email || matchedUser?.email || '',
+            email: cleanUserEmail(matchedResident?.email || matchedUser?.email),
             tenantId: matchedResident?.registration_number || (matchedUser as any)?.resident_id,
             mobile: cleaned,
-            devOtp: otpCode,
-            message: `Welcome back, ${matchedResident?.full_name || matchedUser?.full_name || 'Resident'}! Existing tenant account verified. OTP sent to your registered mobile.`,
+            message: `Welcome back, ${matchedResident?.full_name || matchedUser?.full_name || 'Resident'}! Real OTP sent to +91 ${cleaned.slice(0, 2)}******${cleaned.slice(-2)}.`,
           })
         }
 
-        // Check if this mobile exists as an owner instead (helpful cross-check)
         const { data: existingOwner } = await serviceClient
           .from('users')
           .select('id, full_name, role')
@@ -159,16 +229,15 @@ export async function POST(request: NextRequest) {
           hasAlternateAccount: existingOwner ? 'owner' : null,
           alternateName: existingOwner?.full_name || null,
           mobile: cleaned,
-          devOtp: otpCode,
           message: existingOwner
-            ? `No tenant profile found. This mobile is registered as a PG Owner (${existingOwner.full_name}).`
-            : `No existing tenant profile found for +91 ${cleaned}. Please enter your details to set up your profile.`,
+            ? `No tenant profile found. This mobile is registered as a PG Owner (${existingOwner.full_name}). Real OTP sent to your phone.`
+            : `Real OTP sent to +91 ${cleaned.slice(0, 2)}******${cleaned.slice(-2)}.`,
         })
       }
     }
 
     // ─────────────────────────────────────────────────────────
-    // 2. ACTION: SEND OTP
+    // 2. ACTION: SEND REAL OTP VIA SUPABASE
     // ─────────────────────────────────────────────────────────
     if (action === 'send-otp') {
       const rawMobile = body.mobile || ''
@@ -181,20 +250,36 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Generate 6-digit OTP
-      const otpCode = Math.floor(100000 + Math.random() * 900000).toString()
-      OTP_STORE.set(cleaned, {
-        code: otpCode,
-        expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
+      const formattedPhone = formatPhoneE164(cleaned)
+
+      const { error: otpError } = await serviceClient.auth.signInWithOtp({
+        phone: formattedPhone,
       })
 
-      console.log(`[PG-SETU OTP]: Sent OTP ${otpCode} to mobile ${cleaned}`)
+      if (otpError) {
+        console.error('[Supabase signInWithOtp Error]:', otpError.message)
+        if (
+          otpError.code === 'phone_provider_disabled' ||
+          otpError.message?.toLowerCase().includes('unsupported phone provider') ||
+          otpError.message?.toLowerCase().includes('phone provider disabled')
+        ) {
+          return NextResponse.json(
+            {
+              error: 'Supabase Phone Auth is disabled. Please enable Phone provider in your Supabase Dashboard under Authentication -> Providers -> Phone.',
+              code: 'phone_provider_disabled',
+            },
+            { status: 400 }
+          )
+        }
+        return NextResponse.json(
+          { error: otpError.message || 'Failed to dispatch OTP SMS.' },
+          { status: 400 }
+        )
+      }
 
       return NextResponse.json({
         success: true,
-        message: 'OTP sent to ' + cleaned.slice(0, 2) + '******' + cleaned.slice(-2),
-        // For development/demo purposes, surface demo OTP so user can log in immediately
-        devOtp: otpCode,
+        message: 'OTP sent via SMS to +91 ' + cleaned.slice(0, 2) + '******' + cleaned.slice(-2),
       })
     }
 
@@ -205,20 +290,42 @@ export async function POST(request: NextRequest) {
       const rawMobile = body.mobile || ''
       const cleaned = cleanMobile(rawMobile)
       const userOtp = (body.otp || '').trim()
+      const idToken = body.idToken
 
-      const cached = OTP_STORE.get(cleaned)
-      const isMasterOtp = userOtp === '123456'
-      const isValid = isMasterOtp || (cached && cached.code === userOtp && Date.now() <= cached.expiresAt)
+      // If verified via client Firebase Phone Auth token
+      if (idToken) {
+        const fbResult = await verifyFirebaseToken(idToken, cleaned)
+        if (fbResult.valid) {
+          return NextResponse.json({
+            success: true,
+            verified: true,
+            mobile: cleaned,
+          })
+        }
+      }
 
-      if (!isValid) {
+      if (!userOtp || userOtp.length < 6) {
         return NextResponse.json(
-          { error: 'Invalid or expired OTP. Please enter the correct 6-digit code or use 123456.' },
+          { error: 'Please enter the complete 6-digit OTP.' },
           { status: 400 }
         )
       }
 
-      // Clear used OTP
-      OTP_STORE.delete(cleaned)
+      const formattedPhone = formatPhoneE164(cleaned)
+
+      // Fallback verification with Supabase Auth
+      const { error: verifyError } = await serviceClient.auth.verifyOtp({
+        phone: formattedPhone,
+        token: userOtp,
+        type: 'sms',
+      })
+
+      if (verifyError) {
+        return NextResponse.json(
+          { error: verifyError.message || 'Invalid or expired OTP. Please enter the correct code received on mobile.' },
+          { status: 400 }
+        )
+      }
 
       return NextResponse.json({
         success: true,
@@ -228,36 +335,61 @@ export async function POST(request: NextRequest) {
     }
 
     // ─────────────────────────────────────────────────────────
-    // 3. ACTION: VERIFY OTP FOR EXISTING USER LOGIN & SAVE IN SUPABASE
+    // 3. ACTION: VERIFY REAL OTP LOGIN & ESTABLISH SESSION (FIREBASE & SUPABASE)
     // ─────────────────────────────────────────────────────────
     if (action === 'verify-otp-login') {
       const rawMobile = body.mobile || ''
       const cleaned = cleanMobile(rawMobile)
       const userOtp = (body.otp || '').trim()
+      const idToken = body.idToken
 
-      const cached = OTP_STORE.get(cleaned)
-      const isMasterOtp = userOtp === '123456'
-      const isValid = isMasterOtp || (cached && cached.code === userOtp && Date.now() <= cached.expiresAt)
+      let isVerified = false
+      let firebaseUid = ''
 
-      if (!isValid) {
-        return NextResponse.json(
-          { error: 'Invalid or expired OTP. Please enter the correct 6-digit code or use 123456.' },
-          { status: 400 }
-        )
+      // ── Third-Party Auth: Verify Firebase ID Token if provided ──
+      if (idToken) {
+        const fbResult = await verifyFirebaseToken(idToken, cleaned)
+        if (fbResult.valid) {
+          isVerified = true
+          firebaseUid = fbResult.uid || ''
+        }
       }
 
-      // Clear used OTP
-      OTP_STORE.delete(cleaned)
+      // If not verified by Firebase ID token, verify OTP via Supabase Auth
+      if (!isVerified) {
+        if (!userOtp || userOtp.length < 6) {
+          return NextResponse.json(
+            { error: 'Please enter the 6-digit OTP code received on your mobile.' },
+            { status: 400 }
+          )
+        }
+
+        const formattedPhone = formatPhoneE164(cleaned)
+        const { error: verifyError } = await serviceClient.auth.verifyOtp({
+          phone: formattedPhone,
+          token: userOtp,
+          type: 'sms',
+        })
+
+        if (verifyError) {
+          return NextResponse.json(
+            { error: verifyError.message || 'Invalid or expired OTP. Please verify the code sent to your phone.' },
+            { status: 400 }
+          )
+        }
+        isVerified = true
+      }
+
+      // Mark mobile verified in session cookie for subsequent profile creation steps (15 mins)
+      cookieStore.set('verified_mobile', cleaned, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 15 * 60,
+        path: '/',
+      })
 
       const requestedRole = body.role === 'owner' ? 'owner' : 'tenant'
-
-      // Fetch default organization for foreign key association
-      const { data: defaultOrg } = await serviceClient
-        .from('organizations')
-        .select('id')
-        .limit(1)
-        .maybeSingle()
-      const defaultOrgId = defaultOrg?.id || null
 
       let user: any = null
       let resident: any = null
@@ -281,7 +413,6 @@ export async function POST(request: NextRequest) {
           .maybeSingle()
         matchedOrg = orgData
 
-        // Bidirectional resolution: if user found, fetch org; if org found, fetch user
         if (user?.organization_id && !matchedOrg) {
           const { data: orgById } = await serviceClient
             .from('organizations')
@@ -317,9 +448,8 @@ export async function POST(request: NextRequest) {
         resident = residentData
       }
 
-      // If PG Owner does not exist in DB
+      // If PG Owner does not exist in DB yet
       if (requestedRole === 'owner' && !user && !matchedOrg) {
-        // Cross-check if this mobile exists as a resident/tenant
         const { data: existingTenant } = await serviceClient
           .from('residents')
           .select('id, full_name')
@@ -341,9 +471,8 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      // If Tenant does not exist in DB
+      // If Tenant does not exist in DB yet
       if (requestedRole === 'tenant' && !user && !resident) {
-        // Cross-check if this mobile exists as an owner
         const { data: existingOwner } = await serviceClient
           .from('users')
           .select('id, full_name, role')
@@ -364,35 +493,19 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      // Look up in Firestore tenant_profiles / owner_profiles with timeout safeguard
-      let firestoreProfile: any = null
-      try {
-        const firestorePromise = (async () => {
-          const { queryCollection } = await import('@/lib/firebase/firestore')
-          const collectionName = requestedRole === 'owner' ? 'owner_profiles' : 'tenant_profiles'
-          const matches = await queryCollection(collectionName, [['mobile', '==', cleaned]])
-          if (matches && matches.length > 0) return matches[0]
-          return null
-        })()
-        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 800))
-        firestoreProfile = await Promise.race([firestorePromise, timeoutPromise])
-      } catch {}
-
-      // Consolidate identity
-      const targetUserId = user?.id || resident?.id || matchedOrg?.owner_user_id || crypto.randomUUID()
-      const effectiveName = user?.full_name || resident?.full_name || matchedOrg?.name || firestoreProfile?.full_name || (requestedRole === 'owner' ? 'PG Owner' : 'PG-Setu Resident')
-      const effectiveEmail = user?.email || resident?.email || matchedOrg?.email || firestoreProfile?.email || `${cleaned}@${requestedRole === 'owner' ? 'owner' : 'user'}.pgsetu.com`
+      // Consolidate identity — DO NOT generate synthetic fake emails
+      const targetUserId = firebaseUid || user?.id || resident?.id || matchedOrg?.owner_user_id || crypto.randomUUID()
+      const effectiveName = user?.full_name || resident?.full_name || matchedOrg?.name || (requestedRole === 'owner' ? 'PG Owner' : 'PG-Setu Resident')
+      const rawFoundEmail = user?.email || resident?.email || matchedOrg?.email || ''
+      const effectiveEmail = cleanUserEmail(rawFoundEmail)
       const effectiveRole = requestedRole === 'owner' ? (user?.role || 'owner') : 'resident'
       let residentId = requestedRole === 'tenant' ? (resident?.id || user?.resident_id || null) : null
       const orgId = requestedRole === 'owner'
         ? (user?.organization_id || matchedOrg?.id || null)
         : (resident?.organization_id || user?.organization_id || null)
-      const tenantRegId = resident?.registration_number || firestoreProfile?.id || `TN-${cleaned.slice(-4)}`
+      const tenantRegId = resident?.registration_number || `TN-${cleaned.slice(-4)}`
 
       const now = new Date().toISOString()
-
-      // NOTE: Tenants are NOT auto-assigned to any PG upon login.
-      // A tenant is only assigned to a PG when explicitly allotted by a PG Owner or Superadmin.
 
       // ─── SAVE / UPSERT SIGNED-IN USER IN SUPABASE ───────────
       const { data: savedUser, error: saveErr } = await serviceClient
@@ -400,7 +513,7 @@ export async function POST(request: NextRequest) {
         .upsert({
           id: targetUserId,
           organization_id: orgId,
-          email: effectiveEmail,
+          email: effectiveEmail, // Empty string if not provided by user, never a fake email!
           full_name: effectiveName,
           phone: cleaned,
           role: effectiveRole,
@@ -424,13 +537,19 @@ export async function POST(request: NextRequest) {
         maxAge: 60 * 60 * 24 * 30,
         path: '/',
       })
-      cookieStore.set('auth_email', effectiveEmail, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 30,
-        path: '/',
-      })
+
+      if (effectiveEmail) {
+        cookieStore.set('auth_email', effectiveEmail, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 30,
+          path: '/',
+        })
+      } else {
+        cookieStore.delete('auth_email')
+      }
+
       cookieStore.set('auth_role', effectiveRole, {
         httpOnly: false,
         secure: process.env.NODE_ENV === 'production',
@@ -484,9 +603,8 @@ export async function POST(request: NextRequest) {
         cookieStore.delete('organization_id')
       }
 
-      // Check ERP unlock status for owner
       const isErpUnlocked = requestedRole === 'owner'
-        ? Boolean(orgId || firestoreProfile?.erp_unlocked === true || user?.organization_id)
+        ? Boolean(orgId || user?.organization_id)
         : true
 
       if (!isErpUnlocked) {
@@ -501,15 +619,12 @@ export async function POST(request: NextRequest) {
         cookieStore.delete('erp_locked')
       }
 
-      // When owner or resident logs in, direct them to website profile page (/my-profile)
-      const destination = '/my-profile'
-
       return NextResponse.json({
         success: true,
         exists: true,
         verified: true,
         erp_unlocked: isErpUnlocked,
-        redirect: destination,
+        redirect: '/my-profile',
         user: savedUser || {
           id: targetUserId,
           full_name: effectiveName,
@@ -521,7 +636,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ─────────────────────────────────────────────────────────
-    // 4. ACTION: REGISTER NEW USER & SAVE IN SUPABASE
+    // 4. ACTION: REGISTER NEW USER (TENANT)
     // ─────────────────────────────────────────────────────────
     if (action === 'register-new-user') {
       const {
@@ -571,54 +686,61 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Profession is required.' }, { status: 400 })
       }
 
-      // Verify OTP for new user
-      const userOtp = (otp || '').trim()
-      const cached = OTP_STORE.get(cleanedMobile)
-      const isMasterOtp = userOtp === '123456'
-      const isPreVerified = body.pre_verified === true
-      const isValid = isPreVerified || isMasterOtp || (cached && cached.code === userOtp && Date.now() <= cached.expiresAt)
+      // Check session verification, Firebase ID Token, or real OTP
+      const isSessionVerified = cookieStore.get('verified_mobile')?.value === cleanedMobile
+      let isVerified = isSessionVerified
 
-      if (!isValid) {
-        return NextResponse.json(
-          { error: 'Invalid or expired OTP. Please enter the correct 6-digit code or use 123456.' },
-          { status: 400 }
-        )
+      if (!isVerified && body.idToken) {
+        const fbResult = await verifyFirebaseToken(body.idToken, cleanedMobile)
+        if (fbResult.valid) {
+          isVerified = true
+        }
       }
 
-      // Clear used OTP
-      OTP_STORE.delete(cleanedMobile)
+      if (!isVerified) {
+        const userOtp = (otp || '').trim()
+        if (!userOtp || userOtp.length < 6) {
+          return NextResponse.json(
+            { error: 'Please enter the 6-digit OTP sent to your phone to complete registration.' },
+            { status: 400 }
+          )
+        }
+        const { error: verifyError } = await serviceClient.auth.verifyOtp({
+          phone: formatPhoneE164(cleanedMobile),
+          token: userOtp,
+          type: 'sms',
+        })
+        if (verifyError) {
+          return NextResponse.json(
+            { error: verifyError.message || 'Invalid or expired OTP.' },
+            { status: 400 }
+          )
+        }
+        isVerified = true
+      }
 
-      // Fetch default organization for Supabase foreign key constraints
-      const { data: defaultOrg } = await serviceClient
-        .from('organizations')
-        .select('id')
-        .limit(1)
-        .maybeSingle()
-      const defaultOrgId = defaultOrg?.id || null
+      // Clean email — NEVER fabricate fake email
+      const effectiveEmail = cleanUserEmail(email)
 
-      // Generate canonical Unique Tenant / User ID (e.g. TN2026-X8K)
+      // Canonical Tenant ID (e.g. TN2026-X8K)
       const uniqueTenantId = generateTenantId()
-      const effectiveEmail = (email && email.trim()) ? email.trim().toLowerCase() : `${cleanedMobile}@user.pgsetu.com`
       
-      // Check if user record already exists by phone or email
       const { data: existingUser } = await serviceClient
         .from('users')
         .select('id')
-        .or(`phone.eq.${cleanedMobile},phone.ilike.%${cleanedMobile}%,email.ilike.${effectiveEmail}`)
+        .or(`phone.eq.${cleanedMobile},phone.ilike.%${cleanedMobile}%`)
         .maybeSingle()
 
       const targetUserId = existingUser ? existingUser.id : crypto.randomUUID()
       const now = new Date().toISOString()
 
-      // ─── SAVE IN SUPABASE USERS TABLE (TENANT PROFILE ONLY, NO PG AUTO-ALLOTMENT) ──
-      // Tenants do NOT belong to any PG until explicitly checked-in/allotted by a PG owner or admin.
-      let residentId: string | null = null
+      // Save in Supabase users table
       const { data: savedUser, error: saveErr } = await serviceClient
         .from('users')
         .upsert({
           id: targetUserId,
           organization_id: null,
-          email: effectiveEmail,
+          email: effectiveEmail, // Empty string if not filled by user
           full_name: full_name.trim(),
           phone: cleanedMobile,
           role: 'resident',
@@ -635,7 +757,7 @@ export async function POST(request: NextRequest) {
         console.warn('[Supabase Users Upsert Warning on Register]:', saveErr.message)
       }
 
-      // Prepare and save profile in Firestore
+      // Prepare profile in Firestore
       try {
         const { createDocument } = await import('@/lib/firebase/firestore')
         await createDocument(
@@ -645,7 +767,7 @@ export async function POST(request: NextRequest) {
             user_id: targetUserId,
             full_name: full_name.trim(),
             mobile: cleanedMobile,
-            email: effectiveEmail,
+            email: effectiveEmail || null,
             gender,
             age: effectiveAge,
             dob: dob.trim(),
@@ -662,7 +784,7 @@ export async function POST(request: NextRequest) {
         console.warn('[Firestore Profile Save Warning]:', fErr?.message)
       }
 
-      // Set cookies for immediate logged-in session
+      // Set cookies
       cookieStore.set('auth_user_id', targetUserId, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
@@ -670,13 +792,17 @@ export async function POST(request: NextRequest) {
         maxAge: 60 * 60 * 24 * 30,
         path: '/',
       })
-      cookieStore.set('auth_email', effectiveEmail, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 30,
-        path: '/',
-      })
+      if (effectiveEmail) {
+        cookieStore.set('auth_email', effectiveEmail, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 30,
+          path: '/',
+        })
+      } else {
+        cookieStore.delete('auth_email')
+      }
       cookieStore.set('auth_role', 'resident', {
         httpOnly: false,
         secure: process.env.NODE_ENV === 'production',
@@ -725,7 +851,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: true,
-          message: 'Profile created and saved in Supabase successfully.',
+          message: 'Profile registered successfully.',
           redirect: '/my-profile',
           user: savedUser || {
             id: targetUserId,
@@ -733,7 +859,7 @@ export async function POST(request: NextRequest) {
             email: effectiveEmail,
             phone: cleanedMobile,
             role: 'resident',
-            resident_id: residentId,
+            resident_id: null,
           },
           profile: returnedProfile,
         },
@@ -775,41 +901,60 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Personal city of residence is required.' }, { status: 400 })
       }
 
-      // Verify OTP or accept pre_verified flag from dedicated OTP step
-      const userOtp = (otp || '').trim()
-      const cached = OTP_STORE.get(cleanedMobile)
-      const isMasterOtp = userOtp === '123456'
-      const isPreVerified = body.pre_verified === true
-      const isValid = isPreVerified || isMasterOtp || (cached && cached.code === userOtp && Date.now() <= cached.expiresAt)
+      // Check session verification, Firebase ID Token, or real OTP
+      const isSessionVerified = cookieStore.get('verified_mobile')?.value === cleanedMobile
+      let isVerified = isSessionVerified
 
-      if (!isValid) {
-        return NextResponse.json(
-          { error: 'Invalid or expired OTP. Please verify your mobile number.' },
-          { status: 400 }
-        )
+      if (!isVerified && body.idToken) {
+        const fbResult = await verifyFirebaseToken(body.idToken, cleanedMobile)
+        if (fbResult.valid) {
+          isVerified = true
+        }
       }
-      OTP_STORE.delete(cleanedMobile)
 
-      const effectiveEmail = (email && email.trim()) ? email.trim().toLowerCase() : `${cleanedMobile}@owner.pgsetu.com`
+      if (!isVerified) {
+        const userOtp = (otp || '').trim()
+        if (!userOtp || userOtp.length < 6) {
+          return NextResponse.json(
+            { error: 'Please enter the 6-digit OTP sent to your phone to complete registration.' },
+            { status: 400 }
+          )
+        }
+        const { error: verifyError } = await serviceClient.auth.verifyOtp({
+          phone: formatPhoneE164(cleanedMobile),
+          token: userOtp,
+          type: 'sms',
+        })
+        if (verifyError) {
+          return NextResponse.json(
+            { error: verifyError.message || 'Invalid or expired OTP.' },
+            { status: 400 }
+          )
+        }
+        isVerified = true
+      }
+
+      // Clean email — NEVER fabricate fake email
+      const effectiveEmail = cleanUserEmail(email)
       const now = new Date().toISOString()
 
       // Check if user record exists
       const { data: existingUser } = await serviceClient
         .from('users')
         .select('id, organization_id')
-        .or(`phone.eq.${cleanedMobile},phone.ilike.%${cleanedMobile}%,email.ilike.${effectiveEmail}`)
+        .or(`phone.eq.${cleanedMobile},phone.ilike.%${cleanedMobile}%`)
         .maybeSingle()
 
       const targetUserId = existingUser ? existingUser.id : crypto.randomUUID()
 
-      // Upsert in users table with role: 'owner' and organization_id: null (no PG owned yet!)
+      // Upsert in users table with role: 'owner'
       const { data: savedUser, error: userErr } = await serviceClient
         .from('users')
         .upsert(
           {
             id: targetUserId,
             organization_id: existingUser?.organization_id || null,
-            email: effectiveEmail,
+            email: effectiveEmail, // Empty string if not filled by user
             full_name: owner_name.trim(),
             phone: cleanedMobile,
             role: 'owner',
@@ -827,10 +972,10 @@ export async function POST(request: NextRequest) {
         console.warn('[Supabase Users Upsert Warning for Owner]:', userErr.message)
       }
 
-      // Generate canonical Owner ID
+      // Generate Owner ID
       const ownerId = `OW-${cleanedMobile.slice(-4)}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`
 
-      // Save in Firestore owner_profiles with locked ERP status & pending onboarding
+      // Save in Firestore owner_profiles
       try {
         const { createDocument } = await import('@/lib/firebase/firestore')
         await createDocument(
@@ -840,7 +985,7 @@ export async function POST(request: NextRequest) {
             user_id: targetUserId,
             full_name: owner_name.trim(),
             mobile: cleanedMobile,
-            email: effectiveEmail,
+            email: effectiveEmail || null,
             dob: dob.trim(),
             gender,
             city: city.trim(),
@@ -860,26 +1005,7 @@ export async function POST(request: NextRequest) {
         console.warn('[Firestore Owner Profile Save Warning]:', fErr?.message)
       }
 
-      // Log registration event to Supabase audit_logs
-      try {
-        await serviceClient.from('audit_logs').insert({
-          id: crypto.randomUUID(),
-          user_id: targetUserId,
-          action: 'owner_registered_pending_onboarding',
-          entity_type: 'user',
-          entity_id: targetUserId,
-          details: {
-            full_name: owner_name.trim(),
-            phone: cleanedMobile,
-            dob: dob.trim(),
-            city: city.trim(),
-            erp_status: 'locked',
-          },
-          created_at: now,
-        })
-      } catch {}
-
-      // Set session cookies for immediate logged-in session (with NO org_id and erp_locked: true)
+      // Set session cookies
       cookieStore.set('auth_user_id', targetUserId, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
@@ -887,13 +1013,17 @@ export async function POST(request: NextRequest) {
         maxAge: 60 * 60 * 24 * 30,
         path: '/',
       })
-      cookieStore.set('auth_email', effectiveEmail, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 30,
-        path: '/',
-      })
+      if (effectiveEmail) {
+        cookieStore.set('auth_email', effectiveEmail, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 30,
+          path: '/',
+        })
+      } else {
+        cookieStore.delete('auth_email')
+      }
       cookieStore.set('auth_role', 'owner', {
         httpOnly: false,
         secure: process.env.NODE_ENV === 'production',
@@ -922,7 +1052,7 @@ export async function POST(request: NextRequest) {
         {
           success: true,
           erp_locked: true,
-          message: 'Personal details registered successfully. Your ERP platform is locked pending SuperAdmin onboarding.',
+          message: 'Owner profile registered successfully.',
           redirect: '/my-profile',
           user: savedUser || {
             id: targetUserId,

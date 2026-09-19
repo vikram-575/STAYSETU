@@ -91,13 +91,23 @@ export async function POST(request: NextRequest) {
     const cleanMobile = (phone || '').replace(/[^0-9]/g, '').slice(-10)
 
     let effectiveEmail = (email || '').trim().toLowerCase()
-    if (!effectiveEmail || effectiveEmail === SUPER_ADMIN_EMAIL.toLowerCase()) {
-      if (cleanMobile.length >= 10) {
-        effectiveEmail = `${cleanMobile}@owner.pgsetu.online`
-      } else if (authEmail && authEmail.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase()) {
+    if (
+      !effectiveEmail ||
+      effectiveEmail === SUPER_ADMIN_EMAIL.toLowerCase() ||
+      effectiveEmail.includes('@owner.pgsetu.') ||
+      effectiveEmail.includes('@user.pgsetu.') ||
+      effectiveEmail.includes('@pgsetu.online')
+    ) {
+      if (
+        authEmail &&
+        authEmail.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase() &&
+        !authEmail.includes('@owner.pgsetu.') &&
+        !authEmail.includes('@user.pgsetu.') &&
+        !authEmail.includes('@pgsetu.online')
+      ) {
         effectiveEmail = authEmail.toLowerCase().trim()
       } else {
-        effectiveEmail = `owner_${Date.now()}@pgsetu.online`
+        effectiveEmail = ''
       }
     }
     const ownerTemporaryPassword = generate8DigitPassword()
@@ -177,7 +187,7 @@ export async function POST(request: NextRequest) {
         name: org_name.trim(),
         slug,
         phone: phone?.trim() || null,
-        email: effectiveEmail,
+        email: effectiveEmail || null,
         city: city?.trim() || null,
         state: state?.trim() || null,
         pincode: pincode?.trim() || null,
@@ -205,22 +215,27 @@ export async function POST(request: NextRequest) {
     // 3. Create or Update Owner in Supabase Auth & Users table with 8-digit password
     let authUserId = ''
     try {
-      const { data: userList } = await serviceClient.auth.admin.listUsers()
-      const existingAuth = userList?.users?.find(
-        (u) => u.email?.toLowerCase() === effectiveEmail.toLowerCase()
-      )
+      let existingAuth: any = null
+      if (effectiveEmail) {
+        const { data: userList } = await serviceClient.auth.admin.listUsers()
+        existingAuth = userList?.users?.find(
+          (u) => u.email?.toLowerCase() === effectiveEmail.toLowerCase()
+        )
+      } else if (cleanMobile.length >= 10) {
+        const { data: userList } = await serviceClient.auth.admin.listUsers()
+        existingAuth = userList?.users?.find(
+          (u) => u.phone === `+91${cleanMobile}` || u.phone?.includes(cleanMobile)
+        )
+      }
 
       if (existingAuth) {
-        // Delete existing auth user and recreate to ensure clean password synchronization
         try {
           await serviceClient.auth.admin.deleteUser(existingAuth.id)
         } catch {}
       }
 
-      const { data: createdAuth, error: authCreateErr } = await serviceClient.auth.admin.createUser({
-        email: effectiveEmail,
+      const authPayload: any = {
         password: ownerTemporaryPassword,
-        email_confirm: true,
         user_metadata: {
           full_name: owner_name?.trim() || org_name,
           role: 'owner',
@@ -228,7 +243,17 @@ export async function POST(request: NextRequest) {
           must_change_password: true,
           is_temporary_password: true,
         },
-      })
+      }
+
+      if (effectiveEmail) {
+        authPayload.email = effectiveEmail
+        authPayload.email_confirm = true
+      } else if (cleanMobile.length >= 10) {
+        authPayload.phone = `+91${cleanMobile}`
+        authPayload.phone_confirm = true
+      }
+
+      const { data: createdAuth, error: authCreateErr } = await serviceClient.auth.admin.createUser(authPayload)
 
       if (createdAuth?.user) {
         authUserId = createdAuth.user.id
@@ -305,23 +330,27 @@ export async function POST(request: NextRequest) {
     if (Array.isArray(staff_members) && staff_members.length > 0) {
       for (const staff of staff_members) {
         if (staff.name && (staff.phone || staff.email)) {
-          const staffEmail = (staff.email?.trim() || `${staff.name.toLowerCase().replace(/[^a-z0-9]/g, '')}_${slug}@pgsetu.com`).toLowerCase()
+          const staffEmail = (staff.email?.trim() || '').toLowerCase()
+          const staffPhoneClean = (staff.phone || '').replace(/\D/g, '').slice(-10)
           const staffTemporaryPassword = generate8DigitPassword()
 
           let staffAuthId = ''
           try {
+            let existingAuth: any = null
             const { data: userList } = await serviceClient.auth.admin.listUsers()
-            const existingAuth = userList?.users?.find((u) => u.email?.toLowerCase() === staffEmail)
+            if (staffEmail) {
+              existingAuth = userList?.users?.find((u) => u.email?.toLowerCase() === staffEmail)
+            } else if (staffPhoneClean) {
+              existingAuth = userList?.users?.find((u) => u.phone === `+91${staffPhoneClean}` || u.phone?.includes(staffPhoneClean))
+            }
             if (existingAuth) {
               try {
                 await serviceClient.auth.admin.deleteUser(existingAuth.id)
               } catch {}
             }
 
-            const { data: createdStaff } = await serviceClient.auth.admin.createUser({
-              email: staffEmail,
+            const staffAuthPayload: any = {
               password: staffTemporaryPassword,
-              email_confirm: true,
               user_metadata: {
                 full_name: staff.name.trim(),
                 role: staff.role || 'manager',
@@ -329,22 +358,21 @@ export async function POST(request: NextRequest) {
                 must_change_password: true,
                 is_temporary_password: true,
               },
-            })
+            }
+            if (staffEmail) {
+              staffAuthPayload.email = staffEmail
+              staffAuthPayload.email_confirm = true
+            } else if (staffPhoneClean) {
+              staffAuthPayload.phone = `+91${staffPhoneClean}`
+              staffAuthPayload.phone_confirm = true
+            }
+
+            const { data: createdStaff } = await serviceClient.auth.admin.createUser(staffAuthPayload)
             if (createdStaff?.user) staffAuthId = createdStaff.user.id
           } catch {}
 
           const targetStaffId = staffAuthId || crypto.randomUUID()
           try {
-            const { data: existingStaffDb } = await serviceClient
-              .from('users')
-              .select('id')
-              .ilike('email', staffEmail)
-              .maybeSingle()
-
-            if (existingStaffDb && existingStaffDb.id !== targetStaffId) {
-              await serviceClient.from('users').delete().eq('id', existingStaffDb.id)
-            }
-
             await serviceClient.from('users').upsert(
               {
                 id: targetStaffId,

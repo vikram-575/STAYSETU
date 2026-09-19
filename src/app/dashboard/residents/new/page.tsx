@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -14,6 +14,8 @@ import { formatCurrency, rupeesToPaise } from '@/lib/money'
 import { FirebaseFileUploader } from '@/components/ui/firebase-file-uploader'
 import { AadhaarVerificationModal } from '@/components/kyc/aadhaar-verification-modal'
 import { AadhaarExtractedData } from '@/lib/kyc/types'
+import { setupRecaptcha, sendPhoneOtp } from '@/lib/firebase/auth'
+import type { ConfirmationResult, RecaptchaVerifier } from 'firebase/auth'
 
 export default function CheckInResidentPage() {
   const router = useRouter()
@@ -22,11 +24,44 @@ export default function CheckInResidentPage() {
   const [isMobileVerified, setIsMobileVerified] = useState(false)
   const [verifyMobile, setVerifyMobile] = useState('')
   const [verifyOtp, setVerifyOtp] = useState('')
-  const [devOtp, setDevOtp] = useState('')
   const [otpSent, setOtpSent] = useState(false)
   const [sendingOtp, setSendingOtp] = useState(false)
   const [verifyingOtp, setVerifyingOtp] = useState(false)
   const [otpError, setOtpError] = useState('')
+  const [resendCooldown, setResendCooldown] = useState<number>(0)
+
+  // Firebase Phone Auth Confirmation & Verifier Refs
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null)
+  const confirmationResultRef = useRef<ConfirmationResult | null>(null)
+  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null)
+
+  // Resend cooldown timer
+  useEffect(() => {
+    if (resendCooldown <= 0) return
+    const timer = setInterval(() => {
+      setResendCooldown((c) => (c > 0 ? c - 1 : 0))
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [resendCooldown])
+
+  // Recaptcha verifier helper
+  const getOrCreateVerifier = () => {
+    if (typeof window === 'undefined') return null
+    try {
+      if (recaptchaVerifierRef.current) {
+        try {
+          recaptchaVerifierRef.current.clear()
+        } catch {}
+        recaptchaVerifierRef.current = null
+      }
+      const verifier = setupRecaptcha('recaptcha-resident-container')
+      recaptchaVerifierRef.current = verifier
+      return verifier
+    } catch (e) {
+      console.warn('[Recaptcha Setup Warning]:', e)
+      return null
+    }
+  }
 
   // Active Stay & PG Conflict Verification State
   const [activeStayWarning, setActiveStayWarning] = useState<any | null>(null)
@@ -273,7 +308,7 @@ export default function CheckInResidentPage() {
   }, [verifyMobile])
 
   // ─────────────────────────────────────────────────────────────
-  // 1. SEND OTP TO RESIDENT MOBILE
+  // 1. SEND REAL SMS OTP TO RESIDENT MOBILE VIA FIREBASE PHONE AUTH
   // ─────────────────────────────────────────────────────────────
   const handleSendOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
@@ -298,22 +333,37 @@ export default function CheckInResidentPage() {
         }
       }
 
-      const res = await fetch('/api/auth/mobile-flow', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'send-otp', mobile: clean }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to send OTP to resident.')
+      // Step 1: Send real SMS OTP to the resident's mobile using Firebase Phone Auth
+      const verifier = getOrCreateVerifier()
+      if (!verifier) {
+        throw new Error('Security verification (reCAPTCHA) could not be initialized. Please refresh the page.')
       }
 
+      const confirmation = await sendPhoneOtp(clean, verifier)
+      setConfirmationResult(confirmation)
+      confirmationResultRef.current = confirmation
+      setResendCooldown(30)
       setOtpSent(true)
-      if (data.devOtp) {
-        setDevOtp(data.devOtp)
-      }
     } catch (err: any) {
-      setOtpError(err.message || 'Failed to send OTP.')
+      console.error('[Resident OTP Send Error]:', err)
+      if (recaptchaVerifierRef.current) {
+        try {
+          recaptchaVerifierRef.current.clear()
+        } catch {}
+        recaptchaVerifierRef.current = null
+      }
+
+      let msg = err.message || 'Failed to send OTP.'
+      if (err.code === 'auth/invalid-phone-number') {
+        msg = 'Invalid mobile number. Please enter a valid 10-digit Indian phone number.'
+      } else if (err.code === 'auth/too-many-requests') {
+        msg = 'Too many requests sent from this device. Please wait a few minutes before trying again.'
+      } else if (err.code === 'auth/quota-exceeded') {
+        msg = 'Daily SMS verification quota exceeded. Please try again later.'
+      } else if (err.code === 'auth/captcha-check-failed') {
+        msg = 'reCAPTCHA check failed. Please refresh the page.'
+      }
+      setOtpError(msg)
     } finally {
       setSendingOtp(false)
     }
@@ -329,14 +379,35 @@ export default function CheckInResidentPage() {
     const clean = cleanPhoneDigits(verifyMobile)
     const code = verifyOtp.trim()
 
-    if (!code) {
+    if (!code || code.length < 6) {
       setOtpError('Please enter the 6-digit OTP sent to the resident.')
       return
     }
 
     setVerifyingOtp(true)
     try {
-      // Step A: Verify OTP with server
+      let idToken: string | undefined = undefined
+
+      // Step A: If Firebase Phone Auth confirmation is present, confirm with Firebase!
+      if (confirmationResultRef.current) {
+        try {
+          const cred = await confirmationResultRef.current.confirm(code)
+          if (cred?.user) {
+            idToken = await cred.user.getIdToken()
+          }
+        } catch (fbErr: any) {
+          console.error('[Firebase OTP Verify Error]:', fbErr)
+          if (fbErr.code === 'auth/invalid-verification-code') {
+            throw new Error('Invalid OTP code. Please enter the correct code received by the resident.')
+          } else if (fbErr.code === 'auth/code-expired') {
+            throw new Error('The OTP code has expired. Please click "Resend OTP" to generate a new code.')
+          } else {
+            throw new Error(fbErr.message || 'OTP verification failed.')
+          }
+        }
+      }
+
+      // Step B: Server verification / session check
       const verifyRes = await fetch('/api/auth/mobile-flow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -344,11 +415,12 @@ export default function CheckInResidentPage() {
           action: 'verify-resident-otp',
           mobile: clean,
           otp: code,
+          idToken,
         }),
       })
       const verifyData = await verifyRes.json()
 
-      if (!verifyRes.ok) {
+      if (!verifyRes.ok && !idToken) {
         throw new Error(verifyData.error || 'Invalid or expired OTP. Please enter the correct code.')
       }
 
@@ -436,7 +508,6 @@ export default function CheckInResidentPage() {
     setIsMobileVerified(false)
     setOtpSent(false)
     setVerifyOtp('')
-    setDevOtp('')
     setOtpError('')
     setExistingTenant(null)
     setActiveStayWarning(null)
@@ -759,6 +830,9 @@ export default function CheckInResidentPage() {
       {/* ────────────────────────────────────────────────────────── */}
       {!isMobileVerified && (
         <div className="rounded-3xl border border-gray-200 bg-white p-6 sm:p-8 shadow-xs space-y-6">
+          {/* Invisible ReCAPTCHA container for Firebase Phone Auth */}
+          <div id="recaptcha-resident-container"></div>
+
           <div className="flex items-start gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#14532D] to-[#16A34A] text-white shadow-md ring-4 ring-[#DCFCE7]">
               <Phone className="h-6 w-6" />
@@ -790,23 +864,7 @@ export default function CheckInResidentPage() {
             </div>
           )}
 
-          {/* Development OTP helper box */}
-          {devOtp && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 flex items-center justify-between">
-              <div className="flex items-center gap-2 font-mono font-bold">
-                <Sparkles className="h-4 w-4 text-amber-600" />
-                <span>Simulated Resident OTP:</span>
-                <span className="bg-amber-200 px-2 py-0.5 rounded text-amber-950 tracking-widest">{devOtp}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setVerifyOtp(devOtp)}
-                className="text-[11px] font-bold text-amber-800 underline hover:text-amber-950"
-              >
-                Auto-fill Code
-              </button>
-            </div>
-          )}
+
 
           {!otpSent ? (
             <form onSubmit={handleSendOtp} className="space-y-4">
@@ -887,7 +945,7 @@ export default function CheckInResidentPage() {
                   required
                   value={verifyOtp}
                   onChange={(e) => setVerifyOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  placeholder="Enter 6-digit code or 123456"
+                  placeholder="Enter 6-digit OTP"
                   className="w-full py-2.5 px-3.5 text-center font-mono tracking-widest text-lg font-bold rounded-xl border border-gray-300 outline-none focus:border-[#16A34A] focus:ring-2 focus:ring-[#16A34A]/20"
                   autoFocus
                 />
@@ -897,10 +955,15 @@ export default function CheckInResidentPage() {
                 <button
                   type="button"
                   onClick={handleSendOtp}
-                  disabled={sendingOtp}
-                  className="px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50"
+                  disabled={sendingOtp || resendCooldown > 0}
+                  className="px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
                 >
-                  Resend OTP
+                  {sendingOtp ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-[#14532D]" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5 text-gray-500" />
+                  )}
+                  <span>{resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Real OTP'}</span>
                 </button>
                 <button
                   type="submit"

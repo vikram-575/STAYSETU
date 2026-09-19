@@ -1,12 +1,14 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useState, useRef, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   Building2, Loader2, ShieldCheck, CheckCircle2,
-  ArrowRight, ArrowLeft, User, Check, AlertCircle, Phone
+  ArrowRight, ArrowLeft, User, Check, AlertCircle, Phone, RefreshCw
 } from 'lucide-react'
+import { setupRecaptcha, sendPhoneOtp } from '@/lib/firebase/auth'
+import type { ConfirmationResult, RecaptchaVerifier } from 'firebase/auth'
 
 type FlowStep = 'role_select' | 'mobile_entry' | 'otp_verification' | 'new_owner_details' | 'owner_not_found' | 'new_details' | 'optional_aadhaar'
 type AccountType = 'tenant' | 'owner'
@@ -39,7 +41,6 @@ function UnifiedLoginForm() {
   // Form Fields
   const [mobile, setMobile] = useState('')
   const [otp, setOtp] = useState('')
-  const [devOtp, setDevOtp] = useState('')
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [gender, setGender] = useState<'male' | 'female' | 'other' | ''>('')
@@ -60,16 +61,51 @@ function UnifiedLoginForm() {
   const [ownerCity, setOwnerCity] = useState('')
   const [ownerEmail, setOwnerEmail] = useState('')
 
+  // Firebase Phone Auth Confirmation & ID Token
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null)
+  const confirmationResultRef = useRef<ConfirmationResult | null>(null)
+  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null)
+  const [idToken, setIdToken] = useState<string>('')
+  const [countdown, setCountdown] = useState<number>(0)
+
   // UI state
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [infoMessage, setInfoMessage] = useState('')
   const [existingUserInfo, setExistingUserInfo] = useState<any>(null)
 
+  // Countdown timer for OTP resend cooldown
+  useEffect(() => {
+    if (countdown <= 0) return
+    const timer = setInterval(() => {
+      setCountdown((prev) => (prev > 0 ? prev - 1 : 0))
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [countdown])
+
+  // Recaptcha verifier helper
+  const getOrCreateVerifier = () => {
+    if (typeof window === 'undefined') return null
+    try {
+      if (recaptchaVerifierRef.current) {
+        try {
+          recaptchaVerifierRef.current.clear()
+        } catch {}
+        recaptchaVerifierRef.current = null
+      }
+      const verifier = setupRecaptcha('recaptcha-container')
+      recaptchaVerifierRef.current = verifier
+      return verifier
+    } catch (e) {
+      console.warn('[Recaptcha Setup Warning]:', e)
+      return null
+    }
+  }
+
   // Clean 10-digit mobile
   const cleanMobile = (m: string) => m.replace(/\D/g, '').slice(-10)
 
-  // 1. Submit Mobile Number -> sends OTP and ALWAYS advances to OTP verification step
+  // 1. Submit Mobile Number -> sends real SMS OTP via Firebase Phone Auth
   const handleMobileSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -83,28 +119,80 @@ function UnifiedLoginForm() {
 
     setLoading(true)
     try {
+      // Step A: Check mobile existence & role in PG-Setu DB (skip redundant Supabase SMS since Firebase will send SMS)
       const checkRes = await fetch('/api/auth/mobile-flow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'check-mobile', mobile: cleaned, role: accountType }),
+        body: JSON.stringify({ action: 'check-mobile', mobile: cleaned, role: accountType, skipOtpDispatch: true }),
       })
       const checkData = await checkRes.json()
 
       if (!checkRes.ok) {
-        throw new Error(checkData.error || 'Failed to send OTP to mobile number.')
+        throw new Error(checkData.error || 'Failed to verify mobile number.')
       }
-
-      if (checkData.devOtp) {
-        setDevOtp(checkData.devOtp)
-      }
-
       setExistingUserInfo(checkData)
+
+      // Step B: Dispatch real SMS OTP via Firebase Phone Auth
+      const verifier = getOrCreateVerifier()
+      if (!verifier) {
+        throw new Error('Security check (reCAPTCHA) initialization failed. Please refresh the page.')
+      }
+
+      const confirmation = await sendPhoneOtp(cleaned, verifier)
+      setConfirmationResult(confirmation)
+      confirmationResultRef.current = confirmation
+
       setOtp('')
-      setInfoMessage(`Enter the 6-digit OTP code sent to +91 ${cleaned}`)
-      // Advance to the OTP verification screen so the user can fill OTP to continue!
+      setCountdown(30)
+      setInfoMessage(`Real OTP sent via SMS to +91 ${cleaned}`)
+      // Advance to the OTP verification screen
       setStep('otp_verification')
     } catch (err: any) {
-      setError(err.message || 'Something went wrong. Please try again.')
+      console.error('[handleMobileSubmit error]:', err)
+      if (recaptchaVerifierRef.current) {
+        try {
+          recaptchaVerifierRef.current.clear()
+        } catch {}
+        recaptchaVerifierRef.current = null
+      }
+
+      let msg = err.message || 'Something went wrong. Please try again.'
+      if (err.code === 'auth/invalid-phone-number') {
+        msg = 'Invalid phone number. Please enter a valid 10-digit Indian mobile number.'
+      } else if (err.code === 'auth/too-many-requests') {
+        msg = 'Too many requests from this device. Please wait a few moments and try again.'
+      } else if (err.code === 'auth/quota-exceeded') {
+        msg = 'SMS quota limit reached. Please try again later.'
+      } else if (err.code === 'auth/captcha-check-failed') {
+        msg = 'Security verification failed. Please refresh the page and try again.'
+      }
+      setError(msg)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 1B. Resend Real SMS OTP via Firebase Phone Auth
+  const handleResendOtp = async () => {
+    if (loading || countdown > 0) return
+    setError('')
+    setInfoMessage('')
+    setLoading(true)
+
+    const cleaned = cleanMobile(mobile)
+    try {
+      const verifier = getOrCreateVerifier()
+      if (!verifier) {
+        throw new Error('Could not re-initialize security verification. Please refresh.')
+      }
+
+      const confirmation = await sendPhoneOtp(cleaned, verifier)
+      setConfirmationResult(confirmation)
+      confirmationResultRef.current = confirmation
+      setCountdown(30)
+      setInfoMessage(`New OTP code sent via SMS to +91 ${cleaned}`)
+    } catch (err: any) {
+      setError(err.message || 'Failed to resend OTP code.')
     } finally {
       setLoading(false)
     }
@@ -124,6 +212,29 @@ function UnifiedLoginForm() {
     setLoading(true)
     const cleaned = cleanMobile(mobile)
     try {
+      let firebaseToken: string | undefined = undefined
+
+      // If Firebase Phone Auth confirmation is active, confirm the OTP with Firebase
+      if (confirmationResultRef.current) {
+        try {
+          const userCredential = await confirmationResultRef.current.confirm(userOtp)
+          if (userCredential?.user) {
+            firebaseToken = await userCredential.user.getIdToken()
+            setIdToken(firebaseToken)
+          }
+        } catch (fbErr: any) {
+          console.error('[Firebase OTP Confirm Error]:', fbErr)
+          if (fbErr.code === 'auth/invalid-verification-code') {
+            throw new Error('Invalid OTP code. Please enter the correct code received on your phone.')
+          } else if (fbErr.code === 'auth/code-expired') {
+            throw new Error('The OTP code has expired. Please click "Resend OTP" to get a new code.')
+          } else {
+            throw new Error(fbErr.message || 'OTP verification failed.')
+          }
+        }
+      }
+
+      // Exchange with backend session (passes idToken for Third-Party Auth)
       const res = await fetch('/api/auth/mobile-flow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -131,6 +242,7 @@ function UnifiedLoginForm() {
           action: 'verify-otp-login',
           mobile: cleaned,
           otp: userOtp,
+          idToken: firebaseToken,
           role: accountType,
         }),
       })
@@ -176,7 +288,7 @@ function UnifiedLoginForm() {
         body: JSON.stringify({
           action: 'verify-otp-login',
           mobile: cleaned,
-          otp: otp.trim() || devOtp || '123456',
+          otp: otp.trim(),
           role: 'tenant',
         }),
       })
@@ -247,8 +359,9 @@ function UnifiedLoginForm() {
           gender: ownerGender,
           city: ownerCity.trim(),
           email: ownerEmail.trim() || undefined,
+          idToken: idToken || undefined,
           pre_verified: true,
-          otp: otp.trim() || devOtp || '123456',
+          otp: otp.trim(),
         }),
       })
 
@@ -313,7 +426,8 @@ function UnifiedLoginForm() {
         body: JSON.stringify({
           action: 'register-new-user',
           mobile: cleaned,
-          otp: otp.trim() || devOtp || '123456',
+          otp: otp.trim(),
+          idToken: idToken || undefined,
           pre_verified: true,
           full_name: fullName,
           dob,
@@ -383,22 +497,10 @@ function UnifiedLoginForm() {
         </div>
       )}
 
-      {/* Development OTP helper box - only visible during OTP verification */}
-      {devOtp && step === 'otp_verification' && (
-        <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-900 flex items-center justify-between">
-          <div className="flex items-center gap-1.5 font-mono font-bold">
-            <span>OTP Code:</span>
-            <span className="bg-amber-200 px-2 py-0.5 rounded text-amber-950 text-sm tracking-widest">{devOtp}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setOtp(devOtp)}
-            className="text-[11px] font-bold text-amber-800 underline hover:text-amber-950"
-          >
-            Auto-fill
-          </button>
-        </div>
-      )}
+
+
+      {/* Hidden Firebase Phone Auth ReCAPTCHA Container */}
+      <div id="recaptcha-container"></div>
 
       {/* ────────────────────────────────────────────────────────── */}
       {/* 0. ROLE SELECTION STEP (FIRST QUESTION) */}
@@ -611,7 +713,7 @@ function UnifiedLoginForm() {
               required
               value={otp}
               onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="e.g. 123456"
+              placeholder="------"
               className="w-full px-4 py-3 text-center tracking-[0.3em] font-mono text-xl font-bold rounded-xl border border-gray-300 focus:border-[#16A34A] focus:ring-2 focus:ring-[#16A34A]/20 outline-none"
               autoFocus
             />
@@ -635,6 +737,20 @@ function UnifiedLoginForm() {
               </>
             )}
           </button>
+
+          {/* Resend Real SMS OTP with Countdown */}
+          <div className="flex items-center justify-between text-xs pt-1 px-1">
+            <span className="text-gray-500">Didn&apos;t receive SMS?</span>
+            <button
+              type="button"
+              disabled={loading || countdown > 0}
+              onClick={handleResendOtp}
+              className="font-bold text-[#14532D] hover:underline disabled:text-gray-400 disabled:no-underline flex items-center gap-1"
+            >
+              <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+              <span>{countdown > 0 ? `Resend OTP in ${countdown}s` : 'Resend Real OTP'}</span>
+            </button>
+          </div>
 
           <div className="flex items-center justify-between text-xs pt-2">
             <button

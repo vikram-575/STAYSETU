@@ -279,7 +279,10 @@ function MyProfileContent() {
           if (data.user) {
             setCurrentUser(data.user)
             setEditName(data.user.full_name || '')
-            setEditEmail(data.user.email || '')
+            const safeEmail = data.user.email && !data.user.email.includes('@owner.pgsetu.') && !data.user.email.includes('@user.pgsetu.') && !data.user.email.includes('@resident.pgsetu.') && !data.user.email.includes('@pgsetu.online')
+              ? data.user.email
+              : ''
+            setEditEmail(safeEmail)
             if (data.stays) setStays(data.stays)
             if (data.passbookSummary) setPassbookSummary(data.passbookSummary)
             if (data.transactions) setTransactions(data.transactions)
@@ -2475,7 +2478,15 @@ function MyProfileContent() {
 
                 <div className="rounded-xl bg-gray-50 p-2.5">
                   <span className="text-gray-400 text-[10px] font-bold block">Email</span>
-                  <p className="font-bold text-gray-900 mt-0.5 truncate">{currentUser.email || profileData?.email || 'Not provided'}</p>
+                  <p className="font-bold text-gray-900 mt-0.5 truncate">
+                    {(() => {
+                      const em = currentUser.email || profileData?.email || ''
+                      if (!em || em.includes('@owner.pgsetu.') || em.includes('@user.pgsetu.') || em.includes('@resident.pgsetu.') || em.includes('@pgsetu.online') || em.includes('@pgsetu.local')) {
+                        return 'Not provided'
+                      }
+                      return em
+                    })()}
+                  </p>
                 </div>
 
                 <div className="rounded-xl bg-gray-50 p-2.5">
