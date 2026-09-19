@@ -5,10 +5,14 @@ services:
     plan: starter
     buildCommand: npm install && npm run build
     startCommand: npm run start
-    healthCheckPath: /api/properties
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
+      - key: HOSTNAME
+        value: 0.0.0.0
+      - key: PORT
+        value: 10000
       - key: NEXT_PUBLIC_APP_NAME
         value: PG-SETU
       - key: NEXT_PUBLIC_APP_URL
