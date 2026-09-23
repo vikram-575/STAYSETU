@@ -160,8 +160,10 @@ export async function POST(request: NextRequest) {
             userType: 'owner',
             role: matchedOwnerUser?.role || 'owner',
             name: matchedOwnerUser?.full_name || matchedOrg?.name || 'PG Owner',
-            email: cleanUserEmail(matchedOwnerUser?.email || matchedOrg?.email),
+            userId: matchedOwnerUser?.id || matchedOrg?.owner_user_id || null,
             organizationId: matchedOwnerUser?.organization_id || matchedOrg?.id,
+            organizationName: matchedOrg?.name || null,
+            email: cleanUserEmail(matchedOwnerUser?.email || matchedOrg?.email),
             mobile: cleaned,
             message: `Welcome back, ${matchedOwnerUser?.full_name || matchedOrg?.name || 'Owner'}! Real OTP sent to +91 ${cleaned.slice(0, 2)}******${cleaned.slice(-2)}.`,
           })

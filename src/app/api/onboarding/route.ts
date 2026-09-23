@@ -180,130 +180,181 @@ export async function POST(request: NextRequest) {
       },
     }
 
-    // 1. Create Organization in Supabase
-    const { data: org, error: orgError } = await serviceClient
-      .from('organizations')
-      .insert({
-        name: org_name.trim(),
-        slug,
-        phone: phone?.trim() || null,
-        email: effectiveEmail || null,
-        city: city?.trim() || null,
-        state: state?.trim() || null,
-        pincode: pincode?.trim() || null,
-        address: combinedAddress || address_line1 || null,
-        gst_enabled: Boolean(gst_enabled),
-        gstin: gstin?.trim() || null,
-        settings: organizationSettings,
-      })
-      .select()
-      .single()
+    // 1. Resolve Owner Person First (Strictly save under that person only)
+    let matchedOwnerUser: any = null
 
-    if (orgError || !org) {
-      throw new Error(orgError?.message || 'Failed to create organization record in database.')
+    // Check by explicitly provided user ID
+    if (userId || owner_id) {
+      const { data: userById } = await serviceClient
+        .from('users')
+        .select('id, full_name, email, phone, role, organization_id')
+        .eq('id', userId || owner_id)
+        .maybeSingle()
+      if (userById) matchedOwnerUser = userById
     }
 
-    const orgId = org.id
+    // Check by verified Indian mobile number
+    if (!matchedOwnerUser && cleanMobile.length >= 10) {
+      const { data: userByPhone } = await serviceClient
+        .from('users')
+        .select('id, full_name, email, phone, role, organization_id')
+        .or(`phone.eq.${cleanMobile},phone.ilike.%${cleanMobile}%`)
+        .in('role', ['owner', 'manager', 'staff', 'accountant'])
+        .maybeSingle()
+      if (userByPhone) matchedOwnerUser = userByPhone
+    }
 
-    // 2. Initialize sequences
+    // Check by email if provided
+    if (!matchedOwnerUser && effectiveEmail && effectiveEmail !== SUPER_ADMIN_EMAIL.toLowerCase()) {
+      const { data: userByEmail } = await serviceClient
+        .from('users')
+        .select('id, full_name, email, phone, role, organization_id')
+        .ilike('email', effectiveEmail)
+        .maybeSingle()
+      if (userByEmail) matchedOwnerUser = userByEmail
+    }
+
+    const finalOwnerUserId = matchedOwnerUser?.id || userId || owner_id || crypto.randomUUID()
+
+    // 2. Resolve or Create Organization for this Owner Person
+    let org: any = null
+    let orgId: string = ''
+
+    // Check if matched owner already has an organization
+    if (matchedOwnerUser?.organization_id) {
+      const { data: existingOrg } = await serviceClient
+        .from('organizations')
+        .select('*')
+        .eq('id', matchedOwnerUser.organization_id)
+        .maybeSingle()
+      if (existingOrg) org = existingOrg
+    }
+
+    // Check if an organization exists where owner_user_id == finalOwnerUserId
+    if (!org) {
+      const { data: orgByOwner } = await serviceClient
+        .from('organizations')
+        .select('*')
+        .eq('owner_user_id', finalOwnerUserId)
+        .maybeSingle()
+      if (orgByOwner) org = orgByOwner
+    }
+
+    // Check if an organization exists with this owner phone
+    if (!org && cleanMobile.length >= 10) {
+      const { data: orgByPhone } = await serviceClient
+        .from('organizations')
+        .select('*')
+        .or(`phone.eq.${cleanMobile},phone.ilike.%${cleanMobile}%`)
+        .maybeSingle()
+      if (orgByPhone) org = orgByPhone
+    }
+
+    if (org) {
+      // Re-use existing organization so all properties are saved under this owner's organization
+      orgId = org.id
+      const { error: updateOrgErr } = await serviceClient
+        .from('organizations')
+        .update({
+          owner_user_id: finalOwnerUserId,
+          phone: cleanMobile || org.phone,
+          ...(effectiveEmail ? { email: effectiveEmail } : {}),
+          gst_enabled: Boolean(gst_enabled),
+          ...(gstin ? { gstin: gstin.trim() } : {}),
+          settings: {
+            ...(org.settings || {}),
+            ...organizationSettings,
+          },
+        })
+        .eq('id', orgId)
+
+      if (updateOrgErr) {
+        console.warn('[Organization update warning]:', updateOrgErr.message)
+      }
+    } else {
+      // Create new organization strictly owned by this verified owner person
+      const { data: newOrg, error: orgError } = await serviceClient
+        .from('organizations')
+        .insert({
+          name: org_name.trim(),
+          slug,
+          owner_user_id: finalOwnerUserId,
+          phone: cleanMobile || null,
+          email: effectiveEmail || null,
+          city: city?.trim() || null,
+          state: state?.trim() || null,
+          pincode: pincode?.trim() || null,
+          address: combinedAddress || address_line1 || null,
+          gst_enabled: Boolean(gst_enabled),
+          gstin: gstin?.trim() || null,
+          settings: organizationSettings,
+        })
+        .select()
+        .single()
+
+      if (orgError || !newOrg) {
+        throw new Error(orgError?.message || 'Failed to create organization record in database.')
+      }
+      org = newOrg
+      orgId = newOrg.id
+    }
+
+    // Initialize sequences if needed
     try {
       await serviceClient.from('organization_sequences').insert({ organization_id: orgId, last_seq: 0 })
       await serviceClient.from('invoice_sequences').insert({ organization_id: orgId, last_seq: 0 })
       await serviceClient.from('payment_sequences').insert({ organization_id: orgId, last_seq: 0 })
     } catch {}
 
-    // 3. Create or Update Owner in Supabase Auth & Users table with 8-digit password
-    let authUserId = ''
+    // Ensure Auth User in Supabase Auth (without clobbering existing account)
     try {
       let existingAuth: any = null
+      const { data: userList } = await serviceClient.auth.admin.listUsers()
       if (effectiveEmail) {
-        const { data: userList } = await serviceClient.auth.admin.listUsers()
         existingAuth = userList?.users?.find(
           (u) => u.email?.toLowerCase() === effectiveEmail.toLowerCase()
         )
       } else if (cleanMobile.length >= 10) {
-        const { data: userList } = await serviceClient.auth.admin.listUsers()
         existingAuth = userList?.users?.find(
           (u) => u.phone === `+91${cleanMobile}` || u.phone?.includes(cleanMobile)
         )
       }
 
-      if (existingAuth) {
-        try {
-          await serviceClient.auth.admin.deleteUser(existingAuth.id)
-        } catch {}
-      }
+      if (!existingAuth) {
+        const authPayload: any = {
+          id: finalOwnerUserId,
+          password: ownerTemporaryPassword,
+          user_metadata: {
+            full_name: owner_name?.trim() || org.name || org_name,
+            role: 'owner',
+            organization_id: orgId,
+            must_change_password: true,
+            is_temporary_password: true,
+          },
+        }
 
-      const authPayload: any = {
-        password: ownerTemporaryPassword,
-        user_metadata: {
-          full_name: owner_name?.trim() || org_name,
-          role: 'owner',
-          organization_id: orgId,
-          must_change_password: true,
-          is_temporary_password: true,
-        },
-      }
+        if (effectiveEmail) {
+          authPayload.email = effectiveEmail
+          authPayload.email_confirm = true
+        } else if (cleanMobile.length >= 10) {
+          authPayload.phone = `+91${cleanMobile}`
+          authPayload.phone_confirm = true
+        }
 
-      if (effectiveEmail) {
-        authPayload.email = effectiveEmail
-        authPayload.email_confirm = true
-      } else if (cleanMobile.length >= 10) {
-        authPayload.phone = `+91${cleanMobile}`
-        authPayload.phone_confirm = true
-      }
-
-      const { data: createdAuth, error: authCreateErr } = await serviceClient.auth.admin.createUser(authPayload)
-
-      if (createdAuth?.user) {
-        authUserId = createdAuth.user.id
-      } else if (authCreateErr) {
-        console.error('[Owner Auth Create Error]:', authCreateErr)
+        await serviceClient.auth.admin.createUser(authPayload)
       }
     } catch (authErr) {
       console.warn('[Owner Auth Setup Warning]:', authErr)
     }
 
-    // Match existing owner user if already created during login / OTP
-    let targetOwnerUserId: string | null = null
-
-    if (userId || owner_id) {
-      const { data: userById } = await serviceClient
-        .from('users')
-        .select('id, email, phone')
-        .eq('id', userId || owner_id)
-        .maybeSingle()
-      if (userById) targetOwnerUserId = userById.id
-    }
-
-    if (!targetOwnerUserId && cleanMobile.length >= 10) {
-      const { data: userByPhone } = await serviceClient
-        .from('users')
-        .select('id, email, phone')
-        .or(`phone.ilike.%${cleanMobile}%,phone.eq.${cleanMobile}`)
-        .maybeSingle()
-      if (userByPhone) targetOwnerUserId = userByPhone.id
-    }
-
-    if (!targetOwnerUserId && effectiveEmail && effectiveEmail !== SUPER_ADMIN_EMAIL.toLowerCase()) {
-      const { data: userByEmail } = await serviceClient
-        .from('users')
-        .select('id, email, phone')
-        .ilike('email', effectiveEmail)
-        .maybeSingle()
-      if (userByEmail) targetOwnerUserId = userByEmail.id
-    }
-
-    const finalOwnerUserId = targetOwnerUserId || authUserId || crypto.randomUUID()
-
-    // Upsert profile in users table with explicit ID
+    // Upsert profile in users table strictly bound to finalOwnerUserId and orgId
     try {
       const { error: userUpsertErr } = await serviceClient.from('users').upsert(
         {
           id: finalOwnerUserId,
           organization_id: orgId,
-          email: effectiveEmail,
-          full_name: owner_name?.trim() || org_name,
+          email: effectiveEmail || matchedOwnerUser?.email || null,
+          full_name: owner_name?.trim() || matchedOwnerUser?.full_name || org.name,
           phone: cleanMobile || phone?.trim() || null,
           role: 'owner',
           is_active: true,
@@ -314,12 +365,6 @@ export async function POST(request: NextRequest) {
       if (userUpsertErr) {
         console.error('[User upsert error]:', userUpsertErr)
       }
-
-      // Link owner_user_id in organization
-      await serviceClient
-        .from('organizations')
-        .update({ owner_user_id: finalOwnerUserId })
-        .eq('id', orgId)
     } catch (userErr) {
       console.warn('[User Record Setup Warning]:', userErr)
     }
@@ -610,6 +655,47 @@ export async function POST(request: NextRequest) {
     try {
       cookieStore.delete('erp_locked')
     } catch {}
+
+    // Set active session cookies for the verified owner person
+    cookieStore.set('auth_user_id', finalOwnerUserId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 30,
+      path: '/',
+    })
+    cookieStore.set('auth_role', 'owner', {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 30,
+      path: '/',
+    })
+    cookieStore.set('auth_org_id', orgId, {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 30,
+      path: '/',
+    })
+    if (cleanMobile) {
+      cookieStore.set('auth_mobile', cleanMobile, {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 30,
+        path: '/',
+      })
+    }
+    if (effectiveEmail) {
+      cookieStore.set('auth_email', effectiveEmail, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 30,
+        path: '/',
+      })
+    }
 
     return NextResponse.json({
       success: true,

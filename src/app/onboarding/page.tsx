@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -10,6 +10,8 @@ import {
   DollarSign, Plus, Trash2, AlertCircle, Info, Landmark,
   Clock, Award, Lock, ChevronRight, Copy, Check, ExternalLink
 } from 'lucide-react'
+import { setupRecaptcha, sendPhoneOtp } from '@/lib/firebase/auth'
+import type { ConfirmationResult, RecaptchaVerifier } from 'firebase/auth'
 
 interface StaffMember {
   name: string
@@ -31,12 +33,78 @@ function OnboardingContent() {
   const [copied, setCopied] = useState(false)
   const [existingOrg, setExistingOrg] = useState<{ id: string; name: string } | null>(null)
 
+  // Step 1: Owner Mobile Verification & Phone Auth State
+  const [ownerMobile, setOwnerMobile] = useState('')
+  const [ownerCheckLoading, setOwnerCheckLoading] = useState(false)
+  const [ownerCheckResult, setOwnerCheckResult] = useState<any>(null)
+  const [otpSent, setOtpSent] = useState(false)
+  const [otpCode, setOtpCode] = useState('')
+  const [otpVerifying, setOtpVerifying] = useState(false)
+  const [countdown, setCountdown] = useState(0)
+  const [isOwnerVerified, setIsOwnerVerified] = useState(false)
+  const [verifiedOwner, setVerifiedOwner] = useState<any>(null)
+
+  // Firebase Phone Auth confirmation & verifier refs
+  const confirmationResultRef = useRef<ConfirmationResult | null>(null)
+  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null)
+
+  // Countdown timer for OTP resend cooldown
+  useEffect(() => {
+    if (countdown <= 0) return
+    const timer = setInterval(() => {
+      setCountdown((prev) => (prev > 0 ? prev - 1 : 0))
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [countdown])
+
+  const getOrCreateVerifier = () => {
+    if (typeof window === 'undefined') return null
+    try {
+      if (recaptchaVerifierRef.current) {
+        try {
+          recaptchaVerifierRef.current.clear()
+        } catch {}
+        recaptchaVerifierRef.current = null
+      }
+      const verifier = setupRecaptcha('recaptcha-container')
+      recaptchaVerifierRef.current = verifier
+      return verifier
+    } catch (e) {
+      console.warn('[Recaptcha Setup Warning]:', e)
+      return null
+    }
+  }
+
+  const cleanMobileDigits = (m: string) => (m || '').replace(/\D/g, '').slice(-10)
+
+  // Check if owner session already exists
   useEffect(() => {
     fetch('/api/auth/session')
       .then((res) => res.json())
       .then((data) => {
         if (data?.organization?.name && !isFromAdmin) {
           setExistingOrg(data.organization)
+        }
+        if (data?.user?.role === 'owner' && data.user.phone) {
+          const digits = cleanMobileDigits(data.user.phone)
+          setOwnerMobile(digits)
+          setIsOwnerVerified(true)
+          setVerifiedOwner({
+            id: data.user.id,
+            name: data.user.full_name || 'PG Owner',
+            phone: digits,
+            email: data.user.email || '',
+            organizationId: data.organization?.id,
+            organizationName: data.organization?.name,
+            isExisting: true,
+          })
+          setForm((prev) => ({
+            ...prev,
+            phone: digits,
+            owner_name: prev.owner_name || data.user.full_name || '',
+            email: prev.email || data.user.email || '',
+            org_name: prev.org_name || data.organization?.name || '',
+          }))
         }
       })
       .catch(() => {})
@@ -51,11 +119,15 @@ function OnboardingContent() {
     const qPropName = searchParams.get('property_name') || searchParams.get('propertyName') || ''
     const qOrgName = searchParams.get('org_name') || searchParams.get('orgName') || ''
 
+    if (qMobile) {
+      setOwnerMobile(cleanMobileDigits(qMobile))
+    }
+
     if (qMobile || qName || qCity || qEmail || qPropName || qOrgName) {
       setForm((prev) => ({
         ...prev,
         owner_name: prev.owner_name || qName,
-        phone: prev.phone || qMobile,
+        phone: prev.phone || cleanMobileDigits(qMobile),
         city: prev.city || qCity,
         email: prev.email || qEmail,
         org_name: prev.org_name || qOrgName || (qName ? `${qName}'s PG Living` : ''),
@@ -63,6 +135,171 @@ function OnboardingContent() {
       }))
     }
   }, [searchParams])
+
+  // 1. Submit Mobile Number -> Check if already registered as PG Owner in DB
+  const handleCheckMobile = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    setError('')
+    const cleaned = cleanMobileDigits(ownerMobile)
+    if (cleaned.length < 10) {
+      setError('Please enter a valid 10-digit Indian mobile number.')
+      return
+    }
+
+    setOwnerCheckLoading(true)
+    try {
+      const res = await fetch('/api/auth/mobile-flow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'check-mobile',
+          mobile: cleaned,
+          role: 'owner',
+          skipOtpDispatch: true,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to check mobile number.')
+      }
+
+      setOwnerCheckResult(data)
+      setForm((prev) => ({
+        ...prev,
+        phone: cleaned,
+        owner_name: prev.owner_name || data.name || '',
+        email: prev.email || data.email || '',
+        org_name: prev.org_name || data.organizationName || (data.name ? `${data.name}'s PG Living` : ''),
+      }))
+    } catch (err: any) {
+      setError(err.message || 'Error checking mobile number.')
+    } finally {
+      setOwnerCheckLoading(false)
+    }
+  }
+
+  // 2. Dispatch Real SMS OTP via Firebase Phone Auth
+  const handleSendOtp = async () => {
+    setError('')
+    const cleaned = cleanMobileDigits(ownerMobile)
+    if (cleaned.length < 10) {
+      setError('Please enter a valid 10-digit Indian mobile number.')
+      return
+    }
+
+    setOwnerCheckLoading(true)
+    try {
+      const verifier = getOrCreateVerifier()
+      if (!verifier) {
+        throw new Error('Security verification (reCAPTCHA) initialization failed. Please refresh the page.')
+      }
+
+      const confirmation = await sendPhoneOtp(cleaned, verifier)
+      confirmationResultRef.current = confirmation
+      setOtpSent(true)
+      setCountdown(30)
+      setOtpCode('')
+    } catch (err: any) {
+      console.error('[sendPhoneOtp error]:', err)
+      if (recaptchaVerifierRef.current) {
+        try {
+          recaptchaVerifierRef.current.clear()
+        } catch {}
+        recaptchaVerifierRef.current = null
+      }
+      let msg = err.message || 'Failed to dispatch SMS OTP.'
+      if (err.code === 'auth/invalid-phone-number') {
+        msg = 'Invalid phone number format. Please enter a 10-digit Indian mobile number.'
+      } else if (err.code === 'auth/too-many-requests') {
+        msg = 'Too many OTP requests. Please wait a few moments and try again.'
+      } else if (err.code === 'auth/captcha-check-failed') {
+        msg = 'Security verification failed. Please refresh the page.'
+      }
+      setError(msg)
+    } finally {
+      setOwnerCheckLoading(false)
+    }
+  }
+
+  // 3. Verify SMS OTP via Firebase and Exchange with Backend Session
+  const handleVerifyOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    setError('')
+    const cleaned = cleanMobileDigits(ownerMobile)
+    const code = otpCode.trim()
+    if (code.length < 6) {
+      setError('Please enter the complete 6-digit OTP code.')
+      return
+    }
+
+    setOtpVerifying(true)
+    try {
+      let fbToken: string | undefined = undefined
+      if (confirmationResultRef.current) {
+        try {
+          const cred = await confirmationResultRef.current.confirm(code)
+          if (cred?.user) {
+            fbToken = await cred.user.getIdToken()
+          }
+        } catch (fbErr: any) {
+          if (fbErr.code === 'auth/invalid-verification-code') {
+            throw new Error('Invalid OTP code. Please enter the correct code received on your phone.')
+          } else if (fbErr.code === 'auth/code-expired') {
+            throw new Error('The OTP code has expired. Please click "Resend OTP" to get a new code.')
+          } else {
+            throw new Error(fbErr.message || 'OTP verification failed.')
+          }
+        }
+      }
+
+      const res = await fetch('/api/auth/mobile-flow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'verify-otp-login',
+          mobile: cleaned,
+          otp: code,
+          idToken: fbToken,
+          role: 'owner',
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to verify OTP with server.')
+      }
+
+      // Mark owner verified!
+      setIsOwnerVerified(true)
+      const verifiedInfo = {
+        id: data.userId || ownerCheckResult?.userId || null,
+        name: ownerCheckResult?.name || form.owner_name || 'PG Owner',
+        phone: cleaned,
+        email: ownerCheckResult?.email || form.email || '',
+        organizationId: ownerCheckResult?.organizationId || data.organizationId || null,
+        organizationName: ownerCheckResult?.organizationName || null,
+        isExisting: Boolean(ownerCheckResult?.exists),
+      }
+      setVerifiedOwner(verifiedInfo)
+
+      setForm((prev) => ({
+        ...prev,
+        phone: cleaned,
+        owner_name: prev.owner_name || verifiedInfo.name || '',
+        email: prev.email || verifiedInfo.email || '',
+        org_name: prev.org_name || verifiedInfo.organizationName || prev.org_name || '',
+      }))
+
+      // Advance to Step 2
+      setError('')
+      setCurrentStep(2)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } catch (err: any) {
+      setError(err.message || 'OTP verification failed. Please try again.')
+    } finally {
+      setOtpVerifying(false)
+    }
+  }
 
   // Form State
   const [form, setForm] = useState({
@@ -150,8 +387,8 @@ function OnboardingContent() {
   const projectedMonthlyRevenue = calculatedBeds * Number(estimatedRentPerBed)
 
   const steps = [
-    { id: 1, title: 'PG & Address', icon: MapPin, desc: 'Location & Campus' },
-    { id: 2, title: 'Owner & Login', icon: User, desc: 'Contact & Access' },
+    { id: 1, title: 'Owner & Mobile', icon: Phone, desc: 'Owner Verification' },
+    { id: 2, title: 'PG & Address', icon: MapPin, desc: 'Location & Campus' },
     { id: 3, title: 'Rooms & Beds', icon: Layers, desc: 'Inventory & Rent' },
     { id: 4, title: 'Electricity & Utilities', icon: Zap, desc: 'Sub-Meters & Units' },
     { id: 5, title: 'UPI & Bank Settlement', icon: CreditCard, desc: 'Direct Rent Inflow' },
@@ -162,14 +399,15 @@ function OnboardingContent() {
   const validateStep = (step: number) => {
     setError('')
     if (step === 1) {
+      if (!isOwnerVerified) return 'Please verify the Owner Mobile Number via OTP first.'
+      if (!form.owner_name.trim()) return 'Please enter the Owner / Proprietor Full Name.'
+      if (!form.phone.trim()) return 'Please enter the Owner Mobile Number.'
+    }
+    if (step === 2) {
       if (!form.org_name.trim()) return 'Please enter your PG Brand / Business Name.'
       if (!form.property_name.trim()) return 'Please enter your Property Campus Name.'
       if (!form.city.trim()) return 'Please enter the City.'
       if (!form.address_line1.trim()) return 'Please enter the Street Address.'
-    }
-    if (step === 2) {
-      if (!form.owner_name.trim()) return 'Please enter the Owner Full Name.'
-      if (!form.phone.trim()) return 'Please enter the Owner Mobile Number.'
     }
     if (step === 3) {
       if (form.num_floors < 1) return 'Floors must be at least 1.'
@@ -202,7 +440,9 @@ function OnboardingContent() {
     try {
       const payload = {
         ...form,
-        userId: searchParams.get('userId') || searchParams.get('ownerId') || undefined,
+        userId: verifiedOwner?.id || searchParams.get('userId') || searchParams.get('ownerId') || undefined,
+        owner_id: verifiedOwner?.id || undefined,
+        verified_owner_id: verifiedOwner?.id || undefined,
         staff_members: staffMembers,
       }
 
@@ -342,6 +582,40 @@ function OnboardingContent() {
           </div>
         )}
 
+        {/* Active Verified PG Owner Badge */}
+        {isOwnerVerified && verifiedOwner && (
+          <div className="mb-6 p-4 bg-emerald-950/60 border border-emerald-500/50 rounded-2xl flex items-center justify-between text-xs text-emerald-200 shadow-lg animate-in fade-in">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="font-extrabold text-white text-xs block">
+                  Verified PG Owner: {verifiedOwner.name} (+91 {verifiedOwner.phone})
+                </span>
+                <span className="text-[11px] text-emerald-300/80">
+                  {verifiedOwner.isExisting
+                    ? `Existing Owner Account · This property campus and rooms will be saved under your account.`
+                    : 'Verified PG Owner Account · All property and room details will be saved strictly under your profile.'}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setIsOwnerVerified(false)
+                setOwnerCheckResult(null)
+                setOtpSent(false)
+                setOtpCode('')
+                setCurrentStep(1)
+              }}
+              className="text-[11px] text-slate-400 hover:text-white underline shrink-0 transition"
+            >
+              Change Owner
+            </button>
+          </div>
+        )}
+
         {/* Existing Active Property Alert / Shortcut */}
         {existingOrg && (
           <div className="mb-6 p-4.5 bg-emerald-950/60 border border-emerald-600/50 rounded-2xl text-xs text-emerald-200 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl backdrop-blur-md animate-in fade-in">
@@ -377,9 +651,349 @@ function OnboardingContent() {
             <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl space-y-6">
 
               {/* ─────────────────────────────────────────────────────────────
-                  STEP 1: PG IDENTITY & COMPLETE LOCATION ADDRESS
+                  STEP 1: OWNER MOBILE VERIFICATION & PROFILE
               ───────────────────────────────────────────────────────────── */}
               {currentStep === 1 && (
+                <div className="space-y-6 animate-in fade-in">
+                  <div>
+                    <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
+                      <Phone className="w-5 h-5 text-blue-400" /> Owner Mobile Verification & Profile
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Enter the owner's mobile number. If you are an existing PG Owner, we'll connect this property directly under your account.
+                    </p>
+                  </div>
+
+                  {/* Stage 1: Mobile Input & Database Check */}
+                  {!isOwnerVerified ? (
+                    <div className="space-y-5">
+                      {/* Mobile Input Card */}
+                      <div className="p-5 sm:p-6 bg-slate-950 rounded-2xl border border-slate-800 space-y-4">
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                          Owner 10-Digit Mobile Number *
+                        </label>
+                        <div className="flex flex-col sm:flex-row gap-3">
+                          <div className="relative flex-1">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 font-mono">
+                              🇮🇳 +91
+                            </span>
+                            <input
+                              type="tel"
+                              maxLength={10}
+                              value={ownerMobile}
+                              onChange={(e) => {
+                                setOwnerMobile(e.target.value.replace(/\D/g, ''))
+                                setOwnerCheckResult(null)
+                                setOtpSent(false)
+                                setOtpCode('')
+                              }}
+                              disabled={ownerCheckLoading || otpSent}
+                              placeholder="Enter 10-digit mobile"
+                              className="w-full pl-20 pr-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-sm font-mono text-white placeholder-slate-600 focus:border-blue-500 outline-none transition disabled:opacity-60"
+                            />
+                          </div>
+                          {!ownerCheckResult && !otpSent && (
+                            <button
+                              type="button"
+                              onClick={() => handleCheckMobile()}
+                              disabled={ownerCheckLoading || cleanMobileDigits(ownerMobile).length < 10}
+                              className="py-3 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-40 text-white font-bold text-xs sm:text-sm rounded-xl transition flex items-center justify-center gap-2 shrink-0 shadow-lg shadow-blue-600/25"
+                            >
+                              {ownerCheckLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+                              <span>Check Number</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Stage 2A: Existing PG Owner Found in DB */}
+                      {ownerCheckResult && ownerCheckResult.exists && !otpSent && (
+                        <div className="p-5 sm:p-6 bg-gradient-to-br from-emerald-950/70 via-slate-900 to-slate-950 border-2 border-emerald-500/60 rounded-2xl space-y-4 shadow-xl shadow-emerald-950/40 animate-in fade-in slide-in-from-top-2">
+                          <div className="flex items-start gap-3.5">
+                            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+                              <CheckCircle2 className="w-6 h-6" />
+                            </div>
+                            <div className="space-y-1">
+                              <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-wider">
+                                Existing PG Owner Found
+                              </span>
+                              <h3 className="text-base font-extrabold text-white">
+                                Welcome back, {ownerCheckResult.name}!
+                              </h3>
+                              <p className="text-xs text-slate-300 leading-relaxed">
+                                We found an active PG Owner account registered with <strong className="text-emerald-400">+91 {ownerCheckResult.mobile}</strong>
+                                {ownerCheckResult.organizationName ? (
+                                  <> under <strong className="text-white">"{ownerCheckResult.organizationName}"</strong></>
+                                ) : null}.
+                                Would you like to continue to onboard this new property under your existing account?
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={handleSendOtp}
+                              disabled={ownerCheckLoading}
+                              className="w-full sm:w-auto py-3 px-6 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-2"
+                            >
+                              {ownerCheckLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                              <span>Continue with this Account →</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOwnerCheckResult(null)
+                                setOwnerMobile('')
+                              }}
+                              className="text-xs text-slate-400 hover:text-slate-200 underline transition py-2"
+                            >
+                              Use a different number
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Stage 2B: New PG Owner */}
+                      {ownerCheckResult && !ownerCheckResult.exists && !otpSent && (
+                        <div className="p-5 sm:p-6 bg-gradient-to-br from-blue-950/70 via-slate-900 to-slate-950 border border-blue-600/50 rounded-2xl space-y-4 shadow-xl animate-in fade-in slide-in-from-top-2">
+                          <div className="flex items-start gap-3.5">
+                            <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-blue-400 shrink-0">
+                              <User className="w-5 h-5" />
+                            </div>
+                            <div className="space-y-1">
+                              <span className="inline-block px-2.5 py-0.5 rounded-full bg-blue-500/20 border border-blue-500/40 text-[10px] font-mono font-bold text-blue-400 uppercase tracking-wider">
+                                New PG Owner Registration
+                              </span>
+                              <h3 className="text-base font-extrabold text-white">
+                                No existing account found for +91 {ownerCheckResult.mobile}
+                              </h3>
+                              <p className="text-xs text-slate-300 leading-relaxed">
+                                We will set up a new PG Owner account for you. Click below to verify this phone number via SMS OTP and begin setting up your property.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={handleSendOtp}
+                              disabled={ownerCheckLoading}
+                              className="w-full sm:w-auto py-3 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-lg shadow-blue-600/30 transition flex items-center justify-center gap-2"
+                            >
+                              {ownerCheckLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                              <span>Send OTP & Continue →</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOwnerCheckResult(null)
+                                setOwnerMobile('')
+                              }}
+                              className="text-xs text-slate-400 hover:text-slate-200 underline transition py-2"
+                            >
+                              Use a different number
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Stage 3: OTP Input Box */}
+                      {otpSent && (
+                        <div className="p-5 sm:p-6 bg-slate-950 rounded-2xl border border-indigo-500/50 space-y-4 animate-in fade-in slide-in-from-top-2">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider block">
+                                Verify Phone Number via OTP
+                              </span>
+                              <p className="text-xs text-slate-300 mt-0.5">
+                                Enter the 6-digit OTP code sent via SMS to <strong className="text-white">+91 {ownerMobile}</strong>
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOtpSent(false)
+                                setOtpCode('')
+                              }}
+                              className="text-[11px] text-slate-400 hover:text-white underline"
+                            >
+                              Change Number
+                            </button>
+                          </div>
+
+                          <div className="flex flex-col sm:flex-row gap-3">
+                            <input
+                              type="text"
+                              maxLength={6}
+                              value={otpCode}
+                              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                              placeholder="6-digit OTP"
+                              className="w-full sm:w-48 px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-center text-lg font-mono tracking-widest text-white placeholder-slate-600 focus:border-indigo-500 outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleVerifyOtp}
+                              disabled={otpVerifying || otpCode.trim().length < 6}
+                              className="py-3 px-6 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 text-white font-extrabold text-xs sm:text-sm rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30"
+                            >
+                              {otpVerifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                              <span>Verify OTP & Continue →</span>
+                            </button>
+                          </div>
+
+                          <div className="flex items-center gap-3 pt-1 text-xs">
+                            {countdown > 0 ? (
+                              <span className="text-slate-500">Resend code in {countdown}s</span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={handleSendOtp}
+                                disabled={ownerCheckLoading}
+                                className="text-blue-400 hover:text-blue-300 font-bold underline"
+                              >
+                                Resend OTP Code
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* Stage 4: Verified Owner Profile Information */
+                    <div className="space-y-5 animate-in fade-in">
+                      {/* Verified Badge Header */}
+                      <div className="p-4 bg-emerald-950/60 border border-emerald-500/50 rounded-2xl flex items-center justify-between text-xs text-emerald-200">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+                            <ShieldCheck className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <span className="font-extrabold text-white text-xs block">
+                              Phone Number Verified: +91 {form.phone}
+                            </span>
+                            <span className="text-[11px] text-emerald-300/80">
+                              {verifiedOwner?.isExisting
+                                ? `Existing Owner Account: "${verifiedOwner.name}" · All property details will save under your profile.`
+                                : 'New PG Owner Account · Ready to configure your campus and rooms.'}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsOwnerVerified(false)
+                            setOwnerCheckResult(null)
+                            setOtpSent(false)
+                            setOtpCode('')
+                          }}
+                          className="text-[11px] text-slate-400 hover:text-white underline shrink-0 transition"
+                        >
+                          Change Number
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                            Owner / Proprietor Full Name *
+                          </label>
+                          <input
+                            required
+                            value={form.owner_name}
+                            onChange={(e) => setForm({ ...form, owner_name: e.target.value })}
+                            placeholder="e.g. Vikram Tomar"
+                            className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-xs sm:text-sm text-white placeholder-slate-600 focus:border-indigo-500 outline-none transition font-medium"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                            Owner WhatsApp Mobile Number (Verified)
+                          </label>
+                          <div className="relative">
+                            <input
+                              readOnly
+                              type="tel"
+                              value={`+91 ${form.phone}`}
+                              className="w-full px-4 py-3 bg-slate-950/80 border border-emerald-500/30 rounded-xl text-xs sm:text-sm text-emerald-300 font-mono outline-none cursor-not-allowed"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-full border border-emerald-500/40">
+                              Verified
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                            Owner Primary Email (Dashboard Login)
+                          </label>
+                          <input
+                            type="email"
+                            value={form.email}
+                            onChange={(e) => setForm({ ...form, email: e.target.value })}
+                            placeholder="owner@example.com (optional)"
+                            className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-xs sm:text-sm text-white placeholder-slate-600 focus:border-indigo-500 outline-none transition font-medium"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                            Emergency / Alternate Phone
+                          </label>
+                          <input
+                            type="tel"
+                            value={form.emergency_phone}
+                            onChange={(e) => setForm({ ...form, emergency_phone: e.target.value })}
+                            placeholder="Manager / Security number"
+                            className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-xs sm:text-sm text-white placeholder-slate-600 focus:border-indigo-500 outline-none transition font-medium"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-xs font-bold text-slate-200">GST Registration & Tax Invoicing</span>
+                            <p className="text-[11px] text-slate-500">Enable if your PG business is GST registered</p>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={form.gst_enabled}
+                            onChange={(e) => setForm({ ...form, gst_enabled: e.target.checked })}
+                            className="w-5 h-5 rounded-md text-blue-600 bg-slate-900 border-slate-700"
+                          />
+                        </div>
+
+                        {form.gst_enabled && (
+                          <div className="pt-2">
+                            <label className="block text-xs font-bold text-slate-400 mb-1">
+                              15-Digit GSTIN Number *
+                            </label>
+                            <input
+                              value={form.gstin}
+                              onChange={(e) => setForm({ ...form, gstin: e.target.value.toUpperCase() })}
+                              placeholder="e.g. 27AAAAA0000A1Z5"
+                              maxLength={15}
+                              className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs font-mono text-white focus:border-blue-500 outline-none uppercase"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Invisible reCAPTCHA container for Firebase Phone Auth */}
+                  <div id="recaptcha-container" />
+                </div>
+              )}
+
+              {/* ─────────────────────────────────────────────────────────────
+                  STEP 2: PG IDENTITY & COMPLETE LOCATION ADDRESS
+              ───────────────────────────────────────────────────────────── */}
+              {currentStep === 2 && (
                 <div className="space-y-5 animate-in fade-in">
                   <div>
                     <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
@@ -533,109 +1147,6 @@ function OnboardingContent() {
                         className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-600 focus:border-blue-500 outline-none transition font-medium"
                       />
                     </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ─────────────────────────────────────────────────────────────
-                  STEP 2: OWNER & DASHBOARD LOGIN DETAILS
-              ───────────────────────────────────────────────────────────── */}
-              {currentStep === 2 && (
-                <div className="space-y-5 animate-in fade-in">
-                  <div>
-                    <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
-                      <User className="w-5 h-5 text-indigo-400" /> Owner Contact & Dashboard Access
-                    </h2>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Enter the primary proprietor/director details. This email and phone will receive executive reports and owner access.
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-                        Owner / Proprietor Full Name *
-                      </label>
-                      <input
-                        required
-                        value={form.owner_name}
-                        onChange={(e) => setForm({ ...form, owner_name: e.target.value })}
-                        placeholder="e.g. Vikram Tomar"
-                        className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-xs sm:text-sm text-white placeholder-slate-600 focus:border-indigo-500 outline-none transition font-medium"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-                        Owner WhatsApp Mobile Number *
-                      </label>
-                      <input
-                        required
-                        type="tel"
-                        value={form.phone}
-                        onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                        placeholder="10-digit mobile number"
-                        className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-xs sm:text-sm text-white placeholder-slate-600 focus:border-indigo-500 outline-none transition font-medium"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-                        Owner Primary Email (Dashboard Login)
-                      </label>
-                      <input
-                        type="email"
-                        value={form.email}
-                        onChange={(e) => setForm({ ...form, email: e.target.value })}
-                        placeholder="owner@example.com"
-                        className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-xs sm:text-sm text-white placeholder-slate-600 focus:border-indigo-500 outline-none transition font-medium"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-                        Emergency / Alternate Phone
-                      </label>
-                      <input
-                        type="tel"
-                        value={form.emergency_phone}
-                        onChange={(e) => setForm({ ...form, emergency_phone: e.target.value })}
-                        placeholder="Manager / Security number"
-                        className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-xs sm:text-sm text-white placeholder-slate-600 focus:border-indigo-500 outline-none transition font-medium"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-xs font-bold text-slate-200">GST Registration & Tax Invoicing</span>
-                        <p className="text-[11px] text-slate-500">Enable if your PG business is GST registered</p>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={form.gst_enabled}
-                        onChange={(e) => setForm({ ...form, gst_enabled: e.target.checked })}
-                        className="w-5 h-5 rounded-md text-blue-600 bg-slate-900 border-slate-700"
-                      />
-                    </div>
-
-                    {form.gst_enabled && (
-                      <div className="pt-2">
-                        <label className="block text-xs font-bold text-slate-400 mb-1">
-                          15-Digit GSTIN Number *
-                        </label>
-                        <input
-                          value={form.gstin}
-                          onChange={(e) => setForm({ ...form, gstin: e.target.value.toUpperCase() })}
-                          placeholder="e.g. 27AAAAA0000A1Z5"
-                          maxLength={15}
-                          className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs font-mono text-white focus:border-blue-500 outline-none uppercase"
-                        />
-                      </div>
-                    )}
                   </div>
                 </div>
               )}
@@ -1160,10 +1671,27 @@ function OnboardingContent() {
                       </div>
                     </div>
 
+                    {/* Verified Owner Target Card */}
+                    <div className="p-3.5 bg-slate-900/90 rounded-xl border border-slate-800 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+                          <CheckCircle2 className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block">Property Linked To Owner</span>
+                          <span className="font-extrabold text-white text-xs">{form.owner_name} (+91 {form.phone})</span>
+                          {form.email ? <span className="text-[10px] text-slate-400 block font-mono">{form.email}</span> : null}
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/30">
+                        {verifiedOwner?.isExisting ? 'Existing DB Owner' : 'Verified Owner'}
+                      </span>
+                    </div>
+
                     <div className="p-3 bg-blue-950/30 border border-blue-800/40 rounded-xl flex items-center gap-3">
                       <ShieldCheck className="w-5 h-5 text-blue-400 shrink-0" />
                       <div className="text-[11px] text-blue-200">
-                        <strong>Ready for live distribution.</strong> All tenant receipts, WhatsApp reminders, and ledger entries will be activated immediately.
+                        <strong>Ready for live distribution.</strong> All tenant receipts, WhatsApp reminders, and ledger entries will be activated immediately under this verified owner.
                       </div>
                     </div>
                   </div>
@@ -1187,9 +1715,14 @@ function OnboardingContent() {
                   <button
                     type="button"
                     onClick={nextStep}
-                    className="py-3 px-6 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-lg shadow-blue-600/25 transition flex items-center gap-2"
+                    disabled={currentStep === 1 && !isOwnerVerified}
+                    className={`py-3 px-6 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-lg transition flex items-center gap-2 ${
+                      currentStep === 1 && !isOwnerVerified
+                        ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                        : 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 shadow-blue-600/25'
+                    }`}
                   >
-                    Continue to Step {currentStep + 1} <ArrowRight className="w-4 h-4" />
+                    {currentStep === 1 && !isOwnerVerified ? 'Verify Mobile First to Continue' : `Continue to Step ${currentStep + 1}`} <ArrowRight className="w-4 h-4" />
                   </button>
                 ) : (
                   <button
