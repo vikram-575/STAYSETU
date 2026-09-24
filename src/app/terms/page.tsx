@@ -26,7 +26,7 @@ export default function TermsOfServicePage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
-      <MarketplaceNavbar onOpenListModal={() => {}} />
+      <MarketplaceNavbar />
       
       <main className="flex-1 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="bg-white shadow rounded-2xl overflow-hidden">

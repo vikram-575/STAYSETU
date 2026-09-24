@@ -1756,6 +1756,20 @@ export default function ResidentPortalPage() {
           </div>
         </div>
       )}
+
+      {/* Portal Footer Legal Links */}
+      <footer className="mt-12 py-6 border-t border-gray-200 text-center text-xs text-gray-500">
+        <p className="mb-2 font-medium">PG-SETU Digital Resident Passbook · PropTech Platform</p>
+        <div className="flex flex-wrap items-center justify-center gap-4 text-xs font-semibold text-gray-600">
+          <Link href="/terms" target="_blank" className="hover:text-[#14532D] hover:underline cursor-pointer">Terms &amp; Conditions</Link>
+          <span>·</span>
+          <Link href="/privacy-policy" target="_blank" className="hover:text-[#14532D] hover:underline cursor-pointer">Privacy Policy</Link>
+          <span>·</span>
+          <Link href="/safety" target="_blank" className="hover:text-[#14532D] hover:underline cursor-pointer">Safety Guidelines</Link>
+          <span>·</span>
+          <Link href="/refund-policy" target="_blank" className="hover:text-[#14532D] hover:underline cursor-pointer">Refund Policy</Link>
+        </div>
+      </footer>
     </div>
   )
 }

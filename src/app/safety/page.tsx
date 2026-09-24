@@ -6,7 +6,7 @@ import { Shield, CheckCircle, AlertTriangle, XCircle, Info, Lock, Phone, UserChe
 export default function SafetyPage() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
-      <MarketplaceNavbar onOpenListModal={() => {}} />
+      <MarketplaceNavbar />
       
       <main className="flex-1 pb-16">
         {/* Hero Section */}

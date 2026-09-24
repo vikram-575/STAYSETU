@@ -39,7 +39,7 @@ export default function InstantPgFloatingWidget() {
   const [notes, setNotes] = useState('')
   const [formError, setFormError] = useState('')
 
-  // Hide widget inside dashboard, admin consoles, and property/portal detail pages to prevent UI overlap
+  // Hide widget inside dashboard, admin consoles, property/portal detail pages, and ALL legal policy pages
   if (
     pathname?.startsWith('/dashboard') ||
     pathname?.startsWith('/admin') ||
@@ -50,10 +50,19 @@ export default function InstantPgFloatingWidget() {
     pathname?.startsWith('/set-password') ||
     pathname?.startsWith('/property') ||
     pathname?.startsWith('/portal') ||
-    pathname?.startsWith('/my-profile')
+    pathname?.startsWith('/my-profile') ||
+    pathname?.startsWith('/terms') ||
+    pathname?.startsWith('/privacy') ||
+    pathname?.startsWith('/safety') ||
+    pathname?.startsWith('/refund') ||
+    pathname?.startsWith('/cookies') ||
+    pathname?.startsWith('/erp-terms') ||
+    pathname?.startsWith('/sitemap')
   ) {
     return null
   }
+
+  const [isMinimized, setIsMinimized] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -125,40 +134,70 @@ export default function InstantPgFloatingWidget() {
 
   return (
     <>
-      {/* FLOATING ACTION BUTTON (TRIGGER) - Aligned with main max-w-7xl content column (Issue 9 Fix) */}
-      <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-6 inset-x-0 pointer-events-none z-30 select-none">
-        <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 flex justify-end">
-          <div className="pointer-events-auto">
-            {/* Mobile Compact Circular FAB (44px) */}
+      {/* FLOATING ACTION BUTTON (TRIGGER) - Non-disturbing dock with highlight */}
+      <aside aria-label="Instant PG Assistant" className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-6 right-3 sm:right-6 z-30 select-none">
+        {isMinimized ? (
+          /* Minimized Compact Icon Badge: Zero disturbance, but subtly highlighted */
+          <button
+            onClick={() => setIsMinimized(false)}
+            className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-[#14532D] to-[#16A34A] text-white rounded-full shadow-xl ring-2 ring-emerald-400/40 hover:scale-105 active:scale-95 transition-all cursor-pointer group"
+            title="Expand Instant PG Finder"
+          >
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+            </span>
+            <Zap className="w-3.5 h-3.5 fill-amber-300 text-amber-300" />
+            <span className="text-[11px] font-bold">Instant PG</span>
+          </button>
+        ) : (
+          /* Full Highlighted Pill: Attractive, vibrant, with close button so it never disturbs */
+          <div className="flex items-center gap-1.5 p-1 bg-gradient-to-r from-[#14532D] via-[#166534] to-[#15803D] rounded-full shadow-2xl shadow-emerald-950/40 ring-2 ring-emerald-400/40 border border-white/20 backdrop-blur-md transition-all duration-200">
+            {/* Main Trigger Button */}
             <button
               onClick={() => setIsOpen(true)}
-              className="flex sm:hidden relative items-center justify-center w-11 h-11 bg-[#14532D] text-white rounded-full shadow-lg shadow-emerald-950/30 active:scale-95 transition-all duration-200 border border-white/30 cursor-pointer"
-              title="Instant Verified PG Support"
+              className="flex items-center gap-2 pl-2 pr-3 py-1.5 text-white active:scale-98 transition-transform cursor-pointer"
+              title="Book Instant Verified PG in 2 Minutes"
               aria-label="Get Instant PG"
             >
-              <div className="w-6 h-6 rounded-full bg-amber-400 text-emerald-950 flex items-center justify-center shadow-xs">
-                <Zap className="w-3.5 h-3.5 fill-emerald-950" />
+              {/* Highlight Glowing Pulse Beacon */}
+              <div className="relative flex items-center justify-center w-7 h-7 rounded-full bg-gradient-to-br from-amber-400 to-amber-500 text-emerald-950 shadow-md shrink-0">
+                <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-200 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-400"></span>
+                </span>
+                <Zap className="w-4 h-4 fill-emerald-950" />
+              </div>
+
+              {/* Text Highlights */}
+              <div className="text-left flex flex-col sm:flex-row sm:items-center sm:gap-2">
+                <span className="font-extrabold text-xs tracking-tight text-white flex items-center gap-1">
+                  Instant PG
+                  <span className="hidden sm:inline-block px-1.5 py-0.2 rounded-full text-[10px] font-black bg-amber-400 text-emerald-950 uppercase tracking-wider">
+                    FAST
+                  </span>
+                </span>
+                <span className="hidden md:inline-block text-[10px] text-emerald-200 font-medium">
+                  Direct Allotment
+                </span>
               </div>
             </button>
 
-            {/* Desktop / Tablet Sleek Pill Button */}
+            {/* Quick Minimize Toggle: Let user hide it out of the way anytime */}
             <button
-              onClick={() => setIsOpen(true)}
-              className="hidden sm:flex group items-center gap-2.5 px-4 py-2.5 bg-[#14532D] hover:bg-[#166534] text-white font-semibold text-xs rounded-full shadow-lg shadow-emerald-950/20 hover:shadow-emerald-900/30 active:scale-95 transition-all cursor-pointer border border-emerald-400/25 backdrop-blur-sm"
-              title="Book Instant Verified PG"
-              aria-label="Get Instant Verified PG"
+              onClick={(e) => {
+                e.stopPropagation()
+                setIsMinimized(true)
+              }}
+              className="w-6 h-6 rounded-full text-emerald-200 hover:text-white hover:bg-white/20 flex items-center justify-center transition cursor-pointer"
+              title="Minimize widget"
+              aria-label="Minimize"
             >
-              <div className="w-6 h-6 rounded-full bg-emerald-700 flex items-center justify-center text-amber-300 shrink-0">
-                <Zap className="w-3.5 h-3.5 fill-amber-300" />
-              </div>
-              <span className="font-bold tracking-tight">Instant PG</span>
-              <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/25 text-emerald-100 border border-emerald-400/20">
-                Direct Allotment
-              </span>
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
-        </div>
-      </div>
+        )}
+      </aside>
 
       {/* POPUP MODAL DRAWER */}
       {isOpen && (

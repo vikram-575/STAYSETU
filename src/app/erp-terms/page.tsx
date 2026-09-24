@@ -10,7 +10,7 @@ export const metadata = {
 export default function ERPTermsPage() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
-      <MarketplaceNavbar onOpenListModal={() => {}} />
+      <MarketplaceNavbar />
       
       <main className="flex-grow py-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto">

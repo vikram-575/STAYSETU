@@ -76,7 +76,7 @@ export default function SitemapPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-between">
-      <MarketplaceNavbar onOpenListModal={() => {}} />
+      <MarketplaceNavbar />
 
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 w-full">
         {/* Header Banner */}

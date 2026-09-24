@@ -32,7 +32,7 @@ export default function PrivacyPolicyPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
-      <MarketplaceNavbar onOpenListModal={() => {}} />
+      <MarketplaceNavbar />
 
       {/* Hero Section */}
       <div className="bg-green-900 text-white py-16 px-4">

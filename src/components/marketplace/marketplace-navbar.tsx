@@ -22,7 +22,7 @@ import {
 import { useWebsiteContent } from '@/context/website-content-context'
 
 interface MarketplaceNavbarProps {
-  onOpenListModal: () => void
+  onOpenListModal?: () => void
   savedCount?: number
   compareCount?: number
   onOpenCompare?: () => void
@@ -37,7 +37,7 @@ export function MarketplaceNavbar({
   onOpenCompare,
   onScrollToSection,
   onShowSaved,
-}: MarketplaceNavbarProps) {
+}: MarketplaceNavbarProps = {}) {
   const router = useRouter()
   const { content } = useWebsiteContent()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -49,7 +49,11 @@ export function MarketplaceNavbar({
       router.push('/login?role=owner')
       return
     }
-    onOpenListModal()
+    if (onOpenListModal) {
+      onOpenListModal()
+    } else {
+      router.push('/register')
+    }
   }
 
   const announcement = content?.announcement
@@ -433,6 +437,21 @@ export function MarketplaceNavbar({
                 </button>
               </div>
             )}
+
+            {/* Mobile Menu Legal Links */}
+            <div className="pt-2 border-t border-gray-100 flex items-center justify-center gap-4 text-[11px] text-gray-500 font-medium">
+              <Link href="/privacy-policy" onClick={() => setMobileMenuOpen(false)} className="hover:text-[#14532D] hover:underline">
+                Privacy Policy
+              </Link>
+              <span>·</span>
+              <Link href="/terms" onClick={() => setMobileMenuOpen(false)} className="hover:text-[#14532D] hover:underline">
+                Terms of Service
+              </Link>
+              <span>·</span>
+              <Link href="/safety" onClick={() => setMobileMenuOpen(false)} className="hover:text-[#14532D] hover:underline">
+                Safety
+              </Link>
+            </div>
           </div>
         </div>
       )}

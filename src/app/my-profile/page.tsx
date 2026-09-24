@@ -3669,6 +3669,20 @@ function MyProfileContent() {
         </div>
       )}
 
+      {/* Legal & Policy Links Footer */}
+      <div className="mt-12 pt-6 border-t border-gray-200 text-center text-xs text-gray-500 pb-16">
+        <div className="flex flex-wrap items-center justify-center gap-4 text-xs font-semibold text-gray-600">
+          <Link href="/terms" target="_blank" className="hover:text-[#14532D] hover:underline cursor-pointer">Terms &amp; Conditions</Link>
+          <span>·</span>
+          <Link href="/privacy-policy" target="_blank" className="hover:text-[#14532D] hover:underline cursor-pointer">Privacy Policy</Link>
+          <span>·</span>
+          <Link href="/safety" target="_blank" className="hover:text-[#14532D] hover:underline cursor-pointer">Safety Guidelines</Link>
+          <span>·</span>
+          <Link href="/refund-policy" target="_blank" className="hover:text-[#14532D] hover:underline cursor-pointer">Refund Policy</Link>
+        </div>
+        <p className="mt-2 text-[11px] text-gray-400">© 2026 PGSetu PropTech Technologies Pvt. Ltd.</p>
+      </div>
+
       {/* Share Toast */}
       {sharedToast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-2xl bg-gray-900 text-white px-4 py-2.5 text-xs font-bold shadow-xl flex items-center gap-2">
