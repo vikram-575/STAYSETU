@@ -85,7 +85,7 @@ export async function applyVerifiedKYCToResident(params: ApplyKYCParams) {
       : `[Sandbox Aadhaar Verified: ${verificationId}]`,
   }
 
-  if (extractedData?.name && !resident.full_name) {
+  if (extractedData?.name) {
     residentUpdatePayload.full_name = extractedData.name
   }
 
@@ -213,13 +213,17 @@ export async function applyVerifiedKYCToResident(params: ApplyKYCParams) {
         .eq('id', existingPhotoDoc.id)
     }
 
-    // 6. Update users table avatar_url
+    // 6. Update users table avatar_url and name
     try {
       if (resident.phone) {
         const cleanPhone = resident.phone.replace(/\D/g, '').slice(-10)
+        const userUpdatePayload: Record<string, any> = { avatar_url: effectivePhoto, updated_at: now }
+        if (extractedData?.name) {
+          userUpdatePayload.full_name = extractedData.name
+        }
         await supabase
           .from('users')
-          .update({ avatar_url: effectivePhoto, updated_at: now })
+          .update(userUpdatePayload)
           .or(`phone.ilike.%${cleanPhone}%,resident_id.eq.${residentId}`)
       }
     } catch (userErr: any) {

@@ -9,6 +9,7 @@ export interface AuthSessionUser {
   role: 'superadmin' | 'owner' | 'manager' | 'accountant' | 'staff' | 'resident'
   organization_id: string | null
   phone?: string | null
+  avatar_url?: string | null
   resident_id?: string | null
   registration_number?: string | null
   organizations?: {

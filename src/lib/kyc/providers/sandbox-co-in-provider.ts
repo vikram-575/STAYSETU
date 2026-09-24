@@ -20,6 +20,7 @@ import { normalizeDobToIso } from '../formatters'
 
 
 export const DEFAULT_SANDBOX_API_KEY = 'key_live_5f51ed66f94447f6aa4de1e62cb0d9e7'
+export const DEFAULT_SANDBOX_API_SECRET = 'secret_live_20d78f2008b34ee092f108718146ee31'
 const SANDBOX_BASE_URL = 'https://api.sandbox.co.in'
 
 interface ProviderConfig {
@@ -57,7 +58,7 @@ export class SandboxCoInProvider implements AadhaarProvider {
 
   constructor(config?: ProviderConfig) {
     this.apiKey = config?.apiKey || process.env.SANDBOX_API_KEY || DEFAULT_SANDBOX_API_KEY
-    this.apiSecret = config?.apiSecret || process.env.SANDBOX_API_SECRET || ''
+    this.apiSecret = config?.apiSecret || process.env.SANDBOX_API_SECRET || DEFAULT_SANDBOX_API_SECRET
     this.name = 'Sandbox Live Aadhaar e-KYC'
     this.isDemoMode = false
   }
@@ -119,37 +120,51 @@ export class SandboxCoInProvider implements AadhaarProvider {
     const maskedAadhaar = maskAadhaar(aadhaar_number)
     const verificationId = generateVerificationId()
     const sessionId = `sbx-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
-    const demoOtp = '123456'
 
-    let liveReferenceId: string | number | null = null
     const token = await this.getAccessToken()
+    if (!token) {
+      throw new Error('Failed to authenticate with Sandbox.co.in API. Please verify live credentials.')
+    }
 
-    // 2. Attempt live Sandbox.co.in OKYC OTP if token available
-    if (token) {
-      try {
-        const liveRes = await fetch(`${SANDBOX_BASE_URL}/kyc/aadhaar/okyc/otp`, {
-          method: 'POST',
-          headers: {
-            Authorization: token,
-            'x-api-key': this.apiKey,
-            'x-api-version': '2.0',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            '@entity': 'in.co.sandbox.kyc.aadhaar.okyc.otp.request',
-            aadhaar_number: aadhaar_number.replace(/\D/g, ''),
-            consent: 'Y',
-            reason: 'For Resident Onboarding at PG-SETU',
-          }),
-        })
+    const cleanAadhaar = aadhaar_number.replace(/\D/g, '')
 
-        if (liveRes.ok) {
-          const liveData = await liveRes.json()
-          liveReferenceId = liveData.data?.reference_id || liveData.reference_id
-        }
-      } catch (liveErr) {
-        console.warn('[Sandbox Live OTP Failed, falling back to Sandbox Engine]:', liveErr)
-      }
+    // 2. Call live Sandbox.co.in OKYC OTP endpoint
+    const liveRes = await fetch(`${SANDBOX_BASE_URL}/kyc/aadhaar/okyc/otp`, {
+      method: 'POST',
+      headers: {
+        Authorization: token,
+        'x-api-key': this.apiKey,
+        'x-api-version': '2.0',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        '@entity': 'in.co.sandbox.kyc.aadhaar.okyc.otp.request',
+        aadhaar_number: cleanAadhaar,
+        consent: 'Y',
+        reason: 'Resident Onboarding at PG-SETU',
+      }),
+    })
+
+    const liveData = await liveRes.json().catch(() => ({}))
+    const rawMsg = (liveData.data?.message || liveData.message || '').trim()
+
+    if (!liveRes.ok || (liveData.code && liveData.code !== 200)) {
+      const errMsg = rawMsg || liveData.error || `Sandbox API error (HTTP ${liveRes.status})`
+      throw new Error(errMsg)
+    }
+
+    // Check if Sandbox returned an error message like "Invalid Aadhaar Card"
+    const isFailedMsg =
+      /invalid|not found|not registered|does not exist|failed|error/i.test(rawMsg) ||
+      (!rawMsg.toLowerCase().includes('otp') && !rawMsg.toLowerCase().includes('success'))
+
+    if (isFailedMsg && !rawMsg.toLowerCase().includes('otp sent')) {
+      throw new Error(rawMsg || 'Sandbox rejected Aadhaar number. Please verify the 12-digit Aadhaar card.')
+    }
+
+    const liveReferenceId = liveData.data?.reference_id || liveData.reference_id
+    if (!liveReferenceId) {
+      throw new Error(rawMsg || 'Sandbox did not return a valid OTP reference ID.')
     }
 
     // 3. Register Session
@@ -159,14 +174,14 @@ export class SandboxCoInProvider implements AadhaarProvider {
       organization_id,
       tenant_id,
       masked_aadhaar: maskedAadhaar,
+      clean_aadhaar: cleanAadhaar,
       tenant_details: {
         full_name: tenant_name,
         phone: tenant_phone,
         date_of_birth: tenant_dob,
         gender: tenant_gender,
       },
-      live_reference_id: liveReferenceId,
-      otp: demoOtp,
+      live_reference_id: String(liveReferenceId),
       attempts: 0,
       status: 'otp_sent',
       provider: this.name,
@@ -184,7 +199,7 @@ export class SandboxCoInProvider implements AadhaarProvider {
       kyc_id: verificationId,
       event: 'KYC_STARTED',
       actor: tenant_name ? `PG Owner (for ${tenant_name})` : 'PG Owner',
-      metadata: { masked_aadhaar: maskedAadhaar, provider: this.name, live_connected: !!liveReferenceId },
+      metadata: { masked_aadhaar: maskedAadhaar, provider: this.name, live_reference_id: String(liveReferenceId) },
     })
 
     await logKYCEvent({
@@ -202,7 +217,7 @@ export class SandboxCoInProvider implements AadhaarProvider {
       verification_id: verificationId,
       masked_aadhaar: maskedAadhaar,
       status: 'otp_sent',
-      message: 'OTP has been dispatched via Sandbox Aadhaar Verification Service.',
+      message: 'Real OTP has been dispatched to your Aadhaar-linked mobile number via Sandbox UIDAI service.',
       expires_in_seconds: 600,
       is_demo_mode: false,
       demo_otp: undefined,
@@ -216,13 +231,46 @@ export class SandboxCoInProvider implements AadhaarProvider {
     const session = globalKYCSessions.get(sessionId)
     if (!session) throw new Error('Verification session expired or invalid.')
 
-    session.attempts = 0
-    session.otp = '123456'
-    globalKYCSessions.set(sessionId, session)
+    const token = await this.getAccessToken()
+    if (!token) throw new Error('Failed to authenticate with Sandbox service.')
+
+    if (!session.clean_aadhaar) {
+      throw new Error('Aadhaar number not found in session. Please restart verification.')
+    }
+
+    const liveRes = await fetch(`${SANDBOX_BASE_URL}/kyc/aadhaar/okyc/otp`, {
+      method: 'POST',
+      headers: {
+        Authorization: token,
+        'x-api-key': this.apiKey,
+        'x-api-version': '2.0',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        '@entity': 'in.co.sandbox.kyc.aadhaar.okyc.otp.request',
+        aadhaar_number: session.clean_aadhaar,
+        consent: 'Y',
+        reason: 'Resident Onboarding at PG-SETU',
+      }),
+    })
+
+    const liveData = await liveRes.json().catch(() => ({}))
+    const rawMsg = (liveData.data?.message || liveData.message || '').trim()
+
+    if (!liveRes.ok || (liveData.code && liveData.code !== 200)) {
+      throw new Error(rawMsg || 'Failed to resend OTP via Sandbox.')
+    }
+
+    const liveReferenceId = liveData.data?.reference_id || liveData.reference_id
+    if (liveReferenceId) {
+      session.live_reference_id = String(liveReferenceId)
+      session.attempts = 0
+      globalKYCSessions.set(sessionId, session)
+    }
 
     return {
       success: true,
-      message: 'New OTP dispatched successfully via Sandbox.',
+      message: rawMsg || 'New OTP dispatched to resident\'s Aadhaar-linked mobile via Sandbox.',
       demo_otp: undefined,
     }
   }
@@ -265,120 +313,137 @@ export class SandboxCoInProvider implements AadhaarProvider {
       }
     }
 
-    let extractedData: AadhaarExtractedData | null = null
-
-    // 1. If live reference_id is active, call Sandbox live verify
-    const token = await this.getAccessToken()
-    if (token && session.live_reference_id) {
-      try {
-        const liveVerifyRes = await fetch(`${SANDBOX_BASE_URL}/kyc/aadhaar/okyc/otp/verify`, {
-          method: 'POST',
-          headers: {
-            Authorization: token,
-            'x-api-key': this.apiKey,
-            'x-api-version': '2.0',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            '@entity': 'in.co.sandbox.kyc.aadhaar.okyc.request',
-            reference_id: session.live_reference_id,
-            otp: String(otp).trim(),
-          }),
-        })
-
-        if (liveVerifyRes.ok) {
-          const liveData = await liveVerifyRes.json()
-          const payload = liveData.data || liveData
-          const rawPhoto = payload.photo_link || payload.photo || payload.photo_base64 || payload.image
-          const photoBase64 = rawPhoto
-            ? (rawPhoto.startsWith('data:') || rawPhoto.startsWith('http') ? rawPhoto : `data:image/jpeg;base64,${rawPhoto}`)
-            : generateVerifiedAadhaarPhoto(payload.full_name || payload.name || session.tenant_details?.full_name || 'Resident')
-
-          extractedData = {
-            masked_aadhaar: session.masked_aadhaar,
-            name: payload.full_name || payload.name,
-            date_of_birth: normalizeDobToIso(payload.date_of_birth || payload.dob) || '1998-05-14',
-            gender: (payload.gender?.toUpperCase() as any) === 'F' ? 'F' : 'M',
-            care_of: payload.care_of,
-            photo_base64: photoBase64,
-            address: {
-              house: payload.address?.house || '',
-              street: payload.address?.street || '',
-              landmark: payload.address?.landmark || '',
-              locality: payload.address?.loc || payload.address?.locality || '',
-              district: payload.address?.dist || payload.address?.district || '',
-              state: payload.address?.state || '',
-              pincode: payload.address?.pincode || '',
-              full_address: [
-                payload.address?.house,
-                payload.address?.street,
-                payload.address?.loc,
-                payload.address?.dist,
-                payload.address?.state,
-                payload.address?.pincode,
-              ].filter(Boolean).join(', ') || payload.address?.full_address || '',
-            },
-            signature_verified: true,
-            qr_verified: true,
-            generated_at: new Date().toISOString(),
-          }
-        }
-      } catch (liveVerifyErr) {
-        console.warn('[Live verify failed, fallback to Sandbox Engine]:', liveVerifyErr)
+    if (!session.live_reference_id) {
+      return {
+        success: false,
+        verification_id: session.verification_id,
+        status: 'unable_to_verify',
+        checks: [],
+        message: 'No live verification reference ID found for this session.',
       }
     }
 
-    // 2. Sandbox Verification Engine fallback / standard mode
-    if (!extractedData) {
-      const cleanOtp = (otp || '').trim()
-      const isCorrectOtp = cleanOtp === session.otp || cleanOtp.length === 6
+    const token = await this.getAccessToken()
+    if (!token) {
+      return {
+        success: false,
+        verification_id: session.verification_id,
+        status: 'unable_to_verify',
+        checks: [],
+        message: 'Failed to authenticate with Sandbox service.',
+      }
+    }
 
-      if (!isCorrectOtp) {
-        await logKYCEvent({
-          organization_id: session.organization_id,
-          tenant_id: session.tenant_id,
-          kyc_id: session.verification_id,
-          event: 'AUTHENTICATION_FAILED',
-          actor: 'Sandbox Verification Service',
-          metadata: { reason: 'Incorrect OTP entered' },
-        })
+    let liveData: any = null
+    try {
+      const liveVerifyRes = await fetch(`${SANDBOX_BASE_URL}/kyc/aadhaar/okyc/otp/verify`, {
+        method: 'POST',
+        headers: {
+          Authorization: token,
+          'x-api-key': this.apiKey,
+          'x-api-version': '2.0',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          '@entity': 'in.co.sandbox.kyc.aadhaar.okyc.request',
+          reference_id: String(session.live_reference_id),
+          otp: String(otp).trim(),
+        }),
+      })
 
+      liveData = await liveVerifyRes.json().catch(() => ({}))
+
+      if (!liveVerifyRes.ok || (liveData.code && liveData.code !== 200)) {
+        const errMsg = liveData.message || liveData.data?.message || `Sandbox verification failed (HTTP ${liveVerifyRes.status})`
         return {
           success: false,
           verification_id: session.verification_id,
           status: 'not_verified',
           checks: [],
-          message: 'Incorrect OTP entered. Please enter the valid 6-digit code.',
+          message: errMsg,
         }
       }
-
-      // Generate verified UIDAI demographic & address profile matching the tenant
-      const verifiedName = session.tenant_details?.full_name?.toUpperCase() || 'RAHUL SHARMA'
-      const verifiedDob = normalizeDobToIso(session.tenant_details?.date_of_birth) || '1998-05-14'
-      const verifiedGender = (session.tenant_details?.gender?.toUpperCase() as any) === 'F' ? 'F' : 'M'
-      const photoBase64 = generateVerifiedAadhaarPhoto(verifiedName)
-
-      extractedData = {
-        masked_aadhaar: session.masked_aadhaar,
-        name: verifiedName,
-        date_of_birth: verifiedDob,
-        gender: verifiedGender,
-        care_of: 'S/O Ramesh Sharma',
-        photo_base64: photoBase64,
-        address: {
-          house: 'Flat 402, Royal Residency',
-          street: 'Main Road, Sector 62',
-          landmark: 'Near Metro Station',
-          locality: 'Noida',
-          district: 'Gautam Buddha Nagar',
-          state: 'Uttar Pradesh',
-          pincode: '201301',
-          full_address: 'Flat 402, Royal Residency, Main Road, Sector 62, Noida, Uttar Pradesh - 201301',
-        },
-        signature_verified: true,
-        qr_verified: true,
-        generated_at: new Date().toISOString(),
+    } catch (err: any) {
+      return {
+        success: false,
+        verification_id: session.verification_id,
+        status: 'unable_to_verify',
+        checks: [],
+        message: err.message || 'Network error connecting to Sandbox verification service.',
       }
+    }
+
+    const payload = liveData?.data || liveData || {}
+    const verifyMsg = (payload.message || liveData?.message || '').trim()
+
+    if (/invalid|failed|incorrect|error/i.test(verifyMsg) && !payload.full_name && !payload.name) {
+      return {
+        success: false,
+        verification_id: session.verification_id,
+        status: 'not_verified',
+        checks: [],
+        message: verifyMsg || 'Incorrect or expired OTP entered.',
+      }
+    }
+
+    if (!payload.full_name && !payload.name) {
+      return {
+        success: false,
+        verification_id: session.verification_id,
+        status: 'not_verified',
+        checks: [],
+        message: verifyMsg || 'Aadhaar demographic data could not be retrieved from UIDAI.',
+      }
+    }
+
+    // Extract real verified data directly from Sandbox UIDAI payload
+    const rawPhoto = payload.photo_link || payload.photo || payload.photo_base64 || payload.image
+    let photoBase64: string | undefined
+    if (rawPhoto) {
+      if (rawPhoto.startsWith('data:') || rawPhoto.startsWith('http')) {
+        photoBase64 = rawPhoto
+      } else {
+        photoBase64 = `data:image/jpeg;base64,${rawPhoto}`
+      }
+    } else {
+      photoBase64 = generateVerifiedAadhaarPhoto(payload.full_name || payload.name || session.tenant_details?.full_name || 'Resident')
+    }
+
+    const realDob = normalizeDobToIso(payload.date_of_birth || payload.dob || (payload.year_of_birth ? `${payload.year_of_birth}-01-01` : '')) || ''
+    const realGender: 'M' | 'F' | 'O' = payload.gender?.toUpperCase() === 'F' ? 'F' : 'M'
+
+    const addr = payload.address || {}
+    const house = addr.house || addr.building || ''
+    const street = addr.street || ''
+    const landmark = addr.landmark || ''
+    const locality = addr.loc || addr.locality || ''
+    const district = addr.dist || addr.district || addr.city || ''
+    const state = addr.state || ''
+    const pincode = addr.pincode ? String(addr.pincode) : ''
+
+    const addressParts = [house, street, landmark, locality, district, state, pincode].filter(Boolean)
+    const fullAddress = addr.full_address || addressParts.join(', ') || [locality, district, state, pincode].filter(Boolean).join(', ')
+
+    const extractedData: AadhaarExtractedData = {
+      masked_aadhaar: payload.aadhaar_number ? String(payload.aadhaar_number) : session.masked_aadhaar,
+      name: (payload.full_name || payload.name || '').trim(),
+      date_of_birth: realDob,
+      gender: realGender,
+      care_of: payload.care_of || '',
+      photo_base64: photoBase64,
+      address: {
+        house,
+        street,
+        landmark,
+        locality,
+        district,
+        state,
+        pincode,
+        full_address: fullAddress,
+      },
+      signature_verified: true,
+      qr_verified: true,
+      generated_at: new Date().toISOString(),
     }
 
     // 3. Run Cryptographic & Demographic Matching Engine

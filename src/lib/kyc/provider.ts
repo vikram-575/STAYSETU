@@ -11,7 +11,7 @@ import type {
   AadhaarExtractedData,
 } from './types'
 import { AuthorizedSandboxProvider } from './providers/authorized-sandbox-provider'
-import { SandboxCoInProvider, DEFAULT_SANDBOX_API_KEY } from './providers/sandbox-co-in-provider'
+import { SandboxCoInProvider, DEFAULT_SANDBOX_API_KEY, DEFAULT_SANDBOX_API_SECRET } from './providers/sandbox-co-in-provider'
 
 
 
@@ -37,9 +37,9 @@ export const globalKYCSessions = new Map<string, any>()
  */
 export function getAadhaarProvider(): AadhaarProvider {
   const sandboxKey = process.env.SANDBOX_API_KEY || DEFAULT_SANDBOX_API_KEY
-  const sandboxSecret = process.env.SANDBOX_API_SECRET
+  const sandboxSecret = process.env.SANDBOX_API_SECRET || DEFAULT_SANDBOX_API_SECRET
 
-  // Return Sandbox.co.in provider with live key and dual-engine fallback
+  // Return Sandbox.co.in provider with live key
   return new SandboxCoInProvider({
     apiKey: sandboxKey,
     apiSecret: sandboxSecret,

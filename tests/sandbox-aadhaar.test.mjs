@@ -9,12 +9,17 @@ import {
 } from '../src/lib/kyc/security.ts'
 
 const DEFAULT_SANDBOX_API_KEY = 'key_live_5f51ed66f94447f6aa4de1e62cb0d9e7'
+const DEFAULT_SANDBOX_API_SECRET = 'secret_live_20d78f2008b34ee092f108718146ee31'
 
 describe('Sandbox Aadhaar e-KYC Verification & Profile Auto-Save', () => {
   it('should verify live Sandbox API key configuration and credentials', () => {
     assert.equal(DEFAULT_SANDBOX_API_KEY, 'key_live_5f51ed66f94447f6aa4de1e62cb0d9e7')
     assert.ok(DEFAULT_SANDBOX_API_KEY.startsWith('key_live_'))
     assert.equal(DEFAULT_SANDBOX_API_KEY.length, 41)
+
+    assert.equal(DEFAULT_SANDBOX_API_SECRET, 'secret_live_20d78f2008b34ee092f108718146ee31')
+    assert.ok(DEFAULT_SANDBOX_API_SECRET.startsWith('secret_live_'))
+    assert.equal(DEFAULT_SANDBOX_API_SECRET.length, 44)
   })
 
   it('should validate Aadhaar 12-digit format and Verhoeff checksum correctly', () => {

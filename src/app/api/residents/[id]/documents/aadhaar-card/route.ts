@@ -57,11 +57,16 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const fullName = resident.full_name || kyc?.metadata?.extracted_name || 'Resident'
     const dobFormatted = formatDate(resident.date_of_birth || kyc?.metadata?.extracted_dob) || '14/05/1998'
     const gender = (resident.gender || kyc?.metadata?.extracted_gender || 'male').toUpperCase()
-    const address = resident.permanent_address || 'Civil Lines, Banda, Uttar Pradesh'
-    const city = resident.permanent_city || 'Banda'
-    const state = resident.permanent_state || 'Uttar Pradesh'
-    const pincode = resident.permanent_pincode || '210001'
-    const fullAddress = `${address}, ${city}, ${state} - ${pincode}`
+    const rawAddress = resident.permanent_address || kyc?.metadata?.extracted_address?.full_address || ''
+    const city = resident.permanent_city || kyc?.metadata?.extracted_address?.district || ''
+    const state = resident.permanent_state || kyc?.metadata?.extracted_address?.state || ''
+    const pincode = resident.permanent_pincode || kyc?.metadata?.extracted_address?.pincode || ''
+    let fullAddress = rawAddress
+    if (!fullAddress) {
+      fullAddress = [city, state, pincode].filter(Boolean).join(', ') || 'Address on file'
+    } else if (pincode && !fullAddress.includes(pincode)) {
+      fullAddress = `${fullAddress} - ${pincode}`
+    }
     const verificationId = kyc?.verification_id || 'SBX-KYC-9453-2026'
     const verifiedAt = formatDate(kyc?.verified_at || resident.created_at || new Date().toISOString())
     const photoUrl = resident.photo_url || kyc?.metadata?.photo_link || null

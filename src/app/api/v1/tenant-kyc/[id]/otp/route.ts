@@ -3,6 +3,7 @@ import { getAuthenticatedUser } from '@/lib/auth-session'
 import { resolveEffectiveOrgId, isValidUUID } from '@/lib/org-helper'
 import { getAadhaarProvider, globalKYCSessions } from '@/lib/kyc/provider'
 import { createServiceClient } from '@/lib/supabase/server'
+import { applyVerifiedKYCToResident } from '@/lib/kyc/sync-kyc'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -69,21 +70,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           verificationResult.kyc_record = kycRecord
         }
 
-        // 2. If a tenant_id exists, update resident's KYC status directly in Supabase
+        // 2. If a tenant_id exists, update resident's demographics, documents, and photo directly
         if (session.tenant_id) {
-          const updatePayload: Record<string, any> = {
-            id_type: 'aadhaar',
-            id_number: session.masked_aadhaar,
-            notes: `Sandbox Aadhaar Verified (${verificationResult.verification_id}) on ${new Date().toLocaleDateString('en-IN')}`,
-          }
-          if (verificationResult.extracted_data?.address?.full_address) {
-            updatePayload.permanent_address = verificationResult.extracted_data.address.full_address
-          }
-          await supabase
-            .from('residents')
-            .update(updatePayload)
-            .eq('id', session.tenant_id)
-            .eq('organization_id', orgId)
+          await applyVerifiedKYCToResident({
+            residentId: session.tenant_id,
+            organizationId: orgId,
+            verificationId: verificationResult.verification_id,
+            maskedAadhaar: session.masked_aadhaar,
+            extractedData: verificationResult.extracted_data,
+            provider: provider.name,
+            actorUserId: user?.id || null,
+            photoUrl: verificationResult.extracted_data?.photo_base64 || null,
+          })
         }
       } catch (dbErr) {
         console.warn('[KYC DB Persist Warning]:', dbErr)
