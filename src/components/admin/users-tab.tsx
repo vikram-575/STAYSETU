@@ -64,6 +64,7 @@ export default function UsersTab() {
   const [page, setPage] = useState(1)
   const PAGE_SIZE = 25
   const [impersonatingUserId, setImpersonatingUserId] = useState<string | null>(null)
+  const [fetchError, setFetchError] = useState('')
 
   // 360° Profile Modal
   const [selectedProfile, setSelectedProfile] = useState<UserProfile | null>(null)
@@ -85,6 +86,7 @@ export default function UsersTab() {
 
   const loadUsers = async () => {
     setLoading(true)
+    setFetchError('')
     try {
       const res = await fetch('/api/admin/users')
       const data = await res.json()
@@ -93,9 +95,12 @@ export default function UsersTab() {
         if (data.stats) {
           setStats(data.stats)
         }
+      } else {
+        setFetchError(data.error || 'Failed to fetch platform users.')
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load platform users and profiles', err)
+      setFetchError(err?.message || 'Network error fetching platform users.')
     } finally {
       setLoading(false)
     }
@@ -337,6 +342,21 @@ export default function UsersTab() {
           <p className="text-[10px] text-purple-400/80 mt-0.5">Superadmins & staff</p>
         </div>
       </div>
+
+      {fetchError && (
+        <div className="p-4 bg-rose-950/70 border border-rose-800/80 rounded-2xl text-xs text-rose-300 flex items-center justify-between gap-3 animate-in fade-in">
+          <div className="flex items-center gap-2.5">
+            <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>{fetchError}</span>
+          </div>
+          <button
+            onClick={loadUsers}
+            className="px-3 py-1 bg-rose-900/60 hover:bg-rose-800 text-rose-200 rounded-lg text-xs font-bold transition flex items-center gap-1 shrink-0"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Retry
+          </button>
+        </div>
+      )}
 
       {/* Directory Filter & Search Bar */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">

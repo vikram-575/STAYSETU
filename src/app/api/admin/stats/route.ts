@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/supabase/config'
-import { isSuperAdminFromRequest } from '@/lib/admin-auth'
+import { isSuperAdminFromRequest, isKnownSuperAdmin } from '@/lib/admin-auth'
 
 async function requireSuperAdmin(request: NextRequest) {
   if (isSuperAdminFromRequest(request)) {
@@ -16,10 +16,15 @@ async function requireSuperAdmin(request: NextRequest) {
     )
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
+    if (isKnownSuperAdmin(user.email, user.user_metadata?.role, user.id, user.phone)) {
+      return user
+    }
     const service = await createServiceClient()
-    const { data: profile } = await service.from('users').select('role').eq('id', user.id).single()
-    if (profile?.role !== 'superadmin') return null
-    return user
+    const { data: profile } = await service.from('users').select('role, email, phone').eq('id', user.id).maybeSingle()
+    if (profile && isKnownSuperAdmin(profile.email || user.email, profile.role, user.id, profile.phone)) {
+      return user
+    }
+    return null
   } catch {
     return null
   }

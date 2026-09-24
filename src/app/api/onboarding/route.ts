@@ -442,37 +442,71 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 5. Create Property Record
-    const { data: property, error: propError } = await serviceClient
-      .from('properties')
-      .insert({
-        organization_id: orgId,
-        name: property_name.trim(),
-        address: combinedAddress || address_line1 || null,
-        city: city?.trim() || null,
-        state: state?.trim() || null,
-        pincode: pincode?.trim() || null,
-        phone: phone?.trim() || null,
-        is_active: true,
-      })
-      .select()
-      .single()
+    // 5. Create or Update Property Record
+    let propId = body.property_id
+    let property: any = null
+    const isEditMode = body.mode === 'edit' && Boolean(propId)
 
-    if (propError || !property) {
-      throw new Error(propError?.message || 'Failed to create property campus record.')
+    if (isEditMode) {
+      const { data: updatedProp, error: propErr } = await serviceClient
+        .from('properties')
+        .update({
+          name: property_name.trim(),
+          address: combinedAddress || address_line1 || null,
+          city: city?.trim() || null,
+          state: state?.trim() || null,
+          pincode: pincode?.trim() || null,
+          phone: phone?.trim() || null,
+        })
+        .eq('id', propId)
+        .select()
+        .single()
+
+      if (propErr || !updatedProp) {
+        throw new Error(propErr?.message || 'Failed to update property details.')
+      }
+      property = updatedProp
+    } else {
+      const { data: newProp, error: propError } = await serviceClient
+        .from('properties')
+        .insert({
+          organization_id: orgId,
+          name: property_name.trim(),
+          address: combinedAddress || address_line1 || null,
+          city: city?.trim() || null,
+          state: state?.trim() || null,
+          pincode: pincode?.trim() || null,
+          phone: phone?.trim() || null,
+          is_active: true,
+        })
+        .select()
+        .single()
+
+      if (propError || !newProp) {
+        throw new Error(propError?.message || 'Failed to create property campus record.')
+      }
+      property = newProp
+      propId = newProp.id
     }
-
-    const propId = property.id
 
     // 6. Create Buildings, Floors, Rooms, Beds & Sub-Meters
     const bedLabels = ['A', 'B', 'C', 'D', 'E', 'F']
     let totalRoomsCreated = 0
     let totalBedsCreated = 0
 
+    const { count: existingRoomsCount } = await serviceClient
+      .from('rooms')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId)
+
+    const shouldCreateRooms = !isEditMode || !existingRoomsCount || existingRoomsCount === 0
+
     const buildingsCount = Math.min(Math.max(Number(num_buildings) || 1, 1), 5)
     const floorsCount = Math.min(Math.max(Number(num_floors) || 2, 1), 10)
     const roomsCount = Math.min(Math.max(Number(rooms_per_floor) || 4, 1), 20)
     const bedsPerRoomCount = Math.min(Math.max(Number(default_beds_per_room) || 2, 1), 6)
+
+    if (shouldCreateRooms) {
 
     for (let b = 1; b <= buildingsCount; b++) {
       const bldgName = buildingsCount > 1 ? `Building ${b}` : 'Main Building'
@@ -594,6 +628,14 @@ export async function POST(request: NextRequest) {
           }
         }
       }
+    }
+  } else {
+      totalRoomsCreated = existingRoomsCount || 0
+      const { count: existingBedsCount } = await serviceClient
+        .from('beds')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', orgId)
+      totalBedsCreated = existingBedsCount || 0
     }
 
     // 7. Seed Default Catalog & Message Templates

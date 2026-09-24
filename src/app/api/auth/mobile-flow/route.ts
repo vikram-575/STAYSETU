@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServiceClient } from '@/lib/supabase/server'
 import { cleanMobile, isValidMobile, generateTenantId } from '@/lib/profiles'
+import { isKnownSuperAdmin, signAdminToken } from '@/lib/admin-auth'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -155,17 +156,43 @@ export async function POST(request: NextRequest) {
         }
 
         if (matchedOwnerUser || matchedOrg) {
+          const targetOrgId = matchedOwnerUser?.organization_id || matchedOrg?.id
+          let ownerProperties: any[] = []
+          let orgSettings: any = null
+
+          if (targetOrgId) {
+            const [
+              { data: props },
+              { data: orgFull }
+            ] = await Promise.all([
+              serviceClient
+                .from('properties')
+                .select('id, name, city, state, pincode, address, phone, is_active')
+                .eq('organization_id', targetOrgId)
+                .order('created_at', { ascending: false }),
+              serviceClient
+                .from('organizations')
+                .select('id, name, city, state, pincode, address, gst_enabled, gstin, settings')
+                .eq('id', targetOrgId)
+                .maybeSingle()
+            ])
+            ownerProperties = props || []
+            orgSettings = orgFull
+          }
+
           return NextResponse.json({
             exists: true,
             userType: 'owner',
             role: matchedOwnerUser?.role || 'owner',
             name: matchedOwnerUser?.full_name || matchedOrg?.name || 'PG Owner',
             userId: matchedOwnerUser?.id || matchedOrg?.owner_user_id || null,
-            organizationId: matchedOwnerUser?.organization_id || matchedOrg?.id,
-            organizationName: matchedOrg?.name || null,
+            organizationId: targetOrgId,
+            organizationName: matchedOrg?.name || orgSettings?.name || null,
             email: cleanUserEmail(matchedOwnerUser?.email || matchedOrg?.email),
             mobile: cleaned,
-            message: `Welcome back, ${matchedOwnerUser?.full_name || matchedOrg?.name || 'Owner'}! Real OTP sent to +91 ${cleaned.slice(0, 2)}******${cleaned.slice(-2)}.`,
+            properties: ownerProperties,
+            organization: orgSettings,
+            message: `Welcome back, ${matchedOwnerUser?.full_name || matchedOrg?.name || 'Owner'}! Found ${ownerProperties.length} existing properties.`,
           })
         }
 
@@ -603,6 +630,17 @@ export async function POST(request: NextRequest) {
       } else {
         cookieStore.delete('org_id')
         cookieStore.delete('organization_id')
+      }
+
+      if (isKnownSuperAdmin(effectiveEmail, effectiveRole, targetUserId, cleaned)) {
+        const adminToken = await signAdminToken(effectiveEmail || 'vikramtomar0505@gmail.com')
+        cookieStore.set('superadmin_token', adminToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 30,
+          path: '/',
+        })
       }
 
       const isErpUnlocked = requestedRole === 'owner'

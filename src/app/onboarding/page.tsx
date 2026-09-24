@@ -44,6 +44,11 @@ function OnboardingContent() {
   const [isOwnerVerified, setIsOwnerVerified] = useState(false)
   const [verifiedOwner, setVerifiedOwner] = useState<any>(null)
 
+  // Owner Intent & Multiple Properties Selection
+  const [ownerIntent, setOwnerIntent] = useState<'edit' | 'add_property'>('edit')
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string>('')
+  const [onboardingMode, setOnboardingMode] = useState<'create' | 'edit' | 'add_property'>('create')
+
   // Firebase Phone Auth confirmation & verifier refs
   const confirmationResultRef = useRef<ConfirmationResult | null>(null)
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null)
@@ -164,6 +169,17 @@ function OnboardingContent() {
       }
 
       setOwnerCheckResult(data)
+      if (data.exists) {
+        const props = data.properties || []
+        if (props.length > 0) {
+          setSelectedPropertyId(props[0].id)
+          setOwnerIntent('edit')
+        } else {
+          setOwnerIntent('add_property')
+        }
+      } else {
+        setOnboardingMode('create')
+      }
       setForm((prev) => ({
         ...prev,
         phone: cleaned,
@@ -282,13 +298,68 @@ function OnboardingContent() {
       }
       setVerifiedOwner(verifiedInfo)
 
-      setForm((prev) => ({
-        ...prev,
-        phone: cleaned,
-        owner_name: prev.owner_name || verifiedInfo.name || '',
-        email: prev.email || verifiedInfo.email || '',
-        org_name: prev.org_name || verifiedInfo.organizationName || prev.org_name || '',
-      }))
+      if (ownerCheckResult?.exists) {
+        if (ownerIntent === 'edit') {
+          setOnboardingMode('edit')
+          const props = ownerCheckResult.properties || []
+          const chosenProp = props.find((p: any) => p.id === selectedPropertyId) || props[0]
+          const orgSettings = ownerCheckResult.organization?.settings || {}
+
+          setForm((prev) => ({
+            ...prev,
+            phone: cleaned,
+            owner_name: verifiedInfo.name || prev.owner_name,
+            email: verifiedInfo.email || prev.email,
+            org_name: ownerCheckResult.organizationName || prev.org_name,
+            property_name: chosenProp?.name || prev.property_name,
+            city: chosenProp?.city || prev.city,
+            state: chosenProp?.state || prev.state,
+            pincode: chosenProp?.pincode || prev.pincode,
+            address_line1: chosenProp?.address || prev.address_line1,
+            gst_enabled: Boolean(ownerCheckResult.organization?.gst_enabled ?? prev.gst_enabled),
+            gstin: ownerCheckResult.organization?.gstin || prev.gstin,
+            upi_id: orgSettings.upi_id || prev.upi_id,
+            bank_account_no: orgSettings.bank_settlement?.account_no || prev.bank_account_no,
+            bank_ifsc: orgSettings.bank_settlement?.ifsc || prev.bank_ifsc,
+            bank_account_holder: orgSettings.bank_settlement?.account_holder || prev.bank_account_holder,
+            bank_name: orgSettings.bank_settlement?.bank_name || prev.bank_name,
+            deposit_policy: orgSettings.billing?.deposit_policy || prev.deposit_policy,
+            deposit_fixed_rupees: orgSettings.billing?.deposit_fixed_paise ? Math.round(orgSettings.billing.deposit_fixed_paise / 100) : prev.deposit_fixed_rupees,
+            billing_cycle_day: orgSettings.billing?.billing_cycle_day || prev.billing_cycle_day,
+            notice_period_days: orgSettings.billing?.notice_period_days || prev.notice_period_days,
+            electricity_billing_type: orgSettings.utilities?.electricity_type || prev.electricity_billing_type,
+            rate_per_unit_rupees: orgSettings.utilities?.rate_per_unit_paise ? orgSettings.utilities.rate_per_unit_paise / 100 : prev.rate_per_unit_rupees,
+            maintenance_fee_rupees: orgSettings.utilities?.maintenance_fee_paise ? Math.round(orgSettings.utilities.maintenance_fee_paise / 100) : prev.maintenance_fee_rupees,
+          }))
+        } else {
+          // Add new property under same owner number
+          setOnboardingMode('add_property')
+          setSelectedPropertyId('')
+          setForm((prev) => ({
+            ...prev,
+            phone: cleaned,
+            owner_name: verifiedInfo.name || prev.owner_name,
+            email: verifiedInfo.email || prev.email,
+            org_name: ownerCheckResult.organizationName || prev.org_name,
+            property_name: '',
+            address_line1: '',
+            address_line2: '',
+            landmark: '',
+            city: '',
+            state: '',
+            pincode: '',
+          }))
+        }
+      } else {
+        setOnboardingMode('create')
+        setForm((prev) => ({
+          ...prev,
+          phone: cleaned,
+          owner_name: prev.owner_name || verifiedInfo.name || '',
+          email: prev.email || verifiedInfo.email || '',
+          org_name: prev.org_name || verifiedInfo.organizationName || prev.org_name || '',
+        }))
+      }
 
       // Advance to Step 2
       setError('')
@@ -440,6 +511,8 @@ function OnboardingContent() {
     try {
       const payload = {
         ...form,
+        mode: onboardingMode,
+        property_id: onboardingMode === 'edit' ? selectedPropertyId : undefined,
         userId: verifiedOwner?.id || searchParams.get('userId') || searchParams.get('ownerId') || undefined,
         owner_id: verifiedOwner?.id || undefined,
         verified_owner_id: verifiedOwner?.id || undefined,
@@ -592,9 +665,15 @@ function OnboardingContent() {
               <div>
                 <span className="font-extrabold text-white text-xs block">
                   Verified PG Owner: {verifiedOwner.name} (+91 {verifiedOwner.phone})
+                  {onboardingMode === 'edit' && ' · [Mode: Editing Existing Property]'}
+                  {onboardingMode === 'add_property' && ' · [Mode: Adding New Property Campus]'}
                 </span>
                 <span className="text-[11px] text-emerald-300/80">
-                  {verifiedOwner.isExisting
+                  {onboardingMode === 'edit'
+                    ? `Updating property details for "${form.property_name || 'Selected Property'}" under your account.`
+                    : onboardingMode === 'add_property'
+                    ? `Adding a new property campus under your account. Saved strictly under ${verifiedOwner.name}.`
+                    : verifiedOwner.isExisting
                     ? `Existing Owner Account · This property campus and rooms will be saved under your account.`
                     : 'Verified PG Owner Account · All property and room details will be saved strictly under your profile.'}
                 </span>
@@ -706,9 +785,9 @@ function OnboardingContent() {
                         </div>
                       </div>
 
-                      {/* Stage 2A: Existing PG Owner Found in DB */}
+                      {/* Stage 2A: Existing PG Owner Found in DB - Ask What Want to Do */}
                       {ownerCheckResult && ownerCheckResult.exists && !otpSent && (
-                        <div className="p-5 sm:p-6 bg-gradient-to-br from-emerald-950/70 via-slate-900 to-slate-950 border-2 border-emerald-500/60 rounded-2xl space-y-4 shadow-xl shadow-emerald-950/40 animate-in fade-in slide-in-from-top-2">
+                        <div className="p-5 sm:p-6 bg-gradient-to-br from-emerald-950/70 via-slate-900 to-slate-950 border-2 border-emerald-500/60 rounded-2xl space-y-5 shadow-xl shadow-emerald-950/40 animate-in fade-in slide-in-from-top-2">
                           <div className="flex items-start gap-3.5">
                             <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
                               <CheckCircle2 className="w-6 h-6" />
@@ -724,9 +803,90 @@ function OnboardingContent() {
                                 We found an active PG Owner account registered with <strong className="text-emerald-400">+91 {ownerCheckResult.mobile}</strong>
                                 {ownerCheckResult.organizationName ? (
                                   <> under <strong className="text-white">"{ownerCheckResult.organizationName}"</strong></>
+                                ) : null}
+                                {Array.isArray(ownerCheckResult.properties) && ownerCheckResult.properties.length > 0 ? (
+                                  <> with <strong className="text-emerald-300">{ownerCheckResult.properties.length} existing {ownerCheckResult.properties.length === 1 ? 'property' : 'properties'}</strong></>
                                 ) : null}.
-                                Would you like to continue to onboard this new property under your existing account?
                               </p>
+                            </div>
+                          </div>
+
+                          {/* Decision: What do you want to do? */}
+                          <div className="space-y-3 pt-1">
+                            <label className="block text-xs font-bold text-emerald-300 uppercase tracking-wider">
+                              What would you like to do? *
+                            </label>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {/* Option 1: Edit Existing Property */}
+                              <div
+                                onClick={() => setOwnerIntent('edit')}
+                                className={`cursor-pointer p-4 rounded-xl border transition-all text-left space-y-2 ${
+                                  ownerIntent === 'edit'
+                                    ? 'bg-emerald-950/80 border-emerald-400 shadow-md shadow-emerald-500/10 ring-1 ring-emerald-400/50'
+                                    : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 opacity-80'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <div className={`p-1.5 rounded-lg ${ownerIntent === 'edit' ? 'bg-emerald-500/30 text-emerald-300' : 'bg-slate-800 text-slate-400'}`}>
+                                      <Building2 className="w-4 h-4" />
+                                    </div>
+                                    <span className="text-xs font-black text-white">Edit Existing Property</span>
+                                  </div>
+                                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${ownerIntent === 'edit' ? 'border-emerald-400 bg-emerald-500' : 'border-slate-700'}`}>
+                                    {ownerIntent === 'edit' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                  </div>
+                                </div>
+                                <p className="text-[11px] text-slate-300 leading-snug">
+                                  Update room pricing, deposit policies, bank settlement, or campus details for an existing property.
+                                </p>
+
+                                {/* Property Dropdown Selector if editing and properties exist */}
+                                {ownerIntent === 'edit' && Array.isArray(ownerCheckResult.properties) && ownerCheckResult.properties.length > 0 && (
+                                  <div className="pt-2" onClick={(e) => e.stopPropagation()}>
+                                    <label className="block text-[10px] font-bold text-emerald-300 uppercase mb-1">
+                                      Select Property to Edit:
+                                    </label>
+                                    <select
+                                      value={selectedPropertyId}
+                                      onChange={(e) => setSelectedPropertyId(e.target.value)}
+                                      className="w-full px-2.5 py-1.5 bg-slate-900 border border-emerald-500/50 rounded-lg text-xs text-white outline-none focus:border-emerald-400 font-medium"
+                                    >
+                                      {ownerCheckResult.properties.map((p: any) => (
+                                        <option key={p.id} value={p.id} className="bg-slate-900 text-white">
+                                          {p.name} ({p.city || 'General'})
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Option 2: Add New Property on Same Number */}
+                              <div
+                                onClick={() => setOwnerIntent('add_property')}
+                                className={`cursor-pointer p-4 rounded-xl border transition-all text-left space-y-2 ${
+                                  ownerIntent === 'add_property'
+                                    ? 'bg-blue-950/80 border-blue-400 shadow-md shadow-blue-500/10 ring-1 ring-blue-400/50'
+                                    : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 opacity-80'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <div className={`p-1.5 rounded-lg ${ownerIntent === 'add_property' ? 'bg-blue-500/30 text-blue-300' : 'bg-slate-800 text-slate-400'}`}>
+                                      <Plus className="w-4 h-4" />
+                                    </div>
+                                    <span className="text-xs font-black text-white">Add Property on Same No.</span>
+                                  </div>
+                                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${ownerIntent === 'add_property' ? 'border-blue-400 bg-blue-500' : 'border-slate-700'}`}>
+                                    {ownerIntent === 'add_property' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                  </div>
+                                </div>
+                                <p className="text-[11px] text-slate-300 leading-snug">
+                                  Add a new PG branch or campus under your current account. Stored strictly under your verified owner profile.
+                                </p>
+                              </div>
                             </div>
                           </div>
 
@@ -735,10 +895,18 @@ function OnboardingContent() {
                               type="button"
                               onClick={handleSendOtp}
                               disabled={ownerCheckLoading}
-                              className="w-full sm:w-auto py-3 px-6 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-2"
+                              className={`w-full sm:w-auto py-3 px-6 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-lg transition flex items-center justify-center gap-2 ${
+                                ownerIntent === 'edit'
+                                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-600/30'
+                                  : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-blue-600/30'
+                              }`}
                             >
                               {ownerCheckLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-                              <span>Continue with this Account →</span>
+                              <span>
+                                {ownerIntent === 'edit'
+                                  ? 'Send OTP to Edit Property →'
+                                  : 'Send OTP to Add New Property →'}
+                              </span>
                             </button>
                             <button
                               type="button"
@@ -1732,7 +1900,15 @@ function OnboardingContent() {
                     className="py-3.5 px-8 bg-gradient-to-r from-emerald-600 via-teal-600 to-blue-600 hover:from-emerald-500 hover:via-teal-500 hover:to-blue-500 disabled:opacity-50 text-white font-black text-xs sm:text-sm rounded-xl shadow-xl shadow-emerald-600/30 transition flex items-center gap-2"
                   >
                     {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                    <span>{loading ? 'Provisioning Live PG Platform...' : 'Launch Live PG Management Dashboard →'}</span>
+                    <span>
+                      {loading
+                        ? 'Provisioning Live PG Platform...'
+                        : onboardingMode === 'edit'
+                        ? '💾 Save & Update Property Details →'
+                        : onboardingMode === 'add_property'
+                        ? '🚀 Launch New PG Campus →'
+                        : 'Launch Live PG Management Dashboard →'}
+                    </span>
                   </button>
                 )}
               </div>
@@ -1822,12 +1998,24 @@ function OnboardingContent() {
                 <CheckCircle2 className="w-8 h-8" />
               </div>
               <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                PG Setup Completed Successfully!
+                {onboardingMode === 'edit'
+                  ? 'Property Details Updated Successfully!'
+                  : onboardingMode === 'add_property'
+                  ? 'New PG Campus Added Successfully!'
+                  : 'PG Setup Completed Successfully!'}
               </h2>
               <p className="text-xs text-slate-300">
-                <strong>{onboardingSuccessData.summary?.organization_name}</strong> is live in Supabase with{' '}
-                <strong className="text-emerald-400">{onboardingSuccessData.summary?.total_rooms} Rooms</strong> and{' '}
-                <strong className="text-emerald-400">{onboardingSuccessData.summary?.total_beds} Beds</strong>.
+                {onboardingMode === 'edit' ? (
+                  <>
+                    <strong>{onboardingSuccessData.summary?.property_name || onboardingSuccessData.summary?.organization_name}</strong> is updated and saved under your verified owner profile in Supabase.
+                  </>
+                ) : (
+                  <>
+                    <strong>{onboardingSuccessData.summary?.organization_name}</strong> is live in Supabase with{' '}
+                    <strong className="text-emerald-400">{onboardingSuccessData.summary?.total_rooms} Rooms</strong> and{' '}
+                    <strong className="text-emerald-400">{onboardingSuccessData.summary?.total_beds} Beds</strong>.
+                  </>
+                )}
               </p>
             </div>
 

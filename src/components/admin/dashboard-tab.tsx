@@ -346,7 +346,7 @@ export default function DashboardTab({
             <Store className="w-4 h-4 text-blue-400" /> Geographic Fleet Concentration
           </h3>
           <div className="space-y-2">
-            {(!stats.city_distribution || stats.city_distribution.length === 0) ? (
+            {(!stats?.city_distribution || stats.city_distribution.length === 0) ? (
               <p className="text-xs text-slate-500 py-4 text-center">No geographic distribution recorded yet.</p>
             ) : (
               stats.city_distribution.slice(0, 4).map((c: any, i: number) => (

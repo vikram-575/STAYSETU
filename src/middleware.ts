@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
-import { isSuperAdminFromRequestAsync } from '@/lib/admin-auth'
+import { isSuperAdminFromRequestAsync, isKnownSuperAdmin } from '@/lib/admin-auth'
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/supabase/config'
 
 export async function middleware(request: NextRequest) {
@@ -57,9 +57,12 @@ export async function middleware(request: NextRequest) {
 
   const isSuperAdminUser =
     isSuperAdmin ||
-    authEmail === 'vikramtomar0505@gmail.com' ||
-    sbUser?.user_metadata?.role === 'superadmin' ||
-    authRole === 'superadmin'
+    isKnownSuperAdmin(
+      authEmail || sbUser?.email,
+      authRole,
+      authUserId || sbUser?.id,
+      request.cookies.get('auth_mobile')?.value
+    )
 
   const isOwnerOrStaff =
     isSuperAdminUser ||

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/supabase/config'
-import { isSuperAdminFromRequest } from '@/lib/admin-auth'
+import { isSuperAdminFromRequest, isKnownSuperAdmin } from '@/lib/admin-auth'
 
 async function requireSuperAdmin(request: NextRequest) {
   if (isSuperAdminFromRequest(request)) {
@@ -16,10 +16,15 @@ async function requireSuperAdmin(request: NextRequest) {
     )
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
+    if (isKnownSuperAdmin(user.email, user.user_metadata?.role, user.id, user.phone)) {
+      return user
+    }
     const service = await createServiceClient()
-    const { data: profile } = await service.from('users').select('role').eq('id', user.id).single()
-    if (profile?.role !== 'superadmin') return null
-    return user
+    const { data: profile } = await service.from('users').select('role, email, phone').eq('id', user.id).maybeSingle()
+    if (profile && isKnownSuperAdmin(profile.email || user.email, profile.role, user.id, profile.phone)) {
+      return user
+    }
+    return null
   } catch {
     return null
   }
@@ -33,6 +38,7 @@ async function requireSuperAdmin(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const adminUser = await requireSuperAdmin(request)
   if (!adminUser) return NextResponse.json({ error: 'Super Admin access required.' }, { status: 403 })
+
   try {
     const supabase = await createServiceClient()
     const url = new URL(request.url)
@@ -234,6 +240,41 @@ export async function GET(request: NextRequest) {
 
       if (cleanEmail) handledEmails.add(cleanEmail)
       if (cleanPhone) handledPhones.add(cleanPhone)
+    })
+
+    // 3. Process organizations / PG hosts not yet included from users table
+    ;(orgs || []).forEach((o: any) => {
+      const orgEmail = o.email?.toLowerCase().trim()
+      const orgPhone = o.phone?.replace(/\D/g, '')
+
+      if ((orgEmail && handledEmails.has(orgEmail)) || (orgPhone && handledPhones.has(orgPhone))) {
+        return
+      }
+
+      const orgProps = orgPropsMap.get(o.id) || []
+      allProfiles.push({
+        id: o.owner_user_id || o.id,
+        full_name: o.name || 'PG Host Organization',
+        email: o.email || 'No email registered',
+        phone: o.phone || null,
+        alternate_phone: null,
+        role: 'owner',
+        user_type: 'owner',
+        display_role: 'PG Owner',
+        is_active: true,
+        status: 'active',
+        created_at: o.created_at || new Date().toISOString(),
+        last_login_at: null,
+        organization_id: o.id,
+        organization_name: o.name,
+        properties_count: orgProps.length,
+        properties_list: orgProps,
+        property_name: orgProps[0]?.name || (orgProps.length > 0 ? `${orgProps.length} Hosted Properties` : 'Operating Space'),
+        source: 'organization_registry',
+      })
+
+      if (orgEmail) handledEmails.add(orgEmail)
+      if (orgPhone) handledPhones.add(orgPhone)
     })
 
     // Compute aggregated stats

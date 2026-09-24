@@ -37,7 +37,11 @@ function CompanyAdminLoginForm() {
         throw new Error(data.error || 'Invalid Company Admin Credentials')
       }
 
-      if (data.role !== 'superadmin' && cleanEmail !== 'vikramtomar0505@gmail.com') {
+      const isAllowedAdmin =
+        data.role === 'superadmin' ||
+        cleanEmail === 'vikramtomar0505@gmail.com' ||
+        cleanEmail === 'tomarsahab575@gmail.com'
+      if (!isAllowedAdmin) {
         throw new Error('Access Denied: This portal is strictly for Platform Super Administrators.')
       }
 
