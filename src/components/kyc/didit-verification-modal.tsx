@@ -165,7 +165,7 @@ export function DiditVerificationModal({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-black tracking-tight text-white">Verify Person through Didit</h3>
+                <h3 className="text-base font-black tracking-tight text-white">Verify Resident Identity</h3>
                 <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                   AI Protocol
                 </span>
@@ -197,8 +197,8 @@ export function DiditVerificationModal({
           {loading && (
             <div className="py-12 flex flex-col items-center justify-center space-y-3">
               <Loader2 className="w-9 h-9 animate-spin text-blue-500" />
-              <p className="text-xs font-bold text-slate-300">Initializing Didit Secure Session...</p>
-              <span className="text-[11px] text-slate-500">Connecting to live Didit identity network</span>
+              <p className="text-xs font-bold text-slate-300">Initializing Secure Verification Session...</p>
+              <span className="text-[11px] text-slate-500">Connecting to live identity verification gateway</span>
             </div>
           )}
 
@@ -221,14 +221,14 @@ export function DiditVerificationModal({
                 </p>
               </div>
 
-              {/* Primary Action Button: Open Didit Web App */}
+              {/* Primary Action Button: Open Web App */}
               <a
                 href={sessionUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="w-full py-3.5 px-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-black text-xs sm:text-sm rounded-2xl shadow-xl shadow-blue-500/25 flex items-center justify-center gap-2 transition active:scale-[0.99]"
               >
-                <span>Open Didit Verification Portal</span>
+                <span>Open Verification Portal</span>
                 <ExternalLink className="w-4 h-4" />
               </a>
 
@@ -237,7 +237,7 @@ export function DiditVerificationModal({
                 <div className="w-28 h-28 bg-white p-1.5 rounded-xl shrink-0 flex items-center justify-center shadow-md">
                   <img
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(sessionUrl)}`}
-                    alt="Didit QR"
+                    alt="Verification QR"
                     className="w-full h-full object-contain"
                   />
                 </div>
@@ -299,7 +299,7 @@ export function DiditVerificationModal({
                   <CheckCircle2 className="w-7 h-7 text-emerald-400" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-black text-white">Didit Identity Verified ✓</h4>
+                  <h4 className="text-sm font-black text-white">Identity Verified ✓</h4>
                   <p className="text-[11px] text-emerald-300 font-mono mt-0.5">
                     Ref ID: {extractedResult.verification_id}
                   </p>
@@ -353,13 +353,12 @@ export function DiditVerificationModal({
             </div>
           )}
 
-          {/* Declined State */}
           {sessionStatus === 'declined' && (
             <div className="p-4 bg-rose-950/60 border border-rose-800 rounded-2xl space-y-3 text-center">
               <div className="w-12 h-12 rounded-full bg-rose-500/20 border border-rose-500/40 mx-auto flex items-center justify-center text-rose-400">
                 <AlertCircle className="w-6 h-6" />
               </div>
-              <h4 className="text-sm font-black text-white">Verification Declined by Didit Protocol</h4>
+              <h4 className="text-sm font-black text-white">Identity Verification Declined</h4>
               <p className="text-xs text-rose-300">
                 The uploaded document or selfie did not pass security checks. You can restart verification or upload physical documents manually.
               </p>
@@ -368,7 +367,7 @@ export function DiditVerificationModal({
                 onClick={startDiditSession}
                 className="py-2 px-4 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl transition"
               >
-                Retry Didit Verification
+                Retry Identity Verification
               </button>
             </div>
           )}
@@ -377,7 +376,7 @@ export function DiditVerificationModal({
         {/* Footer info */}
         <div className="p-3.5 bg-slate-950 border-t border-slate-800/80 text-center text-[10px] text-slate-500 flex items-center justify-center gap-2 font-mono">
           <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
-          <span>PG-SETU Identity Shield · Powered by Didit.me Global Verification Network</span>
+          <span>PG-SETU Identity Shield · Secure Biometric &amp; ID Verification</span>
         </div>
       </div>
     </div>

@@ -82,7 +82,7 @@ export function MarketplaceFooter() {
             </ul>
           </div>
 
-          {/* Col 3: For Renters - Issue 10: Fixed H2 -> H3 */}
+          {/* Col 3: For Renters */}
           <div>
             <h3 className="text-sm font-semibold text-[#17211B] mb-3.5">
               For Renters
@@ -90,25 +90,33 @@ export function MarketplaceFooter() {
             <ul className="space-y-3 text-xs text-[#647067]">
               <li>
                 <Link href="/portal" className="hover:text-[#16A34A] py-0.5 inline-block font-medium text-[#17211B] transition">
-                  Tenant Portal & Passbook
+                  Tenant Portal &amp; Passbook
                 </Link>
               </li>
               <li>
-                <span className="hover:text-[#16A34A] py-0.5 inline-block cursor-pointer transition">Rent Agreement Maker</span>
+                <Link href="/safety" className="hover:text-[#16A34A] py-0.5 inline-block transition">
+                  Rent Agreement Guidelines
+                </Link>
               </li>
               <li>
-                <span className="hover:text-[#16A34A] py-0.5 inline-block cursor-pointer transition">Electricity Sub-meter Split</span>
+                <Link href="/software" className="hover:text-[#16A34A] py-0.5 inline-block transition">
+                  Electricity Sub-meter Split
+                </Link>
               </li>
               <li>
-                <span className="hover:text-[#16A34A] py-0.5 inline-block cursor-pointer transition">HRA Rent Receipts</span>
+                <Link href="/portal" className="hover:text-[#16A34A] py-0.5 inline-block transition">
+                  HRA Rent Receipts
+                </Link>
               </li>
               <li>
-                <span className="hover:text-[#16A34A] py-0.5 inline-block cursor-pointer transition">Tenant Rights & FAQs</span>
+                <Link href="/safety" className="hover:text-[#16A34A] py-0.5 inline-block transition">
+                  Tenant Rights &amp; FAQs
+                </Link>
               </li>
             </ul>
           </div>
 
-          {/* Col 4: For PG Owners - Issues 6 & 10: Title Case H3 */}
+          {/* Col 4: For PG Owners */}
           <div>
             <h3 className="text-sm font-semibold text-[#17211B] mb-3.5">
               For Owners &amp; Landlords
@@ -123,8 +131,6 @@ export function MarketplaceFooter() {
               <li>
                 <Link
                   href="/login"
-                  target="_blank"
-                  rel="noopener noreferrer"
                   className="hover:text-[#16A34A] py-0.5 inline-block font-semibold text-gray-700 transition"
                 >
                   Owner ERP Login
@@ -136,31 +142,37 @@ export function MarketplaceFooter() {
                 </Link>
               </li>
               <li>
-                <span className="hover:text-[#16A34A] py-0.5 inline-block cursor-pointer transition">Aadhaar KYC Verification</span>
+                <Link href="/safety" className="hover:text-[#16A34A] py-0.5 inline-block transition">
+                  Aadhaar KYC Verification
+                </Link>
               </li>
               <li>
-                <span className="hover:text-[#16A34A] py-0.5 inline-block cursor-pointer transition">Automated Rent Invoicing</span>
+                <Link href="/software" className="hover:text-[#16A34A] py-0.5 inline-block transition">
+                  Automated Rent Invoicing
+                </Link>
               </li>
               <li>
-                <span className="hover:text-[#16A34A] py-0.5 inline-block cursor-pointer transition">Sub-Meter Split & Rent Ledger</span>
+                <Link href="/erp-terms" className="hover:text-[#16A34A] py-0.5 inline-block transition">
+                  ERP Service Level Agreement
+                </Link>
               </li>
             </ul>
           </div>
         </div>
       </div>
 
-      {/* Bottom Copyright Bar - Issue 7: Changed text-[11px] to text-xs */}
-      <div className="border-t border-gray-100 bg-[#F7FAF7] py-4 pb-24 md:pb-4">
-        <div className="mx-auto flex max-w-7xl flex-col sm:flex-row items-center justify-between px-4 sm:px-6 lg:px-8 gap-2 text-xs text-[#647067] text-center sm:text-left">
-          <p>{footer?.copyrightText || '© 2026 PGSetu PropTech Technologies Pvt. Ltd. All rights reserved.'}</p>
-          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
-            <Link href="/privacy-policy" className="hover:text-[#17211B] transition">Privacy Policy</Link>
-            <Link href="/terms" className="hover:text-[#17211B] transition">Terms of Service</Link>
-            <Link href="/safety" className="hover:text-[#17211B] transition">Safety Guidelines</Link>
-            <Link href="/refund-policy" className="hover:text-[#17211B] transition">Refund Policy</Link>
-            <Link href="/cookies-policy" className="hover:text-[#17211B] transition">Cookie Policy</Link>
-            <Link href="/erp-terms" className="hover:text-[#17211B] transition">ERP Terms</Link>
-            <Link href="/sitemap" className="hover:text-[#17211B] transition">Sitemap</Link>
+      {/* Bottom Copyright Bar - generous bottom padding so floating widgets never overlap */}
+      <div className="border-t border-gray-200 bg-[#F7FAF7] py-6 pb-32 md:pb-20 relative z-20">
+        <div className="mx-auto flex max-w-7xl flex-col sm:flex-row items-center justify-between px-4 sm:px-6 lg:px-8 gap-3 text-xs text-[#647067] text-center sm:text-left">
+          <p className="font-medium">{footer?.copyrightText || '© 2026 PGSetu PropTech Technologies Pvt. Ltd. All rights reserved.'}</p>
+          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-5 relative z-20">
+            <Link href="/privacy-policy" className="font-semibold text-gray-700 hover:text-[#14532D] hover:underline underline-offset-4 decoration-emerald-600 transition py-1 px-0.5 cursor-pointer">Privacy Policy</Link>
+            <Link href="/terms" className="font-semibold text-gray-700 hover:text-[#14532D] hover:underline underline-offset-4 decoration-emerald-600 transition py-1 px-0.5 cursor-pointer">Terms of Service</Link>
+            <Link href="/safety" className="font-semibold text-gray-700 hover:text-[#14532D] hover:underline underline-offset-4 decoration-emerald-600 transition py-1 px-0.5 cursor-pointer">Safety Guidelines</Link>
+            <Link href="/refund-policy" className="font-semibold text-gray-700 hover:text-[#14532D] hover:underline underline-offset-4 decoration-emerald-600 transition py-1 px-0.5 cursor-pointer">Refund Policy</Link>
+            <Link href="/cookies-policy" className="font-semibold text-gray-700 hover:text-[#14532D] hover:underline underline-offset-4 decoration-emerald-600 transition py-1 px-0.5 cursor-pointer">Cookie Policy</Link>
+            <Link href="/erp-terms" className="font-semibold text-gray-700 hover:text-[#14532D] hover:underline underline-offset-4 decoration-emerald-600 transition py-1 px-0.5 cursor-pointer">ERP Terms</Link>
+            <Link href="/sitemap" className="font-semibold text-gray-700 hover:text-[#14532D] hover:underline underline-offset-4 decoration-emerald-600 transition py-1 px-0.5 cursor-pointer">Sitemap</Link>
           </div>
         </div>
       </div>

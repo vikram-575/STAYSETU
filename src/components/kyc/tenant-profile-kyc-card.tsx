@@ -82,7 +82,7 @@ export function TenantProfileKYCCard({
         const text = `Hello ${residentName},\n\nPlease complete your digital identity verification for PG-SETU stay:\n👉 ${data.url}\n\nTakes less than 2 minutes. Thank you!`
         window.open(`https://wa.me/${targetPhone}?text=${encodeURIComponent(text)}`, '_blank')
       }
-      setShareSuccess('Didit WhatsApp verification link dispatched!')
+      setShareSuccess('Identity verification link dispatched via WhatsApp!')
       setTimeout(() => setShareSuccess(''), 3000)
     } catch (err: any) {
       alert(err.message)
@@ -114,7 +114,7 @@ export function TenantProfileKYCCard({
       <div className="flex items-center justify-between border-b border-gray-100 pb-3">
         <div className="flex items-center gap-2">
           <ScanFace className="w-5 h-5 text-blue-600 shrink-0" />
-          <h3 className="text-sm font-bold text-gray-900">Didit Identity Verification</h3>
+          <h3 className="text-sm font-bold text-gray-900">Official Digital KYC Verification</h3>
         </div>
 
         {isVerified ? (
@@ -141,7 +141,7 @@ export function TenantProfileKYCCard({
           <div className="p-3.5 bg-gradient-to-br from-emerald-50/70 to-teal-50/40 rounded-2xl border border-emerald-200/80 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase text-emerald-800 tracking-wide flex items-center gap-1">
-                <ScanFace className="w-3.5 h-3.5 text-emerald-600" /> Didit AI Verification
+                <ScanFace className="w-3.5 h-3.5 text-emerald-600" /> Biometric AI Verification
               </span>
               <span className="font-mono text-[11px] font-bold text-slate-700">
                 {verificationId}
@@ -164,7 +164,7 @@ export function TenantProfileKYCCard({
           {/* Checks Checklist */}
           <div className="space-y-1.5 pt-1">
             <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">
-              Didit Protocol Biometric &amp; OCR Checks:
+              Biometric &amp; Government ID OCR Checks:
             </span>
             <div className="grid grid-cols-2 gap-2 text-[11px]">
               <div className="p-2 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center gap-1.5 text-slate-700 font-medium">
@@ -200,7 +200,7 @@ export function TenantProfileKYCCard({
               onClick={() => setShowDiditModal(true)}
               className="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition flex items-center gap-1"
             >
-              <RefreshCw className="w-3 h-3" /> Re-verify with Didit
+              <RefreshCw className="w-3 h-3" /> Re-verify Identity
             </button>
           </div>
         </div>
@@ -210,7 +210,7 @@ export function TenantProfileKYCCard({
           <div className="p-3.5 bg-blue-50/60 rounded-2xl border border-blue-200 space-y-1">
             <span className="text-blue-900 font-bold block text-xs">Identity Verification Pending</span>
             <p className="text-slate-600 text-[11px]">
-              Verify this person instantly through Didit protocol (biometric face-match, liveness &amp; ID OCR) or dispatch a direct verification link to {residentName}&apos;s WhatsApp.
+              Verify this person instantly through secure biometric face-match, liveness &amp; ID OCR, or dispatch a direct verification link to {residentName}&apos;s WhatsApp.
             </p>
           </div>
 
@@ -220,7 +220,7 @@ export function TenantProfileKYCCard({
               className="flex-1 py-2.5 px-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-black rounded-xl text-xs shadow-sm transition flex items-center justify-center gap-1.5 active:scale-95"
             >
               <ScanFace className="w-4 h-4" />
-              <span>Verify Person through Didit</span>
+              <span>Verify Resident Identity</span>
             </button>
 
             <button
