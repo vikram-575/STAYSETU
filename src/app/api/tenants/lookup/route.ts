@@ -4,6 +4,7 @@ import { getAuthenticatedUser } from '@/lib/auth-session'
 import { resolveEffectiveOrgId } from '@/lib/org-helper'
 import { cleanMobile, isValidMobile, generateTenantId } from '@/lib/profiles'
 import { queryCollection } from '@/lib/firebase/firestore'
+import { isProtectedSuperAdminIdentity } from '@/lib/admin-auth'
 
 /**
  * GET /api/tenants/lookup?phone=9876543210
@@ -26,6 +27,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         { error: 'Valid 10-digit mobile number is required for lookup.' },
         { status: 400 }
+      )
+    }
+
+    if (isProtectedSuperAdminIdentity({ phone: cleanedPhone })) {
+      return NextResponse.json(
+        { error: 'This phone number is reserved for platform Superadmin and cannot be registered or looked up as a tenant.', blocked: true },
+        { status: 403 }
       )
     }
 

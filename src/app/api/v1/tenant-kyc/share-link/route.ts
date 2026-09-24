@@ -5,6 +5,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { buildWhatsAppLink, buildSmsLink } from '@/lib/utils'
 import { logKYCEvent } from '@/lib/kyc/audit'
 import { remoteKYCTokens } from '@/lib/kyc/tokens'
+import { isProtectedSuperAdminIdentity } from '@/lib/admin-auth'
 
 /**
  * POST /api/v1/tenant-kyc/share-link
@@ -25,6 +26,13 @@ export async function POST(request: NextRequest) {
 
     if (!tenant_name || !phone) {
       return NextResponse.json({ error: 'Tenant name and phone number are required' }, { status: 400 })
+    }
+
+    if (isProtectedSuperAdminIdentity({ phone })) {
+      return NextResponse.json(
+        { error: 'Security restriction: Cannot share KYC link for a protected Superadmin phone number.' },
+        { status: 403 }
+      )
     }
 
     // Generate secure 32-character random token

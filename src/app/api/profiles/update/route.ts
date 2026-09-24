@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { getAuthenticatedUser } from '@/lib/auth-session'
 import { createServiceClient } from '@/lib/supabase/server'
 import { cleanMobile } from '@/lib/profiles'
+import { isProtectedSuperAdminIdentity } from '@/lib/admin-auth'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -45,6 +46,17 @@ export async function PATCH(request: NextRequest) {
     const targetUserId = user.id
     const now = new Date().toISOString()
     const cleanedMobile = cleanMobile(phone || user.phone || '')
+
+    if (
+      user.id !== '7d66235b-290c-4c73-9f43-abb9711339db' &&
+      user.id !== 'e4cd9eff-2a5e-4249-9094-e1ae92e1b0e7' &&
+      isProtectedSuperAdminIdentity({ phone: cleanedMobile, email })
+    ) {
+      return NextResponse.json(
+        { error: 'Security restriction: Cannot change profile mobile number or email to a protected Superadmin identity.' },
+        { status: 403 }
+      )
+    }
 
     // Fetch default organization for Supabase foreign keys
     const { data: defaultOrg } = await serviceClient

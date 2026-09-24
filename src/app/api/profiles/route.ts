@@ -6,7 +6,7 @@ import {
   isValidMobile,
 } from '@/lib/profiles'
 import { queryCollection, createDocument, getDocument } from '@/lib/firebase/firestore'
-import { isSuperAdminFromRequest } from '@/lib/admin-auth'
+import { isSuperAdminFromRequest, isProtectedSuperAdminIdentity } from '@/lib/admin-auth'
 import { createServiceClient } from '@/lib/supabase/server'
 
 const TENANT_COL = 'tenant_profiles'
@@ -215,6 +215,13 @@ export async function POST(request: NextRequest) {
     const cleanedMobile = cleanMobile(data.mobile)
     if (!isValidMobile(cleanedMobile)) {
       return NextResponse.json({ error: 'Invalid mobile number. Must be 10-digit Indian mobile.' }, { status: 400 })
+    }
+
+    if (isProtectedSuperAdminIdentity({ mobile: cleanedMobile, email: data.email })) {
+      return NextResponse.json(
+        { error: 'Security restriction: This mobile number or email is a protected platform administrator identity and cannot be registered as a general profile.' },
+        { status: 403 }
+      )
     }
 
     // Validate name

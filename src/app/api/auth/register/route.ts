@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { isProtectedSuperAdminIdentity } from '@/lib/admin-auth'
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,11 +11,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 })
     }
 
+    const cleanEmail = email.trim().toLowerCase()
+
+    if (isProtectedSuperAdminIdentity({ email: cleanEmail })) {
+      return NextResponse.json(
+        { error: 'Security alert: This email is a protected platform administrator identity and cannot be registered as a general user. Please sign in via the official Superadmin portal.' },
+        { status: 403 }
+      )
+    }
+
     if (password.length < 6) {
       return NextResponse.json({ error: 'Password must be at least 6 characters long.' }, { status: 400 })
     }
 
-    const cleanEmail = email.trim().toLowerCase()
     const cookieStore = await cookies()
     const serviceClient = await createServiceClient()
 

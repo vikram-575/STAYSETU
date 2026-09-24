@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { signPortalToken } from '@/lib/portal-auth'
+import { isProtectedSuperAdminIdentity } from '@/lib/admin-auth'
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,6 +17,14 @@ export async function POST(request: NextRequest) {
 
     // Clean phone/identifier: take digits or registration ID
     const rawInput = String(phone).trim()
+
+    if (isProtectedSuperAdminIdentity({ phone: rawInput })) {
+      return NextResponse.json(
+        { error: 'This mobile number is reserved for platform Superadmin and cannot access the tenant resident portal. Please use the Superadmin console at /superman.' },
+        { status: 403 }
+      )
+    }
+
     const digitsOnly = rawInput.replace(/\D/g, '')
     const searchPhone = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly
 

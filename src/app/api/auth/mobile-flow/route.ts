@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServiceClient } from '@/lib/supabase/server'
 import { cleanMobile, isValidMobile, generateTenantId } from '@/lib/profiles'
-import { isKnownSuperAdmin, signAdminToken } from '@/lib/admin-auth'
+import { isKnownSuperAdmin, signAdminToken, isProtectedSuperAdminIdentity } from '@/lib/admin-auth'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -89,6 +89,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { error: 'Please enter a valid 10-digit Indian mobile number.' },
           { status: 400 }
+        )
+      }
+
+      if (requestedRole === 'tenant' && isProtectedSuperAdminIdentity({ mobile: cleaned })) {
+        return NextResponse.json(
+          { error: 'Security restriction: This mobile number is a protected platform administrator identity and cannot be used for tenant registration or resident check-in.' },
+          { status: 403 }
         )
       }
 
@@ -318,6 +325,14 @@ export async function POST(request: NextRequest) {
     if (action === 'verify-resident-otp') {
       const rawMobile = body.mobile || ''
       const cleaned = cleanMobile(rawMobile)
+
+      if (isProtectedSuperAdminIdentity({ mobile: cleaned })) {
+        return NextResponse.json(
+          { error: 'Security restriction: This mobile number is reserved for platform Superadmin and cannot be checked in as a resident.' },
+          { status: 403 }
+        )
+      }
+
       const userOtp = (body.otp || '').trim()
       const idToken = body.idToken
 
@@ -527,8 +542,16 @@ export async function POST(request: NextRequest) {
       const effectiveName = user?.full_name || resident?.full_name || matchedOrg?.name || (requestedRole === 'owner' ? 'PG Owner' : 'PG-Setu Resident')
       const rawFoundEmail = user?.email || resident?.email || matchedOrg?.email || ''
       const effectiveEmail = cleanUserEmail(rawFoundEmail)
-      const effectiveRole = requestedRole === 'owner' ? (user?.role || 'owner') : 'resident'
-      let residentId = requestedRole === 'tenant' ? (resident?.id || user?.resident_id || null) : null
+      const isSuper = isKnownSuperAdmin(effectiveEmail || rawFoundEmail, user?.role, targetUserId, cleaned)
+      if (requestedRole === 'tenant' && isSuper) {
+        return NextResponse.json(
+          { error: 'Security restriction: This mobile number is a protected platform administrator identity. Please log in through the Superadmin portal or Owner console.' },
+          { status: 403 }
+        )
+      }
+
+      const effectiveRole = isSuper ? (user?.role || 'owner') : (requestedRole === 'owner' ? (user?.role || 'owner') : 'resident')
+      let residentId = isSuper ? null : (requestedRole === 'tenant' ? (resident?.id || user?.resident_id || null) : null)
       const orgId = requestedRole === 'owner'
         ? (user?.organization_id || matchedOrg?.id || null)
         : (resident?.organization_id || user?.organization_id || null)
@@ -695,6 +718,12 @@ export async function POST(request: NextRequest) {
       const cleanedMobile = cleanMobile(mobile || '')
       if (!cleanedMobile || cleanedMobile.length < 10) {
         return NextResponse.json({ error: 'Valid 10-digit mobile number required.' }, { status: 400 })
+      }
+      if (isProtectedSuperAdminIdentity({ mobile: cleanedMobile, email })) {
+        return NextResponse.json(
+          { error: 'Security alert: This mobile number or email is a protected platform administrator identity and cannot be registered as a tenant.' },
+          { status: 403 }
+        )
       }
       if (!full_name || !full_name.trim()) {
         return NextResponse.json({ error: 'Full Name is required.' }, { status: 400 })
@@ -930,6 +959,12 @@ export async function POST(request: NextRequest) {
       const cleanedMobile = cleanMobile(mobile || '')
       if (!cleanedMobile || cleanedMobile.length < 10) {
         return NextResponse.json({ error: 'Valid 10-digit mobile number required.' }, { status: 400 })
+      }
+      if (isProtectedSuperAdminIdentity({ mobile: cleanedMobile, email })) {
+        return NextResponse.json(
+          { error: 'Security alert: This mobile number or email is a protected platform administrator identity. Please sign in directly via the Superadmin portal.' },
+          { status: 403 }
+        )
       }
       if (!owner_name || !owner_name.trim()) {
         return NextResponse.json({ error: 'Full Name is required.' }, { status: 400 })

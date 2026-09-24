@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/supabase/config'
-import { isSuperAdminFromRequest, isKnownSuperAdmin, SUPER_ADMIN_EMAILS } from '@/lib/admin-auth'
+import { isSuperAdminFromRequest, isKnownSuperAdmin, SUPER_ADMIN_EMAILS, isProtectedSuperAdminIdentity } from '@/lib/admin-auth'
 
 async function requireSuperAdmin(request: NextRequest) {
   if (isSuperAdminFromRequest(request)) {
@@ -343,6 +343,14 @@ export async function POST(request: NextRequest) {
     }
 
     const cleanEmail = email.trim().toLowerCase()
+
+    if (isProtectedSuperAdminIdentity({ email: cleanEmail, phone })) {
+      return NextResponse.json(
+        { error: 'Security Protection: Cannot create or overwrite protected Super Admin identities through this endpoint.' },
+        { status: 403 }
+      )
+    }
+
     const supabase = await createServiceClient()
 
     // 1. Create in Supabase Auth with temporary password flag
@@ -454,6 +462,18 @@ export async function PUT(request: NextRequest) {
     const cleanEmail = email ? email.toLowerCase().trim() : undefined
     const cleanPhone = phone ? phone.replace(/\D/g, '') : undefined
     const cleanAltPhone = alternate_phone ? alternate_phone.replace(/\D/g, '') : undefined
+
+    if (
+      id !== '7d66235b-290c-4c73-9f43-abb9711339db' &&
+      id !== 'e4cd9eff-2a5e-4249-9094-e1ae92e1b0e7' &&
+      (isProtectedSuperAdminIdentity({ email: cleanEmail, phone: cleanPhone }) ||
+       (cleanAltPhone && isProtectedSuperAdminIdentity({ phone: cleanAltPhone })))
+    ) {
+      return NextResponse.json(
+        { error: 'Security Protection: Cannot reassign phone or email to a protected Super Admin identity.' },
+        { status: 403 }
+      )
+    }
 
     let updatedUser = null
     let updatedResident = null

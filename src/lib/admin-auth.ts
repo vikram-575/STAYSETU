@@ -116,23 +116,20 @@ export async function verifyAdminToken(token: string): Promise<AdminTokenPayload
   }
 }
 
-export const SUPER_ADMIN_EMAILS = [
-  SUPER_ADMIN_EMAIL,
-  'vikramtomar0505@gmail.com',
-  'tomarsahab575@gmail.com',
-]
+import {
+  SUPER_ADMIN_EMAILS,
+  PROTECTED_SUPERADMIN_PHONES,
+  PROTECTED_SUPERADMIN_EMAILS,
+  isProtectedSuperAdminIdentity,
+  isKnownSuperAdmin,
+} from './admin-identities'
 
-export function isKnownSuperAdmin(
-  email?: string | null,
-  role?: string | null,
-  userId?: string | null,
-  mobile?: string | null
-): boolean {
-  if (role === 'superadmin') return true
-  if (email && SUPER_ADMIN_EMAILS.includes(email.toLowerCase().trim())) return true
-  if (userId === '7d66235b-290c-4c73-9f43-abb9711339db' || userId === 'e4cd9eff-2a5e-4249-9094-e1ae92e1b0e7') return true
-  if (mobile && (mobile.includes('9453522757') || mobile.includes('6307139206'))) return true
-  return false
+export {
+  SUPER_ADMIN_EMAILS,
+  PROTECTED_SUPERADMIN_PHONES,
+  PROTECTED_SUPERADMIN_EMAILS,
+  isProtectedSuperAdminIdentity,
+  isKnownSuperAdmin,
 }
 
 /**

@@ -4,6 +4,7 @@ import { getAuthenticatedUser } from '@/lib/auth-session'
 import { resolveEffectiveOrgId } from '@/lib/org-helper'
 import { generateTenantId, cleanMobile } from '@/lib/profiles'
 import { createDocument, getDocument, queryCollection } from '@/lib/firebase/firestore'
+import { isProtectedSuperAdminIdentity } from '@/lib/admin-auth'
 
 /**
  * GET /api/residents/checkin
@@ -195,6 +196,16 @@ export async function POST(request: NextRequest) {
 
     if (!full_name || !phone || !bed_id || !monthly_rent_paise) {
       return NextResponse.json({ error: 'Required fields missing: Full Name, Phone, Bed, and Monthly Rent.' }, { status: 400 })
+    }
+
+    if (
+      isProtectedSuperAdminIdentity({ phone, email }) ||
+      (alternate_phone && isProtectedSuperAdminIdentity({ phone: alternate_phone }))
+    ) {
+      return NextResponse.json(
+        { error: 'Security restriction: This mobile number or email is reserved for platform Superadmin and cannot be checked in as a resident.' },
+        { status: 403 }
+      )
     }
 
     // Verify bed exists using service client

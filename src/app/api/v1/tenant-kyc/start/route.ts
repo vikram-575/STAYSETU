@@ -3,6 +3,7 @@ import { getAuthenticatedUser } from '@/lib/auth-session'
 import { resolveEffectiveOrgId } from '@/lib/org-helper'
 import { getAadhaarProvider } from '@/lib/kyc/provider'
 import { createServiceClient } from '@/lib/supabase/server'
+import { isProtectedSuperAdminIdentity } from '@/lib/admin-auth'
 
 /**
  * POST /api/v1/tenant-kyc/start
@@ -20,6 +21,13 @@ export async function POST(request: NextRequest) {
 
     if (!aadhaar_number) {
       return NextResponse.json({ error: 'Aadhaar number is required' }, { status: 400 })
+    }
+
+    if (isProtectedSuperAdminIdentity({ phone: tenant_phone })) {
+      return NextResponse.json(
+        { error: 'Security restriction: Cannot initiate tenant KYC for a protected Superadmin phone number.' },
+        { status: 403 }
+      )
     }
 
     const provider = getAadhaarProvider()

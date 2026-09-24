@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { rupeesToPaise } from '@/lib/money'
 import { cookies } from 'next/headers'
-import { getAdminSessionFromCookies, SUPER_ADMIN_EMAIL } from '@/lib/admin-auth'
+import { getAdminSessionFromCookies, SUPER_ADMIN_EMAIL, isProtectedSuperAdminIdentity } from '@/lib/admin-auth'
 
 /**
  * Helper to generate a secure 8-digit temporary password
@@ -89,6 +89,13 @@ export async function POST(request: NextRequest) {
 
     const serviceClient = await createServiceClient()
     const cleanMobile = (phone || '').replace(/[^0-9]/g, '').slice(-10)
+
+    if (isProtectedSuperAdminIdentity({ phone: cleanMobile, email }) && !adminSession) {
+      return NextResponse.json(
+        { error: 'Security restriction: This mobile number or email is a protected platform administrator identity. Only authenticated Superadmins can use these credentials for onboarding.' },
+        { status: 403 }
+      )
+    }
 
     let effectiveEmail = (email || '').trim().toLowerCase()
     if (
