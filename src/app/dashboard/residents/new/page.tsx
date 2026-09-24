@@ -8,7 +8,7 @@ import {
   Building2, BedDouble, Shield, FileText, Loader2, DollarSign,
   Phone, Lock, Sparkles, RefreshCw, KeyRound, AlertCircle, Check,
   UserCheck, ShieldCheck, MapPin, Contact, ScanFace, ExternalLink,
-  AlertTriangle
+  AlertTriangle, Camera, Upload
 } from 'lucide-react'
 import { formatCurrency, rupeesToPaise } from '@/lib/money'
 import { FirebaseFileUploader } from '@/components/ui/firebase-file-uploader'
@@ -104,6 +104,7 @@ export default function CheckInResidentPage() {
         permanent_pincode: ext.address?.pincode || prev.permanent_pincode,
         id_type: 'aadhaar',
         id_number: result.masked_aadhaar || prev.id_number,
+        photo_url: ext.photo_base64 || prev.photo_url,
         notes: prev.notes
           ? `${prev.notes}\n[Sandbox Aadhaar Verified: ${result.verification_id} - Masked: ${result.masked_aadhaar}]`
           : `[Sandbox Aadhaar Verified: ${result.verification_id} - Masked: ${result.masked_aadhaar}]`,
@@ -151,9 +152,10 @@ export default function CheckInResidentPage() {
     emergency_name: '',
     emergency_phone: '',
     emergency_relation: 'Parent',
-    // Step 3: ID Proof
+    // Step 3: ID Proof & Photo
     id_type: 'aadhaar',
     id_number: '',
+    photo_url: '',
     kyc_doc_url: '',
     notes: '',
     // Step 4: Assignment
@@ -557,6 +559,7 @@ export default function CheckInResidentPage() {
           ...form,
           monthly_rent_paise: rupeesToPaise(form.monthly_rent_rupees),
           deposit_amount_paise: rupeesToPaise(form.deposit_amount_rupees),
+          sandbox_kyc: sandboxAadhaarVerified,
         }),
       })
 
@@ -1397,6 +1400,53 @@ export default function CheckInResidentPage() {
                         </span>
                         <span className="text-[10px] text-emerald-700 block font-bold mt-0.5">City: {form.permanent_city} · State: {form.permanent_state} · Pincode: {form.permanent_pincode} ✓</span>
                       </div>
+                    </div>
+
+                    {/* Live Profile Photo Strip */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-white/95 rounded-xl border border-emerald-200 text-xs">
+                      <div className="flex items-center gap-3">
+                        {form.photo_url ? (
+                          <img
+                            src={form.photo_url}
+                            alt="Resident Profile"
+                            className="w-12 h-14 object-cover rounded-xl border border-emerald-300 shadow-xs shrink-0"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-800 font-black flex items-center justify-center shrink-0">
+                            {form.full_name ? form.full_name.slice(0, 2).toUpperCase() : 'KYC'}
+                          </div>
+                        )}
+                        <div>
+                          <span className="text-xs font-black text-emerald-950 block">
+                            {form.photo_url ? 'Resident Photo Captured ✓' : 'Profile Photo'}
+                          </span>
+                          <span className="text-[11px] text-gray-500">
+                            Auto-syncs to resident profile avatar and Document Vault on check-in
+                          </span>
+                        </div>
+                      </div>
+                      <label className="cursor-pointer py-1.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold transition shrink-0 active:scale-95 flex items-center justify-center gap-1.5 shadow-2xs">
+                        <Camera className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>Upload / Change Live Photo</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="user"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              const reader = new FileReader()
+                              reader.onload = () => {
+                                if (typeof reader.result === 'string') {
+                                  setForm((prev) => ({ ...prev, photo_url: reader.result as string }))
+                                }
+                              }
+                              reader.readAsDataURL(file)
+                            }
+                          }}
+                        />
+                      </label>
                     </div>
                   </div>
                 ) : (

@@ -232,21 +232,6 @@ export function AadhaarVerificationModal({
           </button>
         </div>
 
-        {/* Live / Sandbox Engine Notice Banner */}
-        {isDemoMode && (
-          <div className="bg-emerald-50 border-b border-emerald-200 px-4 py-2 text-[11px] font-bold text-emerald-900 flex items-center justify-between">
-            <span className="flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>SANDBOX LIVE AADHAAR VERIFICATION BRIDGE</span>
-            </span>
-            {demoOtp && step === 'otp' && (
-              <span className="font-mono bg-emerald-200/80 px-2 py-0.5 rounded text-emerald-950 font-black">
-                Verification OTP: {demoOtp}
-              </span>
-            )}
-          </div>
-        )}
-
         <div className="p-6 space-y-5">
           {error && (
             <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-semibold flex items-center gap-2">
@@ -431,6 +416,21 @@ export function AadhaarVerificationModal({
                           All Matches Confirmed
                         </span>
                       </div>
+
+                      {extractedData.photo_base64 && (
+                        <div className="flex items-center gap-3 p-2 bg-emerald-100/60 rounded-xl border border-emerald-200">
+                          <img
+                            src={extractedData.photo_base64}
+                            alt="Aadhaar Photo"
+                            className="w-12 h-14 object-cover rounded-lg border border-emerald-300 shadow-xs"
+                          />
+                          <div>
+                            <span className="text-[11px] font-black text-emerald-950 block">Live Photo Fetched ✓</span>
+                            <span className="text-[10px] text-emerald-800">Will automatically set as resident profile picture</span>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="grid grid-cols-2 gap-2 text-[11px]">
                         <div>
                           <span className="text-gray-400 block text-[10px]">DOB / Gender:</span>

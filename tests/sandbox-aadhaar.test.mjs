@@ -174,4 +174,29 @@ describe('Sandbox Aadhaar e-KYC Verification & Profile Auto-Save', () => {
     const mismatch = calculateNameMatch('Rahul Sharma', 'PRIYA PATEL')
     assert.equal(mismatch.match, false)
   })
+
+  it('should normalize diverse DOB formats to ISO YYYY-MM-DD for Postgres compatibility', async () => {
+    const { normalizeDobToIso, formatMaskedAadhaar } = await import('../src/lib/kyc/formatters.ts')
+
+    // DD-MM-YYYY
+    assert.equal(normalizeDobToIso('14-05-1998'), '1998-05-14')
+    // DD/MM/YYYY
+    assert.equal(normalizeDobToIso('14/05/1998'), '1998-05-14')
+    // Single digit day/month
+    assert.equal(normalizeDobToIso('5/5/1998'), '1998-05-05')
+    // Year only
+    assert.equal(normalizeDobToIso('1998'), '1998-01-01')
+    // Standard ISO
+    assert.equal(normalizeDobToIso('1998-05-14'), '1998-05-14')
+    // Null / Undefined
+    assert.equal(normalizeDobToIso(null), null)
+    assert.equal(normalizeDobToIso(''), null)
+
+    // Masked Aadhaar format
+    assert.equal(formatMaskedAadhaar('9453'), 'XXXX XXXX 9453')
+    assert.equal(formatMaskedAadhaar('123456789453'), 'XXXX XXXX 9453')
+    assert.equal(formatMaskedAadhaar('XXXX XXXX 9453'), 'XXXX XXXX 9453')
+    assert.equal(formatMaskedAadhaar(''), 'XXXX XXXX XXXX')
+  })
 })
+

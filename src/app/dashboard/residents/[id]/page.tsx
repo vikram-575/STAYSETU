@@ -11,6 +11,9 @@ import {
 } from 'lucide-react'
 import { signPortalToken } from '@/lib/portal-auth'
 import ResidentDetailTabs from '@/components/residents/resident-detail-tabs'
+import ResidentPhotoUploader from '@/components/residents/resident-photo-uploader'
+import ResidentKycCard from '@/components/residents/resident-kyc-card'
+import ResidentDocumentsVault from '@/components/residents/resident-documents-vault'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -218,13 +221,11 @@ export default async function ResidentDetailPage({ params, searchParams }: Props
       <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-6">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sm:gap-6">
           <div className="flex items-center gap-3.5 sm:gap-4">
-            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center text-lg sm:text-xl font-black border border-blue-200 shrink-0">
-              {resident.photo_url ? (
-                <img src={resident.photo_url} alt="" className="w-full h-full rounded-2xl object-cover" />
-              ) : (
-                initials(resident.full_name)
-              )}
-            </div>
+            <ResidentPhotoUploader
+              residentId={residentId}
+              fullName={resident.full_name}
+              currentPhotoUrl={fullResident?.photo_url || resident.photo_url}
+            />
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-lg sm:text-xl font-black text-gray-900 tracking-tight">{resident.full_name}</h1>
@@ -330,62 +331,12 @@ export default async function ResidentDetailPage({ params, searchParams }: Props
           </div>
 
           {/* Identity Document & KYC Card */}
-          <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-4 sm:p-5 space-y-3 sm:space-y-4 shadow-xs">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                <FileBadge className="w-4 h-4 text-blue-600 shrink-0" /> KYC Verification
-              </h3>
-              {kycRecord ? (
-                <span className={cn(
-                  'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase',
-                  kycRecord.status === 'verified'
-                    ? 'bg-green-100 text-green-800'
-                    : kycRecord.status === 'rejected'
-                    ? 'bg-red-100 text-red-800'
-                    : 'bg-yellow-100 text-yellow-800'
-                )}>
-                  {kycRecord.status}
-                </span>
-              ) : (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-gray-100 text-gray-600">
-                  Pending
-                </span>
-              )}
-            </div>
-
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between py-1.5 border-b border-gray-100">
-                <span className="text-gray-500">Document Type</span>
-                <span className="font-bold uppercase text-gray-900">
-                  {fullResident?.id_type ? fullResident.id_type.replace('_', ' ') : '—'}
-                </span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-gray-100">
-                <span className="text-gray-500">Document Number</span>
-                <span className="font-mono font-bold text-gray-900">
-                  {fullResident?.id_number || '—'}
-                </span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-gray-100">
-                <span className="text-gray-500">Gender / DOB</span>
-                <span className="font-medium text-gray-900 capitalize">
-                  {fullResident?.gender ?? '—'} · {formatDate(fullResident?.date_of_birth)}
-                </span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-gray-100">
-                <span className="text-gray-500">Permanent Address</span>
-                <span className="font-medium text-right text-gray-900 max-w-[180px] truncate">
-                  {fullResident?.permanent_address ?? '—'}
-                </span>
-              </div>
-              <div className="flex justify-between py-1.5">
-                <span className="text-gray-500">City / State</span>
-                <span className="font-bold text-gray-900">
-                  {fullResident?.permanent_city ?? '—'}, {fullResident?.permanent_state ?? ''}
-                </span>
-              </div>
-            </div>
-          </div>
+          <ResidentKycCard
+            residentId={residentId}
+            organizationId={orgId}
+            resident={fullResident || resident}
+            kycRecord={kycRecord}
+          />
 
           {/* Personal & Identification Details */}
           <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-4 sm:p-5 space-y-3 sm:space-y-4 shadow-xs">
@@ -859,33 +810,10 @@ export default async function ResidentDetailPage({ params, searchParams }: Props
             key: 'documents',
             label: `Documents (${documents?.length ?? 0})`,
             content: (
-        <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-3.5 sm:p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-gray-900">Secure Document Vault</h3>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3">
-            {documents && documents.length > 0 ? (
-              documents.map((doc) => (
-                <div key={doc.id} className="p-3 border border-gray-200 rounded-2xl flex items-center justify-between text-xs shadow-2xs">
-                  <div className="flex items-center gap-2.5">
-                    <FileBadge className="w-6 h-6 text-blue-600 shrink-0" />
-                    <div>
-                      <p className="font-bold text-gray-900">{doc.doc_name}</p>
-                      <p className="text-gray-400 text-[10px] uppercase">{doc.doc_type} · Status: {doc.status}</p>
-                    </div>
-                  </div>
-                  <span className="px-2 py-0.5 bg-green-50 text-green-700 font-bold rounded-full text-[10px] uppercase">
-                    {doc.status}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <div className="col-span-2 py-8 text-center text-gray-400 text-xs">
-                No KYC documents uploaded yet.
-              </div>
-            )}
-          </div>
-        </div>
+              <ResidentDocumentsVault
+                residentId={residentId}
+                documents={documents || []}
+              />
             ),
           },
         ]}

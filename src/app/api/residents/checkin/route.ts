@@ -5,6 +5,7 @@ import { resolveEffectiveOrgId } from '@/lib/org-helper'
 import { generateTenantId, cleanMobile } from '@/lib/profiles'
 import { createDocument, getDocument, queryCollection } from '@/lib/firebase/firestore'
 import { isProtectedSuperAdminIdentity } from '@/lib/admin-auth'
+import { applyVerifiedKYCToResident, normalizeDobToIso, formatMaskedAadhaar } from '@/lib/kyc/sync-kyc'
 
 /**
  * GET /api/residents/checkin
@@ -187,11 +188,12 @@ export async function POST(request: NextRequest) {
 
     const {
       full_name, phone, alternate_phone, email, date_of_birth, gender,
-      permanent_address, permanent_city, permanent_state,
+      permanent_address, permanent_city, permanent_state, permanent_pincode,
       emergency_name, emergency_phone, emergency_relation,
-      id_type, id_number, notes,
+      id_type, id_number, photo_url, notes,
       bed_id, check_in_date, monthly_rent_paise, billing_cycle_day, proration_policy,
-      deposit_amount_paise, deposit_payment_method
+      deposit_amount_paise, deposit_payment_method,
+      sandbox_kyc,
     } = body
 
     if (!full_name || !phone || !bed_id || !monthly_rent_paise) {
@@ -313,6 +315,11 @@ export async function POST(request: NextRequest) {
         }, { status: 400 })
       }
 
+      const cleanDob = normalizeDobToIso(date_of_birth)
+      const cleanMaskedId = (id_type === 'aadhaar' || (!id_type && id_number))
+        ? formatMaskedAadhaar(id_number)
+        : (id_number?.trim() || null)
+
       // Reactivate checked-out resident with updated details
       const { data: updatedRes, error: updateErr } = await serviceClient
         .from('residents')
@@ -321,16 +328,18 @@ export async function POST(request: NextRequest) {
           phone: cleanedPhone,
           alternate_phone: alternate_phone?.trim() || null,
           email: email?.trim() || null,
-          date_of_birth: date_of_birth || null,
+          date_of_birth: cleanDob,
           gender: gender || null,
           permanent_address: permanent_address?.trim() || null,
           permanent_city: permanent_city?.trim() || null,
           permanent_state: permanent_state?.trim() || null,
+          permanent_pincode: permanent_pincode?.trim() || null,
           emergency_name: emergency_name?.trim() || null,
           emergency_phone: emergency_phone?.trim() || null,
           emergency_relation: emergency_relation?.trim() || null,
-          id_type: id_type || null,
-          id_number: id_number?.trim() || null,
+          id_type: id_type || 'aadhaar',
+          id_number: cleanMaskedId,
+          photo_url: photo_url || null,
           status: 'active',
           notes: notes?.trim() || null,
           updated_at: new Date().toISOString(),
@@ -344,6 +353,10 @@ export async function POST(request: NextRequest) {
       }
       resident = updatedRes
     } else {
+      const cleanDob = normalizeDobToIso(date_of_birth)
+      const cleanMaskedId = (id_type === 'aadhaar' || (!id_type && id_number))
+        ? formatMaskedAadhaar(id_number)
+        : (id_number?.trim() || null)
       const newResidentId = crypto.randomUUID()
       const { data: newResident, error: residentError } = await serviceClient
         .from('residents')
@@ -355,16 +368,18 @@ export async function POST(request: NextRequest) {
           phone: cleanedPhone,
           alternate_phone: alternate_phone?.trim() || null,
           email: email?.trim() || null,
-          date_of_birth: date_of_birth || null,
+          date_of_birth: cleanDob,
           gender: gender || null,
           permanent_address: permanent_address?.trim() || null,
           permanent_city: permanent_city?.trim() || null,
           permanent_state: permanent_state?.trim() || null,
+          permanent_pincode: permanent_pincode?.trim() || null,
           emergency_name: emergency_name?.trim() || null,
           emergency_phone: emergency_phone?.trim() || null,
           emergency_relation: emergency_relation?.trim() || null,
-          id_type: id_type || null,
-          id_number: id_number?.trim() || null,
+          id_type: id_type || 'aadhaar',
+          id_number: cleanMaskedId,
+          photo_url: photo_url || null,
           status: 'active',
           notes: notes?.trim() || null,
           created_by: validUserId,
@@ -465,6 +480,62 @@ export async function POST(request: NextRequest) {
       credit_paise: 0,
       added_by: validUserId,
     })
+
+    // 5b. Synchronize KYC, Document Vault, and Profile Photo
+    if (sandbox_kyc && sandbox_kyc.verification_id) {
+      try {
+        await applyVerifiedKYCToResident({
+          residentId: resident.id,
+          organizationId: orgId,
+          verificationId: sandbox_kyc.verification_id,
+          maskedAadhaar: sandbox_kyc.masked_aadhaar || id_number,
+          extractedData: sandbox_kyc.extracted_data,
+          provider: 'Sandbox Live Aadhaar e-KYC',
+          actorUserId: validUserId,
+          photoUrl: photo_url || sandbox_kyc.extracted_data?.photo_base64 || null,
+        })
+      } catch (kycSyncErr: any) {
+        console.warn('[Checkin KYC Sync Warning]:', kycSyncErr?.message)
+      }
+    } else {
+      if (photo_url) {
+        try {
+          await serviceClient.from('resident_documents').insert({
+            id: crypto.randomUUID(),
+            organization_id: orgId,
+            resident_id: resident.id,
+            doc_type: 'photo',
+            doc_name: 'Resident Live Photo (Profile)',
+            file_url: photo_url,
+            status: 'verified',
+            verified_by: validUserId,
+            verified_at: new Date().toISOString(),
+          })
+          if (cleanedPhone) {
+            await serviceClient
+              .from('users')
+              .update({ avatar_url: photo_url, updated_at: new Date().toISOString() })
+              .or(`phone.ilike.%${cleanedPhone}%,resident_id.eq.${resident.id}`)
+          }
+        } catch {}
+      }
+      if (id_type === 'aadhaar' || (!id_type && id_number)) {
+        try {
+          await serviceClient.from('resident_documents').insert({
+            id: crypto.randomUUID(),
+            organization_id: orgId,
+            resident_id: resident.id,
+            doc_type: 'aadhaar',
+            doc_name: 'UIDAI e-Aadhaar Verification Card',
+            file_url: `/api/residents/${resident.id}/documents/aadhaar-card`,
+            status: 'verified',
+            verified_by: validUserId,
+            verified_at: new Date().toISOString(),
+            notes: `Aadhaar ID recorded: ${formatMaskedAadhaar(id_number)}`,
+          })
+        } catch {}
+      }
+    }
 
     // 6. Sync Unified Tenant Profile
     try {

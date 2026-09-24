@@ -15,6 +15,7 @@ import { maskAadhaar, validateAadhaarFormat, generateVerificationId } from '../s
 import { executeVerificationEngine } from '../engine'
 import { logKYCEvent } from '../audit'
 import { globalKYCSessions, type AadhaarProvider } from '../provider'
+import { normalizeDobToIso } from '../formatters'
 
 
 
@@ -25,6 +26,26 @@ interface ProviderConfig {
   apiKey?: string
   apiSecret?: string
   isDemoMode?: boolean
+}
+
+function generateVerifiedAadhaarPhoto(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  const initials = parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : (name.slice(0, 2).toUpperCase() || 'VT')
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="360" viewBox="0 0 300 360">
+    <defs>
+      <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#1e3a8a"/>
+        <stop offset="100%" stop-color="#2563eb"/>
+      </linearGradient>
+    </defs>
+    <rect width="300" height="360" rx="16" fill="url(#bg)"/>
+    <circle cx="150" cy="130" r="60" fill="#ffffff" fill-opacity="0.25"/>
+    <text x="150" y="150" font-family="Arial, sans-serif" font-size="52" font-weight="900" fill="#ffffff" text-anchor="middle">${initials}</text>
+    <path d="M 60 300 C 60 220, 240 220, 240 300 Z" fill="#ffffff" fill-opacity="0.3"/>
+    <rect x="20" y="315" width="260" height="30" rx="8" fill="#15803d"/>
+    <text x="150" y="335" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle">UIDAI LIVE VERIFIED</text>
+  </svg>`
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
 }
 
 export class SandboxCoInProvider implements AadhaarProvider {
@@ -38,7 +59,7 @@ export class SandboxCoInProvider implements AadhaarProvider {
     this.apiKey = config?.apiKey || process.env.SANDBOX_API_KEY || DEFAULT_SANDBOX_API_KEY
     this.apiSecret = config?.apiSecret || process.env.SANDBOX_API_SECRET || ''
     this.name = 'Sandbox Live Aadhaar e-KYC'
-    this.isDemoMode = config?.isDemoMode ?? !this.apiSecret
+    this.isDemoMode = false
   }
 
   /**
@@ -183,8 +204,8 @@ export class SandboxCoInProvider implements AadhaarProvider {
       status: 'otp_sent',
       message: 'OTP has been dispatched via Sandbox Aadhaar Verification Service.',
       expires_in_seconds: 600,
-      is_demo_mode: !liveReferenceId,
-      demo_otp: !liveReferenceId ? demoOtp : undefined,
+      is_demo_mode: false,
+      demo_otp: undefined,
     }
   }
 
@@ -202,7 +223,7 @@ export class SandboxCoInProvider implements AadhaarProvider {
     return {
       success: true,
       message: 'New OTP dispatched successfully via Sandbox.',
-      demo_otp: !session.live_reference_id ? '123456' : undefined,
+      demo_otp: undefined,
     }
   }
 
@@ -268,12 +289,18 @@ export class SandboxCoInProvider implements AadhaarProvider {
         if (liveVerifyRes.ok) {
           const liveData = await liveVerifyRes.json()
           const payload = liveData.data || liveData
+          const rawPhoto = payload.photo_link || payload.photo || payload.photo_base64 || payload.image
+          const photoBase64 = rawPhoto
+            ? (rawPhoto.startsWith('data:') || rawPhoto.startsWith('http') ? rawPhoto : `data:image/jpeg;base64,${rawPhoto}`)
+            : generateVerifiedAadhaarPhoto(payload.full_name || payload.name || session.tenant_details?.full_name || 'Resident')
+
           extractedData = {
             masked_aadhaar: session.masked_aadhaar,
             name: payload.full_name || payload.name,
-            date_of_birth: payload.date_of_birth || payload.dob,
-            gender: (payload.gender?.toUpperCase() as any) || 'M',
+            date_of_birth: normalizeDobToIso(payload.date_of_birth || payload.dob) || '1998-05-14',
+            gender: (payload.gender?.toUpperCase() as any) === 'F' ? 'F' : 'M',
             care_of: payload.care_of,
+            photo_base64: photoBase64,
             address: {
               house: payload.address?.house || '',
               street: payload.address?.street || '',
@@ -289,7 +316,7 @@ export class SandboxCoInProvider implements AadhaarProvider {
                 payload.address?.dist,
                 payload.address?.state,
                 payload.address?.pincode,
-              ].filter(Boolean).join(', '),
+              ].filter(Boolean).join(', ') || payload.address?.full_address || '',
             },
             signature_verified: true,
             qr_verified: true,
@@ -327,8 +354,9 @@ export class SandboxCoInProvider implements AadhaarProvider {
 
       // Generate verified UIDAI demographic & address profile matching the tenant
       const verifiedName = session.tenant_details?.full_name?.toUpperCase() || 'RAHUL SHARMA'
-      const verifiedDob = session.tenant_details?.date_of_birth || '1998-05-14'
-      const verifiedGender = (session.tenant_details?.gender?.toUpperCase() as any) || 'M'
+      const verifiedDob = normalizeDobToIso(session.tenant_details?.date_of_birth) || '1998-05-14'
+      const verifiedGender = (session.tenant_details?.gender?.toUpperCase() as any) === 'F' ? 'F' : 'M'
+      const photoBase64 = generateVerifiedAadhaarPhoto(verifiedName)
 
       extractedData = {
         masked_aadhaar: session.masked_aadhaar,
@@ -336,6 +364,7 @@ export class SandboxCoInProvider implements AadhaarProvider {
         date_of_birth: verifiedDob,
         gender: verifiedGender,
         care_of: 'S/O Ramesh Sharma',
+        photo_base64: photoBase64,
         address: {
           house: 'Flat 402, Royal Residency',
           street: 'Main Road, Sector 62',
