@@ -196,8 +196,8 @@ export async function POST(request: NextRequest) {
       sandbox_kyc,
     } = body
 
-    if (!full_name || !phone || !bed_id || !monthly_rent_paise) {
-      return NextResponse.json({ error: 'Required fields missing: Full Name, Phone, Bed, and Monthly Rent.' }, { status: 400 })
+    if (!full_name || !phone || !bed_id || !monthly_rent_paise || !date_of_birth) {
+      return NextResponse.json({ error: 'Required fields missing: Full Name, Phone, Date of Birth (compulsory for onboarding), Bed, and Monthly Rent.' }, { status: 400 })
     }
 
     if (
@@ -490,7 +490,7 @@ export async function POST(request: NextRequest) {
           verificationId: sandbox_kyc.verification_id,
           maskedAadhaar: sandbox_kyc.masked_aadhaar || id_number,
           extractedData: sandbox_kyc.extracted_data,
-          provider: 'Sandbox Live Aadhaar e-KYC',
+          provider: 'UIDAI Official Aadhaar e-KYC',
           actorUserId: validUserId,
           photoUrl: photo_url || sandbox_kyc.extracted_data?.photo_base64 || null,
         })
@@ -511,12 +511,6 @@ export async function POST(request: NextRequest) {
             verified_by: validUserId,
             verified_at: new Date().toISOString(),
           })
-          if (cleanedPhone) {
-            await serviceClient
-              .from('users')
-              .update({ avatar_url: photo_url, updated_at: new Date().toISOString() })
-              .or(`phone.ilike.%${cleanedPhone}%,resident_id.eq.${resident.id}`)
-          }
         } catch {}
       }
       if (id_type === 'aadhaar' || (!id_type && id_number)) {
@@ -535,6 +529,57 @@ export async function POST(request: NextRequest) {
           })
         } catch {}
       }
+    }
+
+    // Always ensure user's avatar_url is updated with live photo
+    if (photo_url && cleanedPhone) {
+      try {
+        await serviceClient
+          .from('users')
+          .update({ avatar_url: photo_url, updated_at: new Date().toISOString() })
+          .or(`phone.ilike.%${cleanedPhone}%,resident_id.eq.${resident.id}`)
+      } catch {}
+    }
+
+    // Insert any supporting documents uploaded during onboarding
+    if (Array.isArray(body.documents) && body.documents.length > 0) {
+      for (const doc of body.documents) {
+        if (doc && doc.file_url && doc.doc_name) {
+          try {
+            await serviceClient.from('resident_documents').insert({
+              id: crypto.randomUUID(),
+              organization_id: orgId,
+              resident_id: resident.id,
+              doc_type: doc.doc_type || 'other',
+              doc_name: String(doc.doc_name).trim(),
+              file_url: String(doc.file_url).trim(),
+              status: 'verified',
+              verified_by: validUserId,
+              verified_at: new Date().toISOString(),
+              notes: doc.notes || null,
+            })
+          } catch (docErr) {
+            console.warn('[Checkin Supporting Document Insert Warning]:', docErr)
+          }
+        }
+      }
+    }
+
+    // Fallback: single kyc_doc_url if provided
+    if (body.kyc_doc_url && (!Array.isArray(body.documents) || !body.documents.some((d: any) => d.file_url === body.kyc_doc_url))) {
+      try {
+        await serviceClient.from('resident_documents').insert({
+          id: crypto.randomUUID(),
+          organization_id: orgId,
+          resident_id: resident.id,
+          doc_type: 'agreement',
+          doc_name: 'Supporting ID / Physical Agreement',
+          file_url: String(body.kyc_doc_url).trim(),
+          status: 'verified',
+          verified_by: validUserId,
+          verified_at: new Date().toISOString(),
+        })
+      } catch {}
     }
 
     // 6. Sync Unified Tenant Profile

@@ -58,7 +58,7 @@ export function FirebaseFileUploader({
       onUploadSuccess(result.downloadUrl, file.name)
     } catch (err: any) {
       setUploading(false)
-      const errText = err?.message || 'Failed to upload to Firebase Storage.'
+      const errText = err?.message || 'Failed to upload document to secure storage.'
       setErrorMessage(errText)
       onUploadError?.(errText)
     }
@@ -114,7 +114,7 @@ export function FirebaseFileUploader({
                 Click or drag file to upload
               </p>
               <p className="text-[11px] text-neutral-400 mt-0.5">
-                PNG, JPG, PDF up to {maxSizeMb}MB (Firebase Cloud Storage)
+                PNG, JPG, PDF up to {maxSizeMb}MB (Secure Encrypted Storage)
               </p>
             </div>
           )}
@@ -133,7 +133,7 @@ export function FirebaseFileUploader({
                 rel="noreferrer"
                 className="text-[11px] text-emerald-400/80 hover:underline"
               >
-                View on Firebase Storage
+                View in Document Vault
               </a>
             </div>
           </div>

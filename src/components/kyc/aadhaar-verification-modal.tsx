@@ -213,7 +213,7 @@ export function AadhaarVerificationModal({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-black tracking-tight">Sandbox Live Aadhaar e-KYC</h3>
+                <h3 className="text-base font-black tracking-tight">Official UIDAI Aadhaar e-KYC</h3>
                 <span className="px-2 py-0.5 rounded-full bg-emerald-400/20 text-emerald-200 text-[10px] font-black uppercase tracking-wider border border-emerald-300/30">
                   Live
                 </span>
@@ -396,7 +396,7 @@ export function AadhaarVerificationModal({
 
                   <div>
                     <span className="text-[10px] font-black uppercase text-emerald-700 tracking-wider bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300">
-                      Sandbox e-KYC Verified
+                      UIDAI e-KYC Verified
                     </span>
                     <h4 className="text-lg font-black text-slate-900 mt-1">AADHAAR VERIFIED ✓</h4>
                     <p className="text-xs text-slate-600 mt-0.5">
@@ -459,7 +459,7 @@ export function AadhaarVerificationModal({
                       <Check className="w-4 h-4 text-emerald-600 shrink-0 font-black" />
                       <div>
                         <span className="text-[10px] text-slate-400 block font-bold">Authentication</span>
-                        <span className="font-bold text-slate-800 text-[11px]">Sandbox Live API</span>
+                        <span className="font-bold text-slate-800 text-[11px]">UIDAI e-KYC Gateway</span>
                       </div>
                     </div>
 

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import React, { useState, useEffect } from 'react'
 import {
@@ -190,7 +190,7 @@ export default function KycTab() {
             )}
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
-            Audit official government identity verifications powered by Sandbox Live Aadhaar e-KYC.
+            Audit official government identity verifications powered by Official UIDAI Live Aadhaar e-KYC.
           </p>
         </div>
 

@@ -29,7 +29,7 @@ export async function applyVerifiedKYCToResident(params: ApplyKYCParams) {
     verificationId,
     maskedAadhaar,
     extractedData,
-    provider = 'Sandbox Live Aadhaar e-KYC',
+    provider = 'UIDAI Official Aadhaar e-KYC',
     actorUserId = null,
     photoUrl = null,
   } = params
@@ -80,9 +80,6 @@ export async function applyVerifiedKYCToResident(params: ApplyKYCParams) {
     permanent_state: address?.state || resident.permanent_state,
     permanent_pincode: address?.pincode || resident.permanent_pincode,
     updated_at: now,
-    notes: resident.notes
-      ? (resident.notes.includes(verificationId) ? resident.notes : `${resident.notes}\n[Sandbox Aadhaar Verified: ${verificationId}]`)
-      : `[Sandbox Aadhaar Verified: ${verificationId}]`,
   }
 
   if (extractedData?.name) {
@@ -127,7 +124,7 @@ export async function applyVerifiedKYCToResident(params: ApplyKYCParams) {
           extracted_gender: effectiveGender,
           extracted_address: address || null,
           care_of: extractedData?.care_of || null,
-          verified_source: 'Sandbox Live UIDAI OKYC',
+          verified_source: 'Official UIDAI OKYC',
           verified_at: now,
         },
         updated_at: now,

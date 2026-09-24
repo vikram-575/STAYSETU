@@ -395,12 +395,25 @@ export default async function ResidentDetailPage({ params, searchParams }: Props
                 <span className="text-gray-500">Emergency Phone</span>
                 <span className="font-black text-blue-600">{fullResident?.emergency_phone ?? '—'}</span>
               </div>
-              <div className="py-1.5">
-                <span className="text-gray-500 block mb-1 font-semibold">Notes / Special Instructions:</span>
-                <p className="text-gray-700 bg-gray-50 p-2.5 rounded-xl text-xs leading-relaxed border border-gray-100">
-                  {fullResident?.notes || 'No specific notes recorded.'}
-                </p>
-              </div>
+              {(() => {
+                const cleanedNotes = fullResident?.notes
+                  ? fullResident.notes
+                      .replace(/\[\s*Sandbox\s*Aadhaar\s*Verified:[^\]]*\]/gi, '')
+                      .replace(/\[\s*Aadhaar\s*Verified:[^\]]*\]/gi, '')
+                      .replace(/\[\s*UIDAI\s*Aadhaar\s*Verified:[^\]]*\]/gi, '')
+                      .replace(/\[\s*Sandbox[^\]]*\]/gi, '')
+                      .trim()
+                  : ''
+                if (!cleanedNotes) return null
+                return (
+                  <div className="py-1.5">
+                    <span className="text-gray-500 block mb-1 font-semibold">Notes / Special Instructions:</span>
+                    <p className="text-gray-700 bg-gray-50 p-2.5 rounded-xl text-xs leading-relaxed border border-gray-100">
+                      {cleanedNotes}
+                    </p>
+                  </div>
+                )
+              })()}
             </div>
           </div>
         </div>

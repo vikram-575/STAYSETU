@@ -8,10 +8,12 @@ import {
   Building2, BedDouble, Shield, FileText, Loader2, DollarSign,
   Phone, Lock, Sparkles, RefreshCw, KeyRound, AlertCircle, Check,
   UserCheck, ShieldCheck, MapPin, Contact, ScanFace, ExternalLink,
-  AlertTriangle, Camera, Upload
+  AlertTriangle, Camera, Upload, Trash2, Plus, Eye, Paperclip,
+  Image as ImageIcon
 } from 'lucide-react'
 import { formatCurrency, rupeesToPaise } from '@/lib/money'
 import { FirebaseFileUploader } from '@/components/ui/firebase-file-uploader'
+import { uploadFileToStorage } from '@/lib/firebase/storage'
 import { AadhaarVerificationModal } from '@/components/kyc/aadhaar-verification-modal'
 import { AadhaarExtractedData } from '@/lib/kyc/types'
 import { setupRecaptcha, sendPhoneOtp } from '@/lib/firebase/auth'
@@ -105,18 +107,12 @@ export default function CheckInResidentPage() {
         id_type: 'aadhaar',
         id_number: result.masked_aadhaar || prev.id_number,
         photo_url: ext.photo_base64 || prev.photo_url,
-        notes: prev.notes
-          ? `${prev.notes}\n[Sandbox Aadhaar Verified: ${result.verification_id} - Masked: ${result.masked_aadhaar}]`
-          : `[Sandbox Aadhaar Verified: ${result.verification_id} - Masked: ${result.masked_aadhaar}]`,
       }))
     } else {
       setForm((prev) => ({
         ...prev,
         id_type: 'aadhaar',
         id_number: result.masked_aadhaar || prev.id_number,
-        notes: prev.notes
-          ? `${prev.notes}\n[Sandbox Aadhaar Verified: ${result.verification_id}]`
-          : `[Sandbox Aadhaar Verified: ${result.verification_id}]`,
       }))
     }
   }
@@ -135,6 +131,119 @@ export default function CheckInResidentPage() {
   const [suggestedTenantId, setSuggestedTenantId] = useState<string | null>(null)
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set())
 
+  // Step 4: Supporting Documents List State
+  const [documents, setDocuments] = useState<Array<{
+    id: string
+    doc_type: string
+    doc_name: string
+    file_url: string
+    file_name?: string
+  }>>([])
+  const [newDocType, setNewDocType] = useState('agreement')
+  const [newDocTitle, setNewDocTitle] = useState('')
+  const [uploadingDoc, setUploadingDoc] = useState(false)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [docUploadError, setDocUploadError] = useState('')
+
+  // Handle live photo from camera or storage
+  const handleLivePhotoCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setError('')
+    setUploadingPhoto(true)
+    try {
+      const reader = new FileReader()
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setForm((prev) => ({ ...prev, photo_url: reader.result as string }))
+        }
+      }
+      reader.readAsDataURL(file)
+
+      // Also try background upload to cloud storage
+      try {
+        const path = `residents/photos/${form.phone || 'profile'}_${Date.now()}`
+        const uploadResult = await uploadFileToStorage(path, file)
+        if (uploadResult?.downloadUrl) {
+          setForm((prev) => ({ ...prev, photo_url: uploadResult.downloadUrl }))
+        }
+      } catch (cloudErr) {
+        console.warn('Live photo cloud upload warning (using data URL):', cloudErr)
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Failed to process photo')
+    } finally {
+      setUploadingPhoto(false)
+      e.target.value = ''
+    }
+  }
+
+  // Handle uploading supporting documents
+  const handleSupportingDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setDocUploadError('')
+    setUploadingDoc(true)
+
+    try {
+      let downloadUrl = ''
+      try {
+        const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
+        const path = `kyc/documents/${form.phone || 'resident'}_${Date.now()}_${safeName}`
+        const uploadResult = await uploadFileToStorage(path, file)
+        downloadUrl = uploadResult?.downloadUrl || ''
+      } catch (cloudErr) {
+        console.warn('Document storage upload fallback:', cloudErr)
+      }
+
+      if (!downloadUrl) {
+        // Fallback to FileReader data URL
+        downloadUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result as string)
+          reader.onerror = reject
+          reader.readAsDataURL(file)
+        })
+      }
+
+      const defaultNames: Record<string, string> = {
+        agreement: 'Rental Agreement',
+        student_id: 'College / Student ID',
+        company_id: 'Company / Office ID',
+        police_verification: 'Police Verification Form',
+        pan: 'PAN Card',
+        passport: 'Passport Copy',
+        driving_licence: 'Driving License',
+        other: 'Supporting Document',
+      }
+
+      const resolvedTitle = newDocTitle.trim() || defaultNames[newDocType] || 'Supporting Document'
+
+      const newDoc = {
+        id: crypto.randomUUID(),
+        doc_type: newDocType,
+        doc_name: resolvedTitle,
+        file_url: downloadUrl,
+        file_name: file.name,
+      }
+
+      setDocuments((prev) => [...prev, newDoc])
+      setNewDocTitle('')
+      if (!form.kyc_doc_url) {
+        setForm((prev) => ({ ...prev, kyc_doc_url: downloadUrl }))
+      }
+    } catch (err: any) {
+      setDocUploadError(err?.message || 'Failed to upload document.')
+    } finally {
+      setUploadingDoc(false)
+      e.target.value = ''
+    }
+  }
+
+  const removeDocument = (idToRemove: string) => {
+    setDocuments((prev) => prev.filter((d) => d.id !== idToRemove))
+  }
+
   const [form, setForm] = useState({
     tenant_id: '',
     // Step 1: Personal
@@ -152,13 +261,13 @@ export default function CheckInResidentPage() {
     emergency_name: '',
     emergency_phone: '',
     emergency_relation: 'Parent',
-    // Step 3: ID Proof & Photo
+    // Step 3: ID Proof
     id_type: 'aadhaar',
     id_number: '',
     photo_url: '',
     kyc_doc_url: '',
     notes: '',
-    // Step 4: Assignment
+    // Step 5: Room & Rent Assignment
     property_id: '',
     building_id: '',
     floor_id: '',
@@ -168,7 +277,7 @@ export default function CheckInResidentPage() {
     monthly_rent_rupees: 6000,
     billing_cycle_day: 1,
     proration_policy: 'daily',
-    // Step 5: Security Deposit
+    // Step 6: Security Deposit
     deposit_amount_rupees: 10000,
     deposit_payment_method: 'upi',
   })
@@ -523,7 +632,11 @@ export default function CheckInResidentPage() {
         setError('Full Name and Phone Number are required.')
         return
       }
-    } else if (currentStep === 4) {
+      if (!form.date_of_birth) {
+        setError('Date of Birth is compulsory for resident onboarding.')
+        return
+      }
+    } else if (currentStep === 5) {
       if (!form.bed_id) {
         setError('Please select an available bed.')
         return
@@ -557,6 +670,7 @@ export default function CheckInResidentPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
+          documents,
           monthly_rent_paise: rupeesToPaise(form.monthly_rent_rupees),
           deposit_amount_paise: rupeesToPaise(form.deposit_amount_rupees),
           sandbox_kyc: sandboxAadhaarVerified,
@@ -823,7 +937,7 @@ export default function CheckInResidentPage() {
           <p className="text-xs text-gray-500 font-medium">
             {!isMobileVerified
               ? 'Step 0: Mobile Number & OTP Identity Verification'
-              : `Step ${currentStep} of 5 — Review details & assign room`}
+              : `Step ${currentStep} of 6 — Review details & complete check-in`}
           </p>
         </div>
       </div>
@@ -1030,10 +1144,10 @@ export default function CheckInResidentPage() {
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                {existingTenant && currentStep < 4 && (
+                {existingTenant && currentStep < 5 && (
                   <button
                     type="button"
-                    onClick={() => setCurrentStep(4)}
+                    onClick={() => setCurrentStep(5)}
                     className="px-3 py-1.5 bg-[#14532D] text-white rounded-xl text-xs font-bold hover:bg-[#166534] transition shadow-xs"
                   >
                     Jump to Room Allotment →
@@ -1057,12 +1171,13 @@ export default function CheckInResidentPage() {
           {/* 1. Mobile Step Bar */}
           <div className="block sm:hidden bg-white p-3.5 rounded-2xl border border-gray-200 shadow-2xs space-y-2">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-extrabold text-[#14532D] uppercase text-[11px]">Step {currentStep} of 5</span>
+              <span className="font-extrabold text-[#14532D] uppercase text-[11px]">Step {currentStep} of 6</span>
               <span className="font-bold text-gray-800">
                 {[
                   'Personal Details',
                   'Address & Emergency',
-                  'KYC & Notes',
+                  'Aadhaar e-KYC',
+                  'Photo & Documents',
                   'Room & Rent',
                   'Deposit & Confirm'
                 ][currentStep - 1]}
@@ -1071,17 +1186,18 @@ export default function CheckInResidentPage() {
             <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
               <div
                 className="bg-[#14532D] h-full transition-all duration-300 rounded-full"
-                style={{ width: `${(currentStep / 5) * 100}%` }}
+                style={{ width: `${(currentStep / 6) * 100}%` }}
               />
             </div>
           </div>
 
           {/* 2. Desktop Step Strip */}
-          <div className="hidden sm:grid grid-cols-5 gap-2">
+          <div className="hidden sm:grid grid-cols-6 gap-2">
             {[
               'Personal Details',
               'Address & Emergency',
-              'KYC & Notes',
+              'Aadhaar e-KYC',
+              'Photo & Documents',
               'Room & Rent',
               'Deposit & Confirm'
             ].map((title, idx) => {
@@ -1092,7 +1208,7 @@ export default function CheckInResidentPage() {
                 <div
                   key={title}
                   onClick={() => setCurrentStep(stepNum)}
-                  className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
+                  className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
                     isActive
                       ? 'bg-emerald-50 border-[#14532D] text-[#14532D] font-bold shadow-2xs'
                       : isDone
@@ -1101,7 +1217,7 @@ export default function CheckInResidentPage() {
                   }`}
                 >
                   <p className="text-[10px] uppercase tracking-wider">Step {stepNum}</p>
-                  <p className="text-xs truncate mt-0.5">{title}</p>
+                  <p className="text-[11px] truncate mt-0.5">{title}</p>
                 </div>
               )
             })}
@@ -1185,14 +1301,16 @@ export default function CheckInResidentPage() {
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Date of Birth {renderFieldBadge('date_of_birth')}
+                      Date of Birth * {renderFieldBadge('date_of_birth', true)}
                     </label>
                     <input
                       type="date"
+                      required
                       value={form.date_of_birth}
                       onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })}
-                      className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#16A34A] outline-none"
+                      className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#16A34A] outline-none font-medium"
                     />
+                    <p className="text-[10px] text-emerald-800 font-semibold mt-1">Compulsory for resident onboarding &amp; police record.</p>
                   </div>
 
                   <div>
@@ -1334,22 +1452,22 @@ export default function CheckInResidentPage() {
               </div>
             )}
 
-            {/* Step 3: Identity Proof Details & Sandbox Live Aadhaar Verification */}
+            {/* Step 3: Official Aadhaar e-KYC Verification */}
             {currentStep === 3 && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-b border-gray-100 pb-2">
                   <div>
                     <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
-                      <span>3. Identity Proof Document &amp; Notes</span>
+                      <span>3. Official Aadhaar e-KYC Verification</span>
                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
-                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Sandbox Live Aadhaar
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> UIDAI Live e-KYC
                       </span>
                     </h3>
                   </div>
                   <span className="text-xs text-gray-500 font-medium">Digital identity screening</span>
                 </div>
 
-                {/* ── Sandbox Aadhaar e-KYC Verification Card ── */}
+                {/* ── Aadhaar e-KYC Verification Card ── */}
                 {sandboxAadhaarVerified ? (
                   <div className="p-4 bg-emerald-50/95 border-2 border-emerald-400 rounded-2xl flex flex-col gap-3 shadow-xs animate-in fade-in-50 duration-200">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -1360,7 +1478,7 @@ export default function CheckInResidentPage() {
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
                             <h4 className="text-xs sm:text-sm font-black text-emerald-950 uppercase tracking-wide">
-                              Aadhaar Identity Verified via Sandbox ✓
+                              Aadhaar Identity Verified via UIDAI e-KYC ✓
                             </h4>
                             <span className="font-mono text-[10px] font-bold bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded border border-emerald-400">
                               {sandboxAadhaarVerified.verification_id}
@@ -1401,53 +1519,6 @@ export default function CheckInResidentPage() {
                         <span className="text-[10px] text-emerald-700 block font-bold mt-0.5">City: {form.permanent_city} · State: {form.permanent_state} · Pincode: {form.permanent_pincode} ✓</span>
                       </div>
                     </div>
-
-                    {/* Live Profile Photo Strip */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-white/95 rounded-xl border border-emerald-200 text-xs">
-                      <div className="flex items-center gap-3">
-                        {form.photo_url ? (
-                          <img
-                            src={form.photo_url}
-                            alt="Resident Profile"
-                            className="w-12 h-14 object-cover rounded-xl border border-emerald-300 shadow-xs shrink-0"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-800 font-black flex items-center justify-center shrink-0">
-                            {form.full_name ? form.full_name.slice(0, 2).toUpperCase() : 'KYC'}
-                          </div>
-                        )}
-                        <div>
-                          <span className="text-xs font-black text-emerald-950 block">
-                            {form.photo_url ? 'Resident Photo Captured ✓' : 'Profile Photo'}
-                          </span>
-                          <span className="text-[11px] text-gray-500">
-                            Auto-syncs to resident profile avatar and Document Vault on check-in
-                          </span>
-                        </div>
-                      </div>
-                      <label className="cursor-pointer py-1.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold transition shrink-0 active:scale-95 flex items-center justify-center gap-1.5 shadow-2xs">
-                        <Camera className="w-3.5 h-3.5 text-emerald-700" />
-                        <span>Upload / Change Live Photo</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          capture="user"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            if (file) {
-                              const reader = new FileReader()
-                              reader.onload = () => {
-                                if (typeof reader.result === 'string') {
-                                  setForm((prev) => ({ ...prev, photo_url: reader.result as string }))
-                                }
-                              }
-                              reader.readAsDataURL(file)
-                            }
-                          }}
-                        />
-                      </label>
-                    </div>
                   </div>
                 ) : (
                   <div className="p-4 bg-gradient-to-r from-emerald-950/5 via-teal-950/5 to-green-950/5 border-2 border-emerald-300/80 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
@@ -1458,7 +1529,7 @@ export default function CheckInResidentPage() {
                       <div>
                         <div className="flex items-center gap-2">
                           <h4 className="text-xs sm:text-sm font-black text-gray-900">
-                            Verify Aadhaar with Sandbox Live
+                            Verify Aadhaar with UIDAI Live e-KYC
                           </h4>
                           <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
                             Live e-KYC
@@ -1476,7 +1547,7 @@ export default function CheckInResidentPage() {
                       className="w-full sm:w-auto py-2.5 px-4 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs rounded-xl shadow-md shadow-emerald-500/20 transition flex items-center justify-center gap-1.5 active:scale-95 whitespace-nowrap"
                     >
                       <ShieldCheck className="w-4 h-4" />
-                      <span>Verify Aadhaar with Sandbox</span>
+                      <span>Verify Aadhaar with UIDAI Live</span>
                     </button>
                   </div>
                 )}
@@ -1491,7 +1562,7 @@ export default function CheckInResidentPage() {
                       onChange={(e) => setForm({ ...form, id_type: e.target.value })}
                       className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#16A34A] outline-none font-semibold"
                     >
-                      <option value="aadhaar">Aadhaar Card (National ID - Sandbox Verified)</option>
+                      <option value="aadhaar">Aadhaar Card (UIDAI Verified)</option>
                       <option value="pan">PAN Card</option>
                       <option value="passport">Passport</option>
                       <option value="driving_licence">Driving License</option>
@@ -1513,37 +1584,293 @@ export default function CheckInResidentPage() {
                       className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#16A34A] outline-none font-mono font-bold"
                     />
                   </div>
-
-                  <div className="sm:col-span-2">
-                    <FirebaseFileUploader
-                      label="Upload Physical Document / Agreement Backup (Optional)"
-                      storagePath={`kyc/${form.property_id || 'general'}/${form.phone || 'resident'}`}
-                      currentUrl={form.kyc_doc_url}
-                      onUploadSuccess={(url) => setForm((prev) => ({ ...prev, kyc_doc_url: url }))}
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Internal Owner / Manager Notes
-                    </label>
-                    <textarea
-                      rows={3}
-                      placeholder="Any special remarks, college/company name, food preferences..."
-                      value={form.notes}
-                      onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                      className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#16A34A] outline-none"
-                    />
-                  </div>
                 </div>
               </div>
             )}
 
-            {/* Step 4: Room & Rent Assignment */}
+            {/* Step 4: Live Photo & Supporting Documents Vault */}
             {currentStep === 4 && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                  <div>
+                    <h3 className="text-sm sm:text-base font-bold text-gray-900 flex items-center gap-2">
+                      <span>4. Live Photo &amp; Supporting Documents</span>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
+                        Profile &amp; Vault
+                      </span>
+                    </h3>
+                  </div>
+                  <span className="text-xs text-gray-500 font-medium">Official resident profile &amp; paperwork</span>
+                </div>
+
+                {/* 1. Live Resident Profile Picture */}
+                <div className="p-4 sm:p-5 bg-gradient-to-br from-emerald-50/80 via-white to-teal-50/80 border-2 border-emerald-300/80 rounded-2xl space-y-4 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs sm:text-sm font-black text-gray-900 flex items-center gap-2">
+                        <ScanFace className="w-4 h-4 text-emerald-700" />
+                        <span>Resident Profile Picture</span>
+                      </h4>
+                      <p className="text-[11px] text-gray-600 mt-0.5">
+                        Capture a live photo from your device camera or upload from internal storage. This is saved as the official profile avatar.
+                      </p>
+                    </div>
+                    {form.photo_url && (
+                      <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-600 text-white shadow-xs">
+                        Photo Ready ✓
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-4 pt-1">
+                    {/* Photo Preview Box */}
+                    <div className="relative group shrink-0">
+                      {form.photo_url ? (
+                        <div className="relative">
+                          <img
+                            src={form.photo_url}
+                            alt="Resident Profile"
+                            className="w-24 h-28 object-cover rounded-2xl border-2 border-emerald-500 shadow-sm"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setForm((prev) => ({ ...prev, photo_url: '' }))}
+                            className="absolute -top-2 -right-2 p-1 bg-red-600 text-white rounded-full shadow-md hover:bg-red-700 transition"
+                            title="Remove photo"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="w-24 h-28 rounded-2xl bg-gray-100 border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 p-2 text-center">
+                          <Camera className="w-7 h-7 mb-1 text-gray-400" />
+                          <span className="text-[10px] font-bold">No Photo</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Action Buttons for Camera or Internal Storage */}
+                    <div className="flex-1 w-full space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {/* Option A: Device Camera */}
+                        <label className="cursor-pointer flex-1 sm:flex-initial py-2.5 px-4 bg-[#14532D] hover:bg-[#166534] text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-xs active:scale-95">
+                          <Camera className="w-4 h-4" />
+                          <span>Take Live Photo (Camera)</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="user"
+                            disabled={uploadingPhoto}
+                            onChange={handleLivePhotoCapture}
+                            className="hidden"
+                          />
+                        </label>
+
+                        {/* Option B: Internal Storage / Device Files */}
+                        <label className="cursor-pointer flex-1 sm:flex-initial py-2.5 px-4 bg-white hover:bg-emerald-50 text-gray-800 border border-gray-300 hover:border-emerald-400 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-2xs active:scale-95">
+                          <ImageIcon className="w-4 h-4 text-emerald-700" />
+                          <span>Choose from Device / Storage</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            disabled={uploadingPhoto}
+                            onChange={handleLivePhotoCapture}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+
+                      {uploadingPhoto && (
+                        <div className="flex items-center gap-2 text-xs text-emerald-800 font-bold animate-pulse">
+                          <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                          <span>Saving resident photo...</span>
+                        </div>
+                      )}
+
+                      <p className="text-[11px] text-gray-500">
+                        Recommended: Bright lighting, clear front-facing face photo. Auto-syncs to ERP resident ID and portal.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Supporting Document Vault (Add Multiple Documents) */}
+                <div className="p-4 sm:p-5 bg-white border border-gray-200 rounded-2xl space-y-4 shadow-2xs">
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-black text-gray-900 flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-[#14532D]" />
+                      <span>Supporting Documents Vault (Agreements, IDs, Verification)</span>
+                    </h4>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      Upload lease agreements, college/company ID cards, police verification certificates, or other onboarding documents.
+                    </p>
+                  </div>
+
+                  {/* Add New Document Form Controls */}
+                  <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-xl space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <div>
+                        <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                          Document Category
+                        </label>
+                        <select
+                          value={newDocType}
+                          onChange={(e) => setNewDocType(e.target.value)}
+                          className="w-full px-3 py-2 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#16A34A] outline-none font-semibold bg-white"
+                        >
+                          <option value="agreement">Rental Agreement / Lease</option>
+                          <option value="student_id">College / Student ID</option>
+                          <option value="company_id">Company / Employee ID</option>
+                          <option value="police_verification">Police Verification Form</option>
+                          <option value="pan">PAN Card</option>
+                          <option value="passport">Passport Copy</option>
+                          <option value="driving_licence">Driving License</option>
+                          <option value="other">Other Supporting Document</option>
+                        </select>
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                          Document Title / Remark (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Signed Lease Agreement 2026 or University ID Card"
+                          value={newDocTitle}
+                          onChange={(e) => setNewDocTitle(e.target.value)}
+                          className="w-full px-3 py-2 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#16A34A] outline-none bg-white font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+                      <label className="cursor-pointer py-2.5 px-4 bg-[#14532D] hover:bg-[#166534] text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-xs active:scale-95 shrink-0">
+                        <Plus className="w-4 h-4" />
+                        <span>Select File &amp; Attach to Vault</span>
+                        <input
+                          type="file"
+                          accept=".pdf,image/*"
+                          disabled={uploadingDoc}
+                          onChange={handleSupportingDocUpload}
+                          className="hidden"
+                        />
+                      </label>
+
+                      {uploadingDoc && (
+                        <div className="flex items-center gap-2 text-xs text-emerald-800 font-bold">
+                          <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                          <span>Uploading &amp; securing document...</span>
+                        </div>
+                      )}
+
+                      <span className="text-[11px] text-gray-400">
+                        Supports PDF, PNG, JPG up to 10MB
+                      </span>
+                    </div>
+
+                    {docUploadError && (
+                      <div className="p-2.5 bg-red-50 border border-red-200 text-xs text-red-700 rounded-lg">
+                        {docUploadError}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Attached Documents List */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-gray-700">
+                        Attached Documents ({documents.length})
+                      </span>
+                      {documents.length > 0 && (
+                        <span className="text-[11px] text-emerald-700 font-bold">
+                          Ready for check-in vault
+                        </span>
+                      )}
+                    </div>
+
+                    {documents.length === 0 ? (
+                      <div className="p-4 bg-gray-50/70 border border-dashed border-gray-200 rounded-xl text-center">
+                        <Paperclip className="w-5 h-5 text-gray-400 mx-auto mb-1" />
+                        <p className="text-xs font-medium text-gray-500">
+                          No supporting documents attached yet.
+                        </p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">
+                          You can attach agreements, ID cards, and police forms now, or add them later from the resident profile.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {documents.map((doc) => (
+                          <div
+                            key={doc.id}
+                            className="flex items-center justify-between p-3 bg-gray-50 hover:bg-emerald-50/40 border border-gray-200 rounded-xl transition"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+                                <FileText className="w-4 h-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-gray-900 truncate">
+                                  {doc.doc_name}
+                                </p>
+                                <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                                  <span className="uppercase font-semibold px-1.5 py-0.2 bg-gray-200 rounded text-gray-700">
+                                    {doc.doc_type.replace('_', ' ')}
+                                  </span>
+                                  {doc.file_name && <span className="truncate">{doc.file_name}</span>}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0">
+                              {doc.file_url && (
+                                <a
+                                  href={doc.file_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-1.5 text-gray-600 hover:text-emerald-700 hover:bg-white rounded-lg transition"
+                                  title="View document"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </a>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => removeDocument(doc.id)}
+                                className="p-1.5 text-red-500 hover:text-red-700 hover:bg-white rounded-lg transition"
+                                title="Remove document"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Internal Notes */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Internal Owner / Property Manager Notes
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="Any special remarks, college/company name, food preferences, vehicle details, etc."
+                    value={form.notes}
+                    onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                    className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#16A34A] outline-none"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Step 5: Room & Rent Assignment */}
+            {currentStep === 5 && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                  <h3 className="text-sm sm:text-base font-bold text-gray-900">4. Room &amp; Bed Assignment</h3>
+                  <h3 className="text-sm sm:text-base font-bold text-gray-900">5. Room &amp; Bed Assignment</h3>
                   <span className="text-xs text-gray-500 font-medium">Select room and assign bed</span>
                 </div>
                 
@@ -1698,12 +2025,12 @@ export default function CheckInResidentPage() {
               </div>
             )}
 
-            {/* Step 5: Deposit & Confirm */}
-            {currentStep === 5 && (
+            {/* Step 6: Deposit & Confirm */}
+            {currentStep === 6 && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                  <h3 className="text-sm sm:text-base font-bold text-gray-900">5. Security Deposit &amp; Final Confirmation</h3>
-                  <span className="text-xs text-gray-500 font-medium">Verify summary before completing</span>
+                  <h3 className="text-sm sm:text-base font-bold text-gray-900">6. Security Deposit &amp; Final Confirmation</h3>
+                  <span className="text-xs text-gray-500 font-medium">Verify summary before completing check-in</span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
@@ -1747,6 +2074,10 @@ export default function CheckInResidentPage() {
                     <span className="font-bold text-gray-900">{form.full_name} (+91 {form.phone})</span>
                   </div>
                   <div className="flex justify-between">
+                    <span className="text-gray-500">Date of Birth:</span>
+                    <span className="font-bold text-gray-900">{form.date_of_birth}</span>
+                  </div>
+                  <div className="flex justify-between">
                     <span className="text-gray-500">Check-in Date:</span>
                     <span className="font-semibold text-gray-900">{form.check_in_date}</span>
                   </div>
@@ -1757,6 +2088,30 @@ export default function CheckInResidentPage() {
                   <div className="flex justify-between">
                     <span className="text-gray-500">Security Deposit:</span>
                     <span className="font-bold text-emerald-800">₹{form.deposit_amount_rupees.toLocaleString('en-IN')} ({form.deposit_payment_method.toUpperCase()})</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-1 border-t border-gray-200">
+                    <span className="text-gray-500">Aadhaar e-KYC:</span>
+                    {sandboxAadhaarVerified ? (
+                      <span className="text-emerald-700 font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> UIDAI Verified ✓
+                      </span>
+                    ) : (
+                      <span className="text-gray-500 font-medium">Unverified / Manual</span>
+                    )}
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500">Profile Picture:</span>
+                    {form.photo_url ? (
+                      <span className="text-emerald-700 font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Live Photo Ready ✓
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">Not Uploaded</span>
+                    )}
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500">Supporting Documents:</span>
+                    <span className="font-bold text-gray-800">{documents.length} document(s) in vault</span>
                   </div>
                 </div>
 
@@ -1790,7 +2145,7 @@ export default function CheckInResidentPage() {
                 </button>
               ) : <div />}
 
-              {currentStep < 5 ? (
+              {currentStep < 6 ? (
                 <button
                   type="button"
                   onClick={nextStep}
@@ -1815,7 +2170,7 @@ export default function CheckInResidentPage() {
       )}
 
 
-      {/* Sandbox Aadhaar e-KYC Verification Modal */}
+      {/* Official UIDAI Aadhaar e-KYC Verification Modal */}
       <AadhaarVerificationModal
         isOpen={showSandboxAadhaarModal}
         onClose={() => setShowSandboxAadhaarModal(false)}

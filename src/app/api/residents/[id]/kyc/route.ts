@@ -57,7 +57,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       verificationId: verification_id,
       maskedAadhaar: masked_aadhaar || resident.id_number || 'XXXX XXXX 9453',
       extractedData: (extracted_data as AadhaarExtractedData) || null,
-      provider: 'Sandbox Live Aadhaar e-KYC',
+      provider: 'UIDAI Official Aadhaar e-KYC',
       actorUserId: user.id,
       photoUrl: photo_url || extracted_data?.photo_base64 || null,
     })

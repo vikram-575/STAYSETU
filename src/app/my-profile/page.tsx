@@ -1090,23 +1090,23 @@ function MyProfileContent() {
                     Owner Onboarding Pending — ERP Platform & Listing Locked
                   </h3>
                   <span className="rounded-full bg-amber-200/90 px-2 py-0.5 text-[10px] font-extrabold text-amber-900 uppercase tracking-wider">
-                    SuperAdmin Review
+                    Verification Review
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-gray-700 leading-relaxed">
-                  Your owner profile is registered. To ensure quality listings, full ERP access and property listing on the website will unlock once SuperAdmin reviews your account and finishes your PG onboarding.
+                  Your owner profile is registered. To ensure quality listings, full ERP access and property listing on the website will unlock once our Verification Team reviews your account and finishes your PG onboarding.
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <a
                     href={`https://wa.me/919453522757?text=${encodeURIComponent(
-                      `Hello SuperAdmin, I registered as a PG Owner on PGSetu (${currentUser?.full_name || 'Owner'}, Mobile: +91 ${currentUser?.phone || ''}). Please finish my onboarding and unlock my ERP platform.`
+                      `Hello Operations Team, I registered as a PG Owner on PGSetu (${currentUser?.full_name || 'Owner'}, Mobile: +91 ${currentUser?.phone || ''}). Please finish my onboarding and unlock my ERP platform.`
                     )}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-[#166534] transition"
                   >
                     <MessageSquare className="h-3.5 w-3.5" />
-                    <span>Chat with SuperAdmin to Unlock</span>
+                    <span>Chat with Support to Unlock</span>
                   </a>
                   <a
                     href="/dashboard"
@@ -2110,7 +2110,7 @@ function MyProfileContent() {
                   </div>
                   <h3 className="mt-3 text-sm font-bold text-gray-900">No Active PG Allotment</h3>
                   <p className="mt-1 text-xs text-gray-500 max-w-sm mx-auto">
-                    You are not currently allotted to any PG. Your PG owner or superadmin will allot your room and bed upon check-in.
+                    You are not currently allotted to any PG. Your PG owner or property manager will allot your room and bed upon check-in.
                   </p>
                   <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                     <Link
@@ -3642,12 +3642,12 @@ function MyProfileContent() {
               </div>
               <h3 className="text-lg font-black text-gray-900">Property Listing Locked</h3>
               <p className="mt-2 text-xs text-gray-600 leading-relaxed">
-                As per PGSetu security policy, PG Owners can only list properties on the website after SuperAdmin verifies personal details and finishes official onboarding.
+                As per PGSetu security policy, PG Owners can only list properties on the website after our Verification Team verifies personal details and finishes official onboarding.
               </p>
               <div className="mt-5 w-full space-y-2">
                 <a
                   href={`https://wa.me/919453522757?text=${encodeURIComponent(
-                    `Hello SuperAdmin, I want to list my PG property on PGSetu. Please finish my onboarding and unlock listing for Mobile: +91 ${currentUser?.phone || ''}.`
+                    `Hello Operations Team, I want to list my PG property on PGSetu. Please finish my onboarding and unlock listing for Mobile: +91 ${currentUser?.phone || ''}.`
                   )}`}
                   target="_blank"
                   rel="noopener noreferrer"

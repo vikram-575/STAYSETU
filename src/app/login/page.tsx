@@ -792,7 +792,7 @@ function UnifiedLoginForm() {
           <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3 text-xs text-blue-950">
             <span className="font-bold block text-blue-900">Owner Profile Registration</span>
             <span className="text-gray-600">
-              Enter your personal details to register as a PG Owner. The ERP platform and property listing remain securely locked until SuperAdmin reviews and finishes your onboarding.
+              Enter your personal details to register as a PG Owner. The ERP platform and property listing remain securely locked until our Verification Team reviews and finishes your onboarding.
             </span>
           </div>
 
@@ -1310,7 +1310,7 @@ function UnifiedLoginForm() {
               {aadhaarVerified && (
                 <div className="flex items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-200 p-2.5 text-xs text-emerald-800 font-bold">
                   <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                  <span>Aadhaar Verified Successfully via Sandbox!</span>
+                  <span>Aadhaar Verified Successfully via UIDAI e-KYC!</span>
                 </div>
               )}
             </div>

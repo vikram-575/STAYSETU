@@ -234,7 +234,7 @@ export default function RecordElectricityReadingPage() {
         </div>
 
         <FirebaseFileUploader
-          label="Upload Sub-Meter Snapshot Photo (Firebase Cloud Storage)"
+          label="Upload Sub-Meter Snapshot Photo (Secure Cloud Storage)"
           storagePath={`meters/${selectedMeterId || 'general'}`}
           accept="image/*"
           currentUrl={meterPhotoUrl}

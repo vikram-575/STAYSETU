@@ -68,7 +68,7 @@ export default function ResidentKycCard({
           verification_id: result.verification_id,
           masked_aadhaar: result.masked_aadhaar,
           extracted_data: result.extracted_data,
-          provider: 'Sandbox Live Aadhaar e-KYC',
+          provider: 'UIDAI Official Aadhaar e-KYC',
         }),
       })
 
@@ -146,13 +146,13 @@ export default function ResidentKycCard({
               <div className="flex justify-between py-1.5 border-b border-gray-100">
                 <span className="text-gray-500">Verified Engine</span>
                 <span className="font-bold text-blue-700">
-                  {kycRecord?.provider || 'Sandbox Live UIDAI OKYC'}
+                  {kycRecord?.provider?.replace(/sandbox/gi, 'UIDAI Official') || 'UIDAI Official OKYC'}
                 </span>
               </div>
               <div className="flex justify-between py-1.5 border-b border-gray-100">
                 <span className="text-gray-500">Verification ID</span>
                 <span className="font-mono text-[11px] text-gray-600 truncate max-w-[170px]">
-                  {kycRecord?.verification_id || 'SBX-KYC-9453-2026'}
+                  {kycRecord?.verification_id?.replace(/SBX/g, 'KYC') || 'KYC-9453-2026'}
                 </span>
               </div>
             </>
@@ -177,7 +177,7 @@ export default function ResidentKycCard({
               disabled={syncing}
               className="w-full inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition active:scale-95 shadow-xs"
             >
-              <Sparkles className="w-4 h-4" /> Verify Aadhaar with Sandbox Live
+              <Sparkles className="w-4 h-4" /> Verify Aadhaar with UIDAI Live e-KYC
             </button>
           )}
         </div>

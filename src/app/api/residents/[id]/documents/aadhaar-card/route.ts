@@ -506,7 +506,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       <div class="seal-wrap">
         <div class="seal-icon">✓</div>
         <div class="seal-text">
-          <h4>CRYPTOGRAPHICALLY VERIFIED VIA SANDBOX LIVE OKYC</h4>
+          <h4>CRYPTOGRAPHICALLY VERIFIED VIA UIDAI OFFICIAL OKYC</h4>
           <p>Verified on ${verifiedAt} · Certified Document Vault Security</p>
         </div>
       </div>
@@ -516,7 +516,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     </div>
 
     <div class="disclaimer">
-      This Electronic Aadhaar Verification Record is generated through Sandbox UIDAI e-KYC API integration compliant with Aadhaar (Authentication) Regulations, 2016. All personal identity attributes are verified and stored securely in the PG-SETU Document Vault.
+      This Electronic Aadhaar Verification Record is generated through UIDAI Official e-KYC integration compliant with Aadhaar (Authentication) Regulations, 2016. All personal identity attributes are verified and stored securely in the PG-SETU Document Vault.
     </div>
   </div>
 

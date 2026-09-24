@@ -30,7 +30,7 @@ interface LockedErpScreenProps {
 export default function LockedErpScreen({ owner }: LockedErpScreenProps) {
   const formattedPhone = owner.phone ? owner.phone.replace(/\D/g, '').slice(-10) : ''
   const whatsappUrl = `https://wa.me/919453522757?text=${encodeURIComponent(
-    `Hello SuperAdmin, I registered as a PG Owner on PGSetu (Name: ${owner.full_name || 'Owner'}, Mobile: +91 ${formattedPhone}). Please complete my onboarding and unlock my ERP platform.`
+    `Hello Operations Team, I registered as a PG Owner on PGSetu (Name: ${owner.full_name || 'Owner'}, Mobile: +91 ${formattedPhone}). Please complete my onboarding and unlock my ERP platform.`
   )}`
 
   return (
@@ -94,7 +94,7 @@ export default function LockedErpScreen({ owner }: LockedErpScreenProps) {
                 ERP Platform Locked
               </h1>
               <p className="mt-2 text-sm text-gray-600 max-w-md leading-relaxed">
-                Welcome to PGSetu, <span className="font-bold text-gray-900">{owner.full_name || 'Owner'}</span>! Your owner profile is registered, but full ERP platform access and property listing are locked until SuperAdmin completes your onboarding.
+                Welcome to PGSetu, <span className="font-bold text-gray-900">{owner.full_name || 'Owner'}</span>! Your owner profile is registered, but full ERP platform access and property listing are locked until our Verification Team completes your onboarding.
               </p>
             </div>
 
@@ -135,7 +135,7 @@ export default function LockedErpScreen({ owner }: LockedErpScreenProps) {
                 <div className="space-y-1">
                   <span className="font-bold text-emerald-900 block">Why is my ERP locked?</span>
                   <p className="text-emerald-800/90 leading-relaxed text-[11px]">
-                    To protect tenants and guarantee legitimate listings, our SuperAdmin team reviews owner credentials, verifies property records, and allocates your official PG setup before unlocking the complete operations ERP.
+                    To protect tenants and guarantee legitimate listings, our Verification Team reviews owner credentials, verifies property records, and allocates your official PG setup before unlocking the complete operations ERP.
                   </p>
                 </div>
               </div>
@@ -150,7 +150,7 @@ export default function LockedErpScreen({ owner }: LockedErpScreenProps) {
                 className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#14532D] to-[#16A34A] py-3 text-sm font-bold text-white shadow-md hover:opacity-95 transition"
               >
                 <MessageSquare className="h-4 w-4" />
-                <span>Contact SuperAdmin via WhatsApp</span>
+                <span>Contact Operations Support via WhatsApp</span>
                 <ExternalLink className="h-3.5 w-3.5 ml-1 opacity-80" />
               </a>
 

@@ -2097,9 +2097,9 @@ function OnboardingContent() {
               >
                 <span>
                   {returnTo.includes('/admin')
-                    ? 'Return to SuperAdmin CRM (/admin) →'
+                    ? 'Return to Administration Console (/admin) →'
                     : isFromAdmin
-                    ? 'Return to Command Center (/superman) →'
+                    ? 'Return to Platform Operations (/superman) →'
                     : 'Enter PG Dashboard Now →'}
                 </span>
               </button>
