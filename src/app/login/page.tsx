@@ -675,6 +675,13 @@ function UnifiedLoginForm() {
               <span>Back to Role Selection</span>
             </button>
           </div>
+
+          <p className="text-center text-[11px] text-gray-400 leading-snug pt-1">
+            By continuing, you agree to PGSetu&apos;s{' '}
+            <a href="/terms" target="_blank" className="text-[#14532D] font-semibold hover:underline">Terms of Service</a>
+            {' '}and{' '}
+            <a href="/privacy-policy" target="_blank" className="text-[#14532D] font-semibold hover:underline">Privacy Policy</a>.
+          </p>
         </form>
       )}
 

@@ -166,6 +166,14 @@ export default function AppSidebar({ role, orgName }: Props) {
           <LogOut className="w-4 h-4" />
           <span>Sign Out</span>
         </button>
+
+        {/* Legal Links */}
+        <div className="flex flex-wrap gap-x-3 gap-y-1 px-2 pt-2 border-t border-gray-100 mt-1">
+          <Link href="/terms" target="_blank" className="text-[10px] text-[#647067] hover:text-[#14532D] transition">Terms</Link>
+          <Link href="/privacy-policy" target="_blank" className="text-[10px] text-[#647067] hover:text-[#14532D] transition">Privacy</Link>
+          <Link href="/refund-policy" target="_blank" className="text-[10px] text-[#647067] hover:text-[#14532D] transition">Refunds</Link>
+          <Link href="/erp-terms" target="_blank" className="text-[10px] text-[#647067] hover:text-[#14532D] transition">ERP Agreement</Link>
+        </div>
       </div>
     </aside>
   )

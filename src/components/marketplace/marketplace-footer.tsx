@@ -154,10 +154,13 @@ export function MarketplaceFooter() {
         <div className="mx-auto flex max-w-7xl flex-col sm:flex-row items-center justify-between px-4 sm:px-6 lg:px-8 gap-2 text-xs text-[#647067] text-center sm:text-left">
           <p>{footer?.copyrightText || '© 2026 PGSetu PropTech Technologies Pvt. Ltd. All rights reserved.'}</p>
           <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
-            <span className="hover:text-[#17211B] cursor-pointer transition">Privacy Policy</span>
-            <span className="hover:text-[#17211B] cursor-pointer transition">Terms of Service</span>
-            <span className="hover:text-[#17211B] cursor-pointer transition">Safety Guidelines</span>
-            <span className="hover:text-[#17211B] cursor-pointer transition">Sitemap</span>
+            <Link href="/privacy-policy" className="hover:text-[#17211B] transition">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-[#17211B] transition">Terms of Service</Link>
+            <Link href="/safety" className="hover:text-[#17211B] transition">Safety Guidelines</Link>
+            <Link href="/refund-policy" className="hover:text-[#17211B] transition">Refund Policy</Link>
+            <Link href="/cookies-policy" className="hover:text-[#17211B] transition">Cookie Policy</Link>
+            <Link href="/erp-terms" className="hover:text-[#17211B] transition">ERP Terms</Link>
+            <Link href="/sitemap" className="hover:text-[#17211B] transition">Sitemap</Link>
           </div>
         </div>
       </div>
