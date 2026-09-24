@@ -91,6 +91,7 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
             organization_id: orgId,
             organizations: orgObj,
             phone: adminProfile.phone,
+            avatar_url: adminProfile.avatar_url || null,
           }
         }
       } catch {}
@@ -248,6 +249,7 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
             phone: fallbackProfile.phone || authMobile,
             resident_id: fallbackProfile.resident_id || residentId || null,
             organizations: orgObj,
+            avatar_url: fallbackProfile.avatar_url || null,
           }
         }
 
@@ -358,6 +360,7 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
         role: profile.role || 'owner',
         organization_id: orgId,
         phone: profile.phone,
+        avatar_url: profile.avatar_url || null,
         organizations: orgObj,
       }
     }
