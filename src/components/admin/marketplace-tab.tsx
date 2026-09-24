@@ -20,6 +20,12 @@ interface MarketplaceTabProps {
 
 export default function MarketplaceTab({ initialSubTab = 'listings', initialBadgeFilter = 'all' }: MarketplaceTabProps) {
   const [subTab, setSubTab] = useState<'listings' | 'instant_pg' | 'enquiries' | 'visits'>(initialSubTab)
+
+  useEffect(() => {
+    if (initialSubTab) {
+      setSubTab(initialSubTab)
+    }
+  }, [initialSubTab])
   const [loading, setLoading] = useState(true)
   const [listings, setListings] = useState<any[]>([])
   const [enquiries, setEnquiries] = useState<any[]>([])

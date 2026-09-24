@@ -3,6 +3,8 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { requireSuperAdmin } from '@/lib/admin-auth'
 import { queryCollection, updateDocument, createDocument } from '@/lib/firebase/firestore'
 
+const PLATFORM_ORG_ID = 'edd624d8-f3a0-4f92-b8b9-515c50ed8e98'
+
 declare global {
   // eslint-disable-next-line no-var
   var __pgsetu_instant_leads__: any[] | undefined
@@ -236,23 +238,69 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 2. Fetch Leads (Firestore + In-Memory)
-    const filters: Array<[string, any, any]> = []
-    if (status && status !== 'all') filters.push(['status', '==', status])
-    const rawLeads = await queryCollection('leads', filters, { field: 'created_at', direction: 'desc' }, 150)
-
+    // 2. Fetch Leads (Supabase Persistent Storage + Firestore + In-Memory)
     const combinedMap = new Map<string, any>()
+
+    // A. Fetch from Supabase settings table (marketplace_leads)
+    try {
+      const { data: sData } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('organization_id', PLATFORM_ORG_ID)
+        .eq('key', 'marketplace_leads')
+        .maybeSingle()
+
+      if (Array.isArray(sData?.value)) {
+        for (const l of sData.value) {
+          const key = l.reference_code || l.id
+          if (key) combinedMap.set(key, l)
+        }
+      }
+
+      // B. Fetch from Supabase audit_logs
+      const { data: aData } = await supabase
+        .from('audit_logs')
+        .select('after_data, created_at')
+        .eq('entity_type', 'lead')
+        .order('created_at', { ascending: false })
+        .limit(150)
+
+      if (Array.isArray(aData)) {
+        for (const row of aData) {
+          if (row.after_data) {
+            const l = row.after_data
+            const key = l.reference_code || l.id
+            if (key && !combinedMap.has(key)) {
+              combinedMap.set(key, l)
+            }
+          }
+        }
+      }
+    } catch (sbErr) {
+      console.warn('[AdminMarketplace] Supabase leads fetch error:', sbErr)
+    }
+
+    // C. Fetch from In-Memory
     const memLeads = global.__pgsetu_instant_leads__ || []
     for (const l of memLeads) {
       if (status && status !== 'all' && l.status !== status) continue
-      combinedMap.set(l.id || l.reference_code, l)
-    }
-    for (const l of rawLeads) {
-      combinedMap.set(l.id || l.reference_code, l)
+      const key = l.reference_code || l.id
+      if (key && !combinedMap.has(key)) combinedMap.set(key, l)
     }
 
+    // D. Fetch from Firestore (Fallback)
+    try {
+      const filters: Array<[string, any, any]> = []
+      if (status && status !== 'all') filters.push(['status', '==', status])
+      const rawLeads = await queryCollection('leads', filters, { field: 'created_at', direction: 'desc' }, 150)
+      for (const l of rawLeads) {
+        const key = l.reference_code || l.id
+        if (key && !combinedMap.has(key)) combinedMap.set(key, l)
+      }
+    } catch {}
+
     const allLeads = Array.from(combinedMap.values()).sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
     )
 
     // A. Instant PG Leads
@@ -339,7 +387,38 @@ export async function POST(request: NextRequest) {
       if (assigned_property_name) updates.assigned_property_name = assigned_property_name
       if (notes !== undefined) updates.notes = notes
 
-      await updateDocument('leads', enquiry_id, updates)
+      // 1. Update in Supabase
+      try {
+        const supabase = await createServiceClient()
+        const { data: sData } = await supabase
+          .from('settings')
+          .select('value')
+          .eq('organization_id', PLATFORM_ORG_ID)
+          .eq('key', 'marketplace_leads')
+          .maybeSingle()
+
+        if (Array.isArray(sData?.value)) {
+          const updatedList = sData.value.map((item: any) => {
+            if (item.id === enquiry_id || item.reference_code === enquiry_id) {
+              return { ...item, ...updates }
+            }
+            return item
+          })
+
+          await supabase.from('settings').upsert({
+            organization_id: PLATFORM_ORG_ID,
+            key: 'marketplace_leads',
+            value: updatedList,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'organization_id, key' })
+        }
+      } catch (sbErr) {
+        console.warn('[AdminMarketplace] Supabase lead update warning:', sbErr)
+      }
+
+      try {
+        await updateDocument('leads', enquiry_id, updates)
+      } catch {}
 
       // Update in memory as well
       if (global.__pgsetu_instant_leads__) {
@@ -367,7 +446,9 @@ export async function POST(request: NextRequest) {
       }
 
       const refCode = `PG-INSTA-${Math.floor(1000 + Math.random() * 9000)}`
+      const leadId = `lead_${Math.random().toString(36).substring(2, 9)}`
       const payload = {
+        id: leadId,
         reference_code: refCode,
         tenant_name: name,
         user_name: name,
@@ -386,11 +467,50 @@ export async function POST(request: NextRequest) {
         updated_at: new Date().toISOString(),
       }
 
-      const doc = await createDocument('leads', payload)
-      if (!global.__pgsetu_instant_leads__) global.__pgsetu_instant_leads__ = []
-      global.__pgsetu_instant_leads__.unshift(doc)
+      // 1. Persist to Supabase
+      try {
+        const supabase = await createServiceClient()
+        await supabase.from('audit_logs').insert({
+          organization_id: PLATFORM_ORG_ID,
+          action: 'create',
+          entity_type: 'lead',
+          entity_label: refCode,
+          user_name: name,
+          after_data: payload,
+          notes: `Instant PG Request created by Superadmin: ${name} (+91 ${phone}) for ${city}`
+        })
 
-      return NextResponse.json({ success: true, lead: doc, message: 'Instant lead created by admin' })
+        const { data: currentSettings } = await supabase
+          .from('settings')
+          .select('value')
+          .eq('organization_id', PLATFORM_ORG_ID)
+          .eq('key', 'marketplace_leads')
+          .maybeSingle()
+
+        const existingList: any[] = Array.isArray(currentSettings?.value) ? currentSettings.value : []
+        const updatedList = [
+          payload,
+          ...existingList.filter((x: any) => x.reference_code !== refCode && x.id !== leadId)
+        ].slice(0, 500)
+
+        await supabase.from('settings').upsert({
+          organization_id: PLATFORM_ORG_ID,
+          key: 'marketplace_leads',
+          value: updatedList,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'organization_id, key' })
+      } catch (dbErr) {
+        console.warn('[AdminMarketplace] Supabase lead creation error:', dbErr)
+      }
+
+      try {
+        await createDocument('leads', payload, leadId)
+      } catch {}
+
+      if (!global.__pgsetu_instant_leads__) global.__pgsetu_instant_leads__ = []
+      global.__pgsetu_instant_leads__.unshift(payload)
+
+      return NextResponse.json({ success: true, lead: payload, message: 'Instant lead created by admin' })
     }
 
     return handleListingModeration(adminUser, body)

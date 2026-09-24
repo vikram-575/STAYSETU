@@ -10,6 +10,7 @@ import {
   BookOpen, Printer
 } from 'lucide-react'
 import { signPortalToken } from '@/lib/portal-auth'
+import ResidentDetailTabs from '@/components/residents/resident-detail-tabs'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -277,35 +278,15 @@ export default async function ResidentDetailPage({ params, searchParams }: Props
         </div>
       </div>
 
-      {/* Tabs with horizontal scroll */}
-      <div className="overflow-x-auto pb-1 scrollbar-none">
-        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl text-xs font-bold w-max">
-          {[
-            { key: 'overview', label: 'Overview & KYC' },
-            { key: 'ledger', label: `Passbook & Ledger (${ledgerEntries?.length ?? 0})` },
-            { key: 'invoices', label: `Invoices (${invoices?.length ?? 0})` },
-            { key: 'payments', label: `Payments (${payments?.length ?? 0})` },
-            { key: 'documents', label: `Documents (${documents?.length ?? 0})` },
-            { key: 'history', label: `History (${assignments?.length ?? 0})` },
-          ].map((t) => (
-            <Link
-              key={t.key}
-              href={`/dashboard/residents/${residentId}?tab=${t.key}`}
-              className={cn(
-                'px-3.5 py-1.5 rounded-lg transition whitespace-nowrap',
-                activeTab === t.key
-                  ? 'bg-white text-blue-700 shadow-xs'
-                  : 'text-gray-600 hover:text-gray-900'
-              )}
-            >
-              {t.label}
-            </Link>
-          ))}
-        </div>
-      </div>
-
-      {/* Tab Contents */}
-      {activeTab === 'overview' && (
+      {/* Interactive 0ms Instant Tabs */}
+      <ResidentDetailTabs
+        initialTab={activeTab}
+        residentId={residentId}
+        tabs={[
+          {
+            key: 'overview',
+            label: 'Overview & KYC',
+            content: (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Current Assignment */}
           <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-4 sm:p-5 space-y-3 sm:space-y-4 shadow-xs">
@@ -472,10 +453,12 @@ export default async function ResidentDetailPage({ params, searchParams }: Props
             </div>
           </div>
         </div>
-      )}
-
-      {/* Digital Passbook & Ledger Tab */}
-      {activeTab === 'ledger' && (
+            ),
+          },
+          {
+            key: 'ledger',
+            label: `Passbook & Ledger (${ledgerEntries?.length ?? 0})`,
+            content: (
         <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-3.5 sm:p-5 shadow-xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
             <div>
@@ -629,10 +612,12 @@ export default async function ResidentDetailPage({ params, searchParams }: Props
             </table>
           </div>
         </div>
-      )}
-
-      {/* Invoices Tab */}
-      {activeTab === 'invoices' && (
+            ),
+          },
+          {
+            key: 'invoices',
+            label: `Invoices (${invoices?.length ?? 0})`,
+            content: (
         <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-3.5 sm:p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-gray-900">Monthly Invoices</h3>
@@ -742,10 +727,12 @@ export default async function ResidentDetailPage({ params, searchParams }: Props
             </table>
           </div>
         </div>
-      )}
-
-      {/* Payments Tab */}
-      {activeTab === 'payments' && (
+            ),
+          },
+          {
+            key: 'payments',
+            label: `Payments (${payments?.length ?? 0})`,
+            content: (
         <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-3.5 sm:p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-gray-900">Payment Collection Records</h3>
@@ -827,10 +814,12 @@ export default async function ResidentDetailPage({ params, searchParams }: Props
             </table>
           </div>
         </div>
-      )}
-
-      {/* History Tab (Transfers & Stay Periods) */}
-      {activeTab === 'history' && (
+            ),
+          },
+          {
+            key: 'history',
+            label: `History (${assignments?.length ?? 0})`,
+            content: (
         <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-3.5 sm:p-5 shadow-xs space-y-3 sm:space-y-4">
           <h3 className="text-sm font-bold text-gray-900">Bed Assignment & Transfer History</h3>
           <div className="space-y-2.5">
@@ -864,10 +853,12 @@ export default async function ResidentDetailPage({ params, searchParams }: Props
             )}
           </div>
         </div>
-      )}
-
-      {/* Documents Tab */}
-      {activeTab === 'documents' && (
+            ),
+          },
+          {
+            key: 'documents',
+            label: `Documents (${documents?.length ?? 0})`,
+            content: (
         <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-3.5 sm:p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-gray-900">Secure Document Vault</h3>
@@ -895,7 +886,10 @@ export default async function ResidentDetailPage({ params, searchParams }: Props
             )}
           </div>
         </div>
-      )}
+            ),
+          },
+        ]}
+      />
     </div>
   )
 }

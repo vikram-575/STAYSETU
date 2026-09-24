@@ -14,6 +14,7 @@ export type AdminTabId =
   | 'dashboard'
   | 'marketplace'
   | 'enquiries'
+  | 'instant_pg'
   | 'visits'
   | 'promotions'
   | 'structure'
@@ -107,6 +108,13 @@ export default function AdminSidebar({
           icon: Users2,
           badge: 'Operators',
           badgeVariant: 'emerald',
+        },
+        {
+          id: 'enquiries',
+          label: '⚡ Instant PG Leads',
+          icon: Zap,
+          badge: badges.activeEnquiries ? `${badges.activeEnquiries} new` : 'Live',
+          badgeVariant: 'amber',
         },
       ],
     },

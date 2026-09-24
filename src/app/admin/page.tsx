@@ -153,7 +153,7 @@ function AdminContent() {
 
           {/* Marketplace & Renting Specific Views */}
           {currentTab === 'marketplace' && <MarketplaceTab initialSubTab="listings" />}
-          {currentTab === 'enquiries' && <MarketplaceTab initialSubTab="enquiries" />}
+          {(currentTab === 'enquiries' || currentTab === 'instant_pg') && <MarketplaceTab initialSubTab="instant_pg" />}
           {currentTab === 'visits' && <MarketplaceTab initialSubTab="visits" />}
           {currentTab === 'promotions' && <MarketplaceTab initialSubTab="listings" initialBadgeFilter="featured" />}
 
