@@ -6,7 +6,8 @@ import {
   Building2, CheckCircle2, XCircle, Clock, Loader2,
   Home, Users, Eye, X, ChevronRight, ExternalLink,
   KeyRound, Copy, Check, MapPin, Bed, Calendar, Shield,
-  Sparkles, Filter, RefreshCw, Download
+  Sparkles, Filter, RefreshCw, Download, Pencil, Trash2,
+  AlertTriangle, AlertCircle
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
@@ -84,6 +85,34 @@ export default function UsersTab() {
     organization_id: '',
   })
 
+  // Edit User State
+  const [editingProfile, setEditingProfile] = useState<UserProfile | null>(null)
+  const [editLoading, setEditLoading] = useState(false)
+  const [editError, setEditError] = useState('')
+  const [editSuccess, setEditSuccess] = useState('')
+  const [editForm, setEditForm] = useState({
+    full_name: '',
+    email: '',
+    phone: '',
+    alternate_phone: '',
+    status: 'active',
+    is_active: true,
+    role: 'resident',
+    organization_name: '',
+    monthly_rent: '',
+    permanent_address: '',
+    permanent_city: '',
+    emergency_name: '',
+    emergency_phone: '',
+  })
+
+  // Delete User State
+  const [deletingProfile, setDeletingProfile] = useState<UserProfile | null>(null)
+  const [deleteCascadeOrg, setDeleteCascadeOrg] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const [deleteSuccess, setDeleteSuccess] = useState('')
+
   const loadUsers = async () => {
     setLoading(true)
     setFetchError('')
@@ -145,6 +174,125 @@ export default function UsersTab() {
     navigator.clipboard.writeText(text)
     setCopiedId(true)
     setTimeout(() => setCopiedId(false), 2000)
+  }
+
+  const openEditModal = (profile: UserProfile) => {
+    setEditingProfile(profile)
+    setEditError('')
+    setEditSuccess('')
+    setEditForm({
+      full_name: profile.full_name || '',
+      email: profile.email || '',
+      phone: profile.phone || '',
+      alternate_phone: profile.alternate_phone || '',
+      status: profile.status || (profile.is_active ? 'active' : 'inactive'),
+      is_active: profile.is_active ?? true,
+      role: profile.role || (profile.user_type === 'owner' ? 'owner' : 'resident'),
+      organization_name: profile.organization_name || '',
+      monthly_rent: profile.monthly_rent_paise ? String(Math.round(profile.monthly_rent_paise / 100)) : '',
+      permanent_address: profile.permanent_address || '',
+      permanent_city: profile.permanent_city || '',
+      emergency_name: profile.emergency_name || '',
+      emergency_phone: profile.emergency_phone || '',
+    })
+  }
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingProfile) return
+    setEditLoading(true)
+    setEditError('')
+    setEditSuccess('')
+
+    try {
+      const rentPaise = editForm.monthly_rent ? Math.round(parseFloat(editForm.monthly_rent) * 100) : undefined
+      const res = await fetch('/api/admin/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingProfile.id,
+          resident_id: editingProfile.resident_id,
+          user_type: editingProfile.user_type,
+          organization_id: editingProfile.organization_id,
+          full_name: editForm.full_name,
+          email: editForm.email,
+          phone: editForm.phone,
+          alternate_phone: editForm.alternate_phone,
+          status: editForm.status,
+          is_active: editForm.is_active,
+          role: editForm.role,
+          organization_name: editForm.organization_name,
+          monthly_rent_paise: rentPaise,
+          permanent_address: editForm.permanent_address,
+          permanent_city: editForm.permanent_city,
+          emergency_name: editForm.emergency_name,
+          emergency_phone: editForm.emergency_phone,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setEditSuccess('Profile successfully updated and synced with Supabase.')
+        loadUsers()
+        setTimeout(() => {
+          setEditingProfile(null)
+          setEditSuccess('')
+        }, 1200)
+      } else {
+        setEditError(data.error || 'Failed to update user profile.')
+      }
+    } catch (err: any) {
+      setEditError(err?.message || 'Network error updating user profile.')
+    } finally {
+      setEditLoading(false)
+    }
+  }
+
+  const openDeleteModal = (profile: UserProfile) => {
+    setDeletingProfile(profile)
+    setDeleteCascadeOrg(false)
+    setDeleteError('')
+    setDeleteSuccess('')
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deletingProfile) return
+    setDeleteLoading(true)
+    setDeleteError('')
+    setDeleteSuccess('')
+
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: deletingProfile.id,
+          resident_id: deletingProfile.resident_id,
+          user_type: deletingProfile.user_type,
+          organization_id: deletingProfile.organization_id,
+          delete_organization: deleteCascadeOrg,
+          email: deletingProfile.email,
+          phone: deletingProfile.phone,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setDeleteSuccess('User and linked records successfully removed from Supabase.')
+        loadUsers()
+        setTimeout(() => {
+          setDeletingProfile(null)
+          setDeleteSuccess('')
+          if (selectedProfile?.id === deletingProfile.id) {
+            setSelectedProfile(null)
+          }
+        }, 1200)
+      } else {
+        setDeleteError(data.error || 'Failed to delete user.')
+      }
+    } catch (err: any) {
+      setDeleteError(err?.message || 'Network error deleting user.')
+    } finally {
+      setDeleteLoading(false)
+    }
   }
 
   const filteredUsers = users.filter((u) => {
@@ -578,19 +726,37 @@ export default function UsersTab() {
                       </td>
 
                       {/* Actions */}
-                      <td className="px-4 py-3.5 text-right space-x-1.5">
+                      <td className="px-4 py-3.5 text-right space-x-1.5 whitespace-nowrap">
                         <button
                           onClick={() => setSelectedProfile(u)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs font-bold transition active:scale-95 border border-slate-700 hover:border-slate-600 shadow-xs"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs font-bold transition active:scale-95 border border-slate-700 hover:border-slate-600 shadow-xs cursor-pointer"
                         >
                           <Eye className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>View Profile</span>
+                          <span>View</span>
                         </button>
+                        <button
+                          onClick={() => openEditModal(u)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 rounded-lg text-xs font-bold transition active:scale-95 border border-amber-500/30 hover:border-amber-500/50 shadow-xs cursor-pointer"
+                          title="Edit user in Supabase"
+                        >
+                          <Pencil className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Edit</span>
+                        </button>
+                        {u.user_type !== 'admin' && (
+                          <button
+                            onClick={() => openDeleteModal(u)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 rounded-lg text-xs font-bold transition active:scale-95 border border-rose-500/30 hover:border-rose-500/50 shadow-xs cursor-pointer"
+                            title="Delete user and data from Supabase"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                            <span>Delete</span>
+                          </button>
+                        )}
                         {u.organization_id && (u.user_type === 'owner' || u.role === 'owner' || u.role === 'manager') && (
                           <button
                             onClick={() => handleImpersonateUser(u)}
                             disabled={impersonatingUserId === u.id}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 rounded-lg text-xs font-bold border border-blue-500/30 transition active:scale-95 shadow-xs"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 rounded-lg text-xs font-bold border border-blue-500/30 transition active:scale-95 shadow-xs cursor-pointer"
                             title={`Login as PG Owner/Manager into ${u.organization_name || 'PG'}`}
                           >
                             {impersonatingUserId === u.id ? (
@@ -878,7 +1044,24 @@ export default function UsersTab() {
               )}
 
               {/* Direct Quick Actions */}
-              <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-800">
+              <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-slate-800">
+                <button
+                  onClick={() => openEditModal(selectedProfile)}
+                  className="px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition active:scale-95 border border-amber-500/30 cursor-pointer"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  <span>Edit in Supabase</span>
+                </button>
+
+                {selectedProfile.user_type !== 'admin' && (
+                  <button
+                    onClick={() => openDeleteModal(selectedProfile)}
+                    className="px-3 py-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition active:scale-95 border border-rose-500/30 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete from Supabase</span>
+                  </button>
+                )}
                 {selectedProfile.phone && (
                   <a
                     href={`tel:${selectedProfile.phone}`}
@@ -1026,6 +1209,346 @@ export default function UsersTab() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Edit User / Profile Modal */}
+      {editingProfile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-xl bg-slate-900 border border-slate-700 rounded-3xl overflow-hidden shadow-2xl max-h-[92vh] flex flex-col animate-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="p-5 border-b border-slate-800 bg-amber-950/20 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-center font-bold">
+                  <Pencil className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">Edit Profile in Supabase</h3>
+                  <p className="text-xs text-slate-400">
+                    {editingProfile.display_role} · {editingProfile.full_name}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingProfile(null)}
+                className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Scrollable Form Body */}
+            <form onSubmit={handleSaveEdit} className="p-5 overflow-y-auto space-y-4 text-xs">
+              {editSuccess && (
+                <div className="p-3 bg-emerald-950/60 border border-emerald-800 text-emerald-300 rounded-xl flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>{editSuccess}</span>
+                </div>
+              )}
+              {editError && (
+                <div className="p-3 bg-rose-950/60 border border-rose-800 text-rose-300 rounded-xl flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span>{editError}</span>
+                </div>
+              )}
+
+              {/* Basic Info */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-300 font-bold block mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.full_name}
+                    onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 font-bold block mb-1">Email Address</label>
+                  <input
+                    type="email"
+                    value={editForm.email}
+                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 font-bold block mb-1">Phone Number (10 digits)</label>
+                  <input
+                    type="tel"
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                    placeholder="9876543210"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 font-bold block mb-1">Account Status</label>
+                  <select
+                    value={editForm.status}
+                    onChange={(e) => setEditForm({
+                      ...editForm,
+                      status: e.target.value,
+                      is_active: e.target.value === 'active'
+                    })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    {editingProfile.user_type === 'tenant' && <option value="checked_out">Checked Out</option>}
+                  </select>
+                </div>
+              </div>
+
+              {/* PG Owner Specific Settings */}
+              {editingProfile.user_type === 'owner' && (
+                <div className="p-3.5 bg-slate-950/60 border border-slate-800 rounded-2xl space-y-3">
+                  <div className="text-[11px] font-black uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5" />
+                    <span>PG Business / Organization</span>
+                  </div>
+                  <div>
+                    <label className="text-slate-300 font-bold block mb-1">PG Name / Organization Name</label>
+                    <input
+                      type="text"
+                      value={editForm.organization_name}
+                      onChange={(e) => setEditForm({ ...editForm, organization_name: e.target.value })}
+                      placeholder="e.g. Setu Luxury PG"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Tenant / Resident Specific Settings */}
+              {editingProfile.user_type === 'tenant' && (
+                <div className="p-3.5 bg-slate-950/60 border border-slate-800 rounded-2xl space-y-3">
+                  <div className="text-[11px] font-black uppercase text-emerald-400 tracking-wider flex items-center gap-1.5">
+                    <Home className="w-3.5 h-3.5" />
+                    <span>Resident & Stay Details</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-slate-300 font-bold block mb-1">Alternate Phone</label>
+                      <input
+                        type="tel"
+                        value={editForm.alternate_phone}
+                        onChange={(e) => setEditForm({ ...editForm, alternate_phone: e.target.value })}
+                        placeholder="Alternate contact"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-slate-300 font-bold block mb-1">Monthly Rent (₹)</label>
+                      <input
+                        type="number"
+                        value={editForm.monthly_rent}
+                        onChange={(e) => setEditForm({ ...editForm, monthly_rent: e.target.value })}
+                        placeholder="e.g. 8500"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-slate-300 font-bold block mb-1">Permanent City</label>
+                      <input
+                        type="text"
+                        value={editForm.permanent_city}
+                        onChange={(e) => setEditForm({ ...editForm, permanent_city: e.target.value })}
+                        placeholder="e.g. Lucknow"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-slate-300 font-bold block mb-1">Permanent Address</label>
+                      <input
+                        type="text"
+                        value={editForm.permanent_address}
+                        onChange={(e) => setEditForm({ ...editForm, permanent_address: e.target.value })}
+                        placeholder="Full address"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-slate-300 font-bold block mb-1">Emergency Contact Name</label>
+                      <input
+                        type="text"
+                        value={editForm.emergency_name}
+                        onChange={(e) => setEditForm({ ...editForm, emergency_name: e.target.value })}
+                        placeholder="Guardian / Parent"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-slate-300 font-bold block mb-1">Emergency Phone</label>
+                      <input
+                        type="tel"
+                        value={editForm.emergency_phone}
+                        onChange={(e) => setEditForm({ ...editForm, emergency_phone: e.target.value })}
+                        placeholder="Emergency mobile"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingProfile(null)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editLoading}
+                  className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-lg shadow-amber-500/20 active:scale-95 disabled:opacity-50"
+                >
+                  {editLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  Save & Sync to Supabase
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete User Confirmation Modal */}
+      {deletingProfile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-md bg-slate-900 border border-rose-800/80 rounded-3xl overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="p-5 border-b border-rose-900/40 bg-rose-950/40 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center justify-center font-bold">
+                  <Trash2 className="w-4 h-4 text-rose-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-rose-200">Delete from Supabase</h3>
+                  <p className="text-xs text-rose-300/80">Permanent Removal Action</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setDeletingProfile(null)}
+                className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 space-y-4 text-xs">
+              {deleteSuccess && (
+                <div className="p-3 bg-emerald-950/60 border border-emerald-800 text-emerald-300 rounded-xl flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>{deleteSuccess}</span>
+                </div>
+              )}
+              {deleteError && (
+                <div className="p-3 bg-rose-950/60 border border-rose-800 text-rose-300 rounded-xl flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span>{deleteError}</span>
+                </div>
+              )}
+
+              <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-medium">Selected Profile:</span>
+                  <span className="font-extrabold text-white">{deletingProfile.full_name}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-medium">Role:</span>
+                  <span className="font-bold text-amber-300">{deletingProfile.display_role}</span>
+                </div>
+                {deletingProfile.phone && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 font-medium">Mobile:</span>
+                    <span className="font-mono text-slate-200">+91 {deletingProfile.phone}</span>
+                  </div>
+                )}
+                {deletingProfile.email && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 font-medium">Email:</span>
+                    <span className="font-mono text-slate-200 truncate max-w-[200px]">{deletingProfile.email}</span>
+                  </div>
+                )}
+                {deletingProfile.organization_name && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 font-medium">Linked PG:</span>
+                    <span className="font-semibold text-slate-200 truncate max-w-[200px]">
+                      {deletingProfile.organization_name}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-3 bg-amber-950/30 border border-amber-900/40 rounded-xl text-amber-200 flex items-start gap-2 text-[11px] leading-relaxed">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  {deletingProfile.user_type === 'tenant' ? (
+                    <span>
+                      Deleting this tenant will <strong>vacate their assigned bed</strong>, remove resident records, ledger, invoices, deposits, and their Supabase user account permanently.
+                    </span>
+                  ) : (
+                    <span>
+                      Deleting this owner will remove their platform login and Supabase user account.
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Owner cascade option */}
+              {deletingProfile.user_type === 'owner' && deletingProfile.organization_id && (
+                <label className="flex items-start gap-2.5 p-3 bg-slate-950 border border-slate-800 rounded-xl cursor-pointer hover:bg-slate-950/80 transition">
+                  <input
+                    type="checkbox"
+                    checked={deleteCascadeOrg}
+                    onChange={(e) => setDeleteCascadeOrg(e.target.checked)}
+                    className="mt-0.5 rounded border-slate-700 text-rose-600 focus:ring-rose-500"
+                  />
+                  <div className="text-[11px] leading-tight">
+                    <span className="font-bold text-slate-200 block">
+                      Also purge and delete the entire PG organization ({deletingProfile.organization_name})
+                    </span>
+                    <span className="text-slate-400 block mt-0.5">
+                      Check this only if you want to permanently delete all properties, rooms, beds, and tenant data belonging to this PG.
+                    </span>
+                  </div>
+                </label>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setDeletingProfile(null)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  disabled={deleteLoading}
+                  className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-lg shadow-rose-600/20 active:scale-95 disabled:opacity-50"
+                >
+                  {deleteLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  Confirm & Delete from Supabase
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

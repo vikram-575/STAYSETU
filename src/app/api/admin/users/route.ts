@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/supabase/config'
-import { isSuperAdminFromRequest, isKnownSuperAdmin } from '@/lib/admin-auth'
+import { isSuperAdminFromRequest, isKnownSuperAdmin, SUPER_ADMIN_EMAILS } from '@/lib/admin-auth'
 
 async function requireSuperAdmin(request: NextRequest) {
   if (isSuperAdminFromRequest(request)) {
@@ -401,5 +401,352 @@ export async function POST(request: NextRequest) {
     })
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Failed to create user' }, { status: 500 })
+  }
+}
+
+/**
+ * PUT /api/admin/users
+ * Update user / resident / owner profile in Supabase
+ * Super Admin only
+ */
+export async function PUT(request: NextRequest) {
+  const adminUser = await requireSuperAdmin(request)
+  if (!adminUser) return NextResponse.json({ error: 'Super Admin access required.' }, { status: 403 })
+
+  try {
+    const body = await request.json()
+    const {
+      id,
+      user_type,
+      full_name,
+      email,
+      phone,
+      alternate_phone,
+      is_active,
+      status,
+      role,
+      organization_id,
+      organization_name,
+      resident_id,
+      monthly_rent_paise,
+      permanent_address,
+      permanent_city,
+      permanent_state,
+      permanent_pincode,
+      emergency_name,
+      emergency_phone,
+      emergency_relation,
+      id_type,
+      id_number,
+      gender,
+      date_of_birth,
+    } = body
+
+    if (!id && !resident_id) {
+      return NextResponse.json({ error: 'User ID or Resident ID is required.' }, { status: 400 })
+    }
+
+    const supabase = await createServiceClient()
+    const cleanEmail = email ? email.toLowerCase().trim() : undefined
+    const cleanPhone = phone ? phone.replace(/\D/g, '') : undefined
+    const cleanAltPhone = alternate_phone ? alternate_phone.replace(/\D/g, '') : undefined
+
+    let updatedUser = null
+    let updatedResident = null
+
+    // 1. Update in users table if user record exists
+    if (id) {
+      const userUpdates: any = {
+        updated_at: new Date().toISOString(),
+      }
+      if (full_name !== undefined) userUpdates.full_name = full_name.trim()
+      if (cleanEmail !== undefined && cleanEmail) userUpdates.email = cleanEmail
+      if (cleanPhone !== undefined) userUpdates.phone = cleanPhone
+      if (is_active !== undefined) userUpdates.is_active = Boolean(is_active)
+      if (role !== undefined) userUpdates.role = role
+
+      const { data: uData, error: uErr } = await supabase
+        .from('users')
+        .update(userUpdates)
+        .eq('id', id)
+        .select()
+        .maybeSingle()
+
+      if (!uErr && uData) {
+        updatedUser = uData
+      }
+
+      // 2. Update Supabase Auth if user exists in auth
+      try {
+        const authUpdates: any = {}
+        if (cleanEmail) authUpdates.email = cleanEmail
+        if (full_name) {
+          authUpdates.user_metadata = { full_name: full_name.trim() }
+        }
+        if (cleanPhone) authUpdates.phone = cleanPhone
+
+        await supabase.auth.admin.updateUserById(id, authUpdates)
+      } catch (authErr) {
+        console.warn('Auth user sync warning (non-fatal):', authErr)
+      }
+    }
+
+    // 3. Update resident record if resident_id exists or matches
+    const targetResidentId = resident_id || (user_type === 'tenant' ? id : null)
+    if (targetResidentId) {
+      const resUpdates: any = {
+        updated_at: new Date().toISOString(),
+      }
+      if (full_name !== undefined) resUpdates.full_name = full_name.trim()
+      if (cleanPhone !== undefined) resUpdates.phone = cleanPhone
+      if (cleanAltPhone !== undefined) resUpdates.alternate_phone = cleanAltPhone
+      if (cleanEmail !== undefined && cleanEmail) resUpdates.email = cleanEmail
+      if (status !== undefined) resUpdates.status = status
+      else if (is_active !== undefined) resUpdates.status = is_active ? 'active' : 'checked_out'
+      if (permanent_address !== undefined) resUpdates.permanent_address = permanent_address
+      if (permanent_city !== undefined) resUpdates.permanent_city = permanent_city
+      if (permanent_state !== undefined) resUpdates.permanent_state = permanent_state
+      if (permanent_pincode !== undefined) resUpdates.permanent_pincode = permanent_pincode
+      if (emergency_name !== undefined) resUpdates.emergency_name = emergency_name
+      if (emergency_phone !== undefined) resUpdates.emergency_phone = emergency_phone
+      if (emergency_relation !== undefined) resUpdates.emergency_relation = emergency_relation
+      if (id_type !== undefined) resUpdates.id_type = id_type
+      if (id_number !== undefined) resUpdates.id_number = id_number
+      if (gender !== undefined) resUpdates.gender = gender
+      if (date_of_birth !== undefined) resUpdates.date_of_birth = date_of_birth
+
+      const { data: rData, error: rErr } = await supabase
+        .from('residents')
+        .update(resUpdates)
+        .eq('id', targetResidentId)
+        .select()
+        .maybeSingle()
+
+      if (!rErr && rData) {
+        updatedResident = rData
+      }
+
+      // Update active assignment rent if specified
+      if (monthly_rent_paise !== undefined && monthly_rent_paise !== null) {
+        await supabase
+          .from('resident_assignments')
+          .update({
+            monthly_rent_paise: Number(monthly_rent_paise),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('resident_id', targetResidentId)
+          .is('check_out_date', null)
+      }
+    }
+
+    // 4. Update Organization name if PG Owner
+    if (organization_id && organization_name) {
+      await supabase
+        .from('organizations')
+        .update({
+          name: organization_name.trim(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', organization_id)
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Profile for ${full_name || cleanEmail || 'user'} successfully updated in Supabase.`,
+      updatedUser,
+      updatedResident,
+    })
+  } catch (err: any) {
+    console.error('Error updating user profile:', err)
+    return NextResponse.json({ error: err.message || 'Failed to update user profile' }, { status: 500 })
+  }
+}
+
+/**
+ * DELETE /api/admin/users
+ * Completely delete Owner or Tenant profile from Supabase
+ * Super Admin only
+ */
+export async function DELETE(request: NextRequest) {
+  const adminUser = await requireSuperAdmin(request)
+  if (!adminUser) return NextResponse.json({ error: 'Super Admin access required.' }, { status: 403 })
+
+  try {
+    const url = new URL(request.url)
+    let body: any = {}
+    try {
+      body = await request.json()
+    } catch {
+      // Body may be empty if params passed via URL
+      body = {
+        id: url.searchParams.get('id'),
+        user_type: url.searchParams.get('user_type'),
+        resident_id: url.searchParams.get('resident_id'),
+        organization_id: url.searchParams.get('organization_id'),
+        delete_organization: url.searchParams.get('delete_organization') === 'true',
+        email: url.searchParams.get('email'),
+        phone: url.searchParams.get('phone'),
+      }
+    }
+
+    const {
+      id,
+      user_type,
+      resident_id,
+      organization_id,
+      delete_organization = false,
+      email,
+      phone,
+    } = body
+
+    if (!id && !resident_id) {
+      return NextResponse.json({ error: 'User ID or Resident ID is required.' }, { status: 400 })
+    }
+
+    const supabase = await createServiceClient()
+
+    // 1. Fetch user to verify safeguard
+    let targetUser: any = null
+    if (id) {
+      const { data } = await supabase.from('users').select('*').eq('id', id).maybeSingle()
+      targetUser = data
+    }
+
+    const targetEmail = (email || targetUser?.email || '').toLowerCase().trim()
+    const targetPhone = phone || targetUser?.phone || ''
+    const targetRole = targetUser?.role
+
+    // CRITICAL MASTER SAFEGUARD: Never delete master superadmin accounts!
+    if (
+      isKnownSuperAdmin(targetEmail, targetRole, id, targetPhone) ||
+      targetRole === 'superadmin' ||
+      SUPER_ADMIN_EMAILS.includes(targetEmail) ||
+      id === '7d66235b-290c-4c73-9f43-abb9711339db' ||
+      id === 'e4cd9eff-2a5e-4249-9094-e1ae92e1b0e7'
+    ) {
+      return NextResponse.json(
+        { error: 'Security Protection: Master Super Admin accounts cannot be deleted.' },
+        { status: 403 }
+      )
+    }
+
+    // 2. TENANT / RESIDENT DELETION CASCADE
+    const targetResidentId = resident_id || (user_type === 'tenant' ? id : null)
+
+    if (targetResidentId) {
+      // 2a. Find bed assignments to vacate beds
+      const { data: assignments } = await supabase
+        .from('resident_assignments')
+        .select('id, bed_id')
+        .eq('resident_id', targetResidentId)
+
+      const bedIds = (assignments || []).map((a: any) => a.bed_id).filter(Boolean)
+      if (bedIds.length > 0) {
+        await supabase.from('beds').update({ status: 'available' }).in('id', bedIds)
+      }
+
+      // 2b. Clean child foreign-key tables in proper order
+      await supabase.from('resident_documents').delete().eq('resident_id', targetResidentId)
+      await supabase.from('complaints').delete().eq('resident_id', targetResidentId)
+
+      const { data: deposits } = await supabase.from('deposits').select('id').eq('resident_id', targetResidentId)
+      const depositIds = (deposits || []).map((d: any) => d.id)
+      if (depositIds.length > 0) {
+        await supabase.from('deposit_adjustments').delete().in('deposit_id', depositIds)
+      }
+      await supabase.from('deposits').delete().eq('resident_id', targetResidentId)
+
+      const { data: payments } = await supabase.from('payments').select('id').eq('resident_id', targetResidentId)
+      const paymentIds = (payments || []).map((p: any) => p.id)
+      if (paymentIds.length > 0) {
+        await supabase.from('payment_allocations').delete().in('payment_id', paymentIds)
+      }
+      await supabase.from('payments').delete().eq('resident_id', targetResidentId)
+
+      const { data: invoices } = await supabase.from('invoices').select('id').eq('resident_id', targetResidentId)
+      const invoiceIds = (invoices || []).map((i: any) => i.id)
+      if (invoiceIds.length > 0) {
+        await supabase.from('invoice_items').delete().in('invoice_id', invoiceIds)
+      }
+      await supabase.from('invoices').delete().eq('resident_id', targetResidentId)
+
+      await supabase.from('ledger_entries').delete().eq('resident_id', targetResidentId)
+      await supabase.from('resident_assignments').delete().eq('resident_id', targetResidentId)
+      await supabase.from('users').update({ resident_id: null }).eq('resident_id', targetResidentId)
+      await supabase.from('residents').delete().eq('id', targetResidentId)
+    }
+
+    // 3. OWNER / USER CLEANUP & CASCADE
+    const targetUserId = id
+
+    if (targetUserId) {
+      // Unlink foreign key references to users(id) to avoid foreign key constraints
+      await supabase.from('residents').update({ created_by: null }).eq('created_by', targetUserId)
+      await supabase.from('resident_assignments').update({ authorized_by: null }).eq('authorized_by', targetUserId)
+      await supabase.from('invoices').update({ created_by: null }).eq('created_by', targetUserId)
+      await supabase.from('payments').update({ received_by: null }).eq('received_by', targetUserId)
+      await supabase.from('expenses').update({ recorded_by: null }).eq('recorded_by', targetUserId)
+
+      // If Owner and delete_organization is requested
+      const targetOrgId = organization_id || targetUser?.organization_id
+      if (delete_organization && targetOrgId) {
+        // Deep purge organization data
+        await supabase.from('ledger_entries').delete().eq('organization_id', targetOrgId)
+        const { data: orgPayments } = await supabase.from('payments').select('id').eq('organization_id', targetOrgId)
+        const orgPayIds = (orgPayments || []).map((p: any) => p.id)
+        if (orgPayIds.length > 0) {
+          await supabase.from('payment_allocations').delete().in('payment_id', orgPayIds)
+        }
+        await supabase.from('payments').delete().eq('organization_id', targetOrgId)
+
+        const { data: orgInvoices } = await supabase.from('invoices').select('id').eq('organization_id', targetOrgId)
+        const orgInvIds = (orgInvoices || []).map((i: any) => i.id)
+        if (orgInvIds.length > 0) {
+          await supabase.from('invoice_items').delete().in('invoice_id', orgInvIds)
+        }
+        await supabase.from('invoices').delete().eq('organization_id', targetOrgId)
+
+        await supabase.from('deposit_adjustments').delete().eq('organization_id', targetOrgId)
+        await supabase.from('deposits').delete().eq('organization_id', targetOrgId)
+        await supabase.from('resident_documents').delete().eq('organization_id', targetOrgId)
+        await supabase.from('complaints').delete().eq('organization_id', targetOrgId)
+        await supabase.from('message_logs').delete().eq('organization_id', targetOrgId)
+        await supabase.from('electricity_readings').delete().eq('organization_id', targetOrgId)
+        await supabase.from('expenses').delete().eq('organization_id', targetOrgId)
+        await supabase.from('resident_assignments').delete().eq('organization_id', targetOrgId)
+        await supabase.from('residents').delete().eq('organization_id', targetOrgId)
+        await supabase.from('electricity_meters').delete().eq('organization_id', targetOrgId)
+        await supabase.from('beds').delete().eq('organization_id', targetOrgId)
+        await supabase.from('rooms').delete().eq('organization_id', targetOrgId)
+        await supabase.from('floors').delete().eq('organization_id', targetOrgId)
+        await supabase.from('buildings').delete().eq('organization_id', targetOrgId)
+        await supabase.from('properties').delete().eq('organization_id', targetOrgId)
+        await supabase.from('organization_sequences').delete().eq('organization_id', targetOrgId)
+        await supabase.from('invoice_sequences').delete().eq('organization_id', targetOrgId)
+        await supabase.from('payment_sequences').delete().eq('organization_id', targetOrgId)
+        await supabase.from('organizations').delete().eq('id', targetOrgId)
+      } else if (targetOrgId) {
+        // Just unlink organization ownership
+        await supabase.from('organizations').update({ owner_user_id: null }).eq('owner_user_id', targetUserId)
+      }
+
+      // Delete from users table
+      await supabase.from('users').delete().eq('id', targetUserId)
+
+      // Delete from Supabase Auth
+      try {
+        await supabase.auth.admin.deleteUser(targetUserId)
+      } catch (authErr) {
+        console.warn('Supabase Auth user delete error (user may not exist in auth.users):', authErr)
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Profile has been completely deleted from Supabase.`,
+    })
+  } catch (err: any) {
+    console.error('Error deleting user:', err)
+    return NextResponse.json({ error: err.message || 'Failed to delete user' }, { status: 500 })
   }
 }
