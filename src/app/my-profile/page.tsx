@@ -265,15 +265,51 @@ function MyProfileContent() {
   const [visitorPurpose, setVisitorPurpose] = useState('Friend Visiting')
   const [generatedPassCode, setGeneratedPassCode] = useState<string | null>(null)
 
-  // Load session & profile data
+  // Instant hydrate from cache and load session with timeout guard
   useEffect(() => {
+    let isMounted = true
+
+    // 1. Instant local cache hydration (0ms latency, eliminates loading spinner)
+    try {
+      const cachedUserStr = localStorage.getItem('pgsetu_session_user')
+      const cachedProfileStr = localStorage.getItem('pgsetu_profile_data')
+      const cachedStaysStr = localStorage.getItem('pgsetu_session_stays')
+      const cachedPropsStr = localStorage.getItem('pgsetu_hosted_properties')
+      const cachedSummaryStr = localStorage.getItem('pgsetu_passbook_summary')
+
+      if (cachedUserStr) {
+        const u = JSON.parse(cachedUserStr)
+        setCurrentUser(u)
+        setEditName(u.full_name || '')
+        if (u.role === 'owner' || u.role === 'superadmin' || u.role === 'manager') {
+          setActiveTab('properties')
+        }
+        setLoading(false)
+      }
+      if (cachedProfileStr) {
+        const p = JSON.parse(cachedProfileStr)
+        setProfileData(p)
+        setEditDob(p.dob || '')
+        setEditGender(p.gender || 'male')
+        setLoading(false)
+      }
+      if (cachedStaysStr) setStays(JSON.parse(cachedStaysStr))
+      if (cachedPropsStr) setHostedProperties(JSON.parse(cachedPropsStr))
+      if (cachedSummaryStr) setPassbookSummary(JSON.parse(cachedSummaryStr))
+    } catch {}
+
+    // 2. Maximum 2s timeout guard to prevent infinite loader
+    const timeoutId = setTimeout(() => {
+      if (isMounted) setLoading(false)
+    }, 2000)
+
     async function loadSession() {
       try {
-        setLoading(true)
         const res = await fetch('/api/auth/session', {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache' },
         })
+        if (!isMounted) return
         if (res.ok) {
           const data = await res.json()
           if (data.user) {
@@ -306,7 +342,11 @@ function MyProfileContent() {
             const serverProfile = data.profile || {}
             setProfileData(serverProfile)
             try {
+              localStorage.setItem('pgsetu_session_user', JSON.stringify(data.user))
               localStorage.setItem('pgsetu_profile_data', JSON.stringify(serverProfile))
+              if (data.stays) localStorage.setItem('pgsetu_session_stays', JSON.stringify(data.stays))
+              if (data.hostedProperties) localStorage.setItem('pgsetu_hosted_properties', JSON.stringify(data.hostedProperties))
+              if (data.passbookSummary) localStorage.setItem('pgsetu_passbook_summary', JSON.stringify(data.passbookSummary))
             } catch {}
 
             setEditDob(serverProfile.dob || '')
@@ -324,10 +364,16 @@ function MyProfileContent() {
       } catch (err) {
         console.error('Failed to load session:', err)
       } finally {
-        setLoading(false)
+        clearTimeout(timeoutId)
+        if (isMounted) setLoading(false)
       }
     }
     loadSession()
+
+    return () => {
+      isMounted = false
+      clearTimeout(timeoutId)
+    }
   }, [])
 
   // Open 10-Step List Property Wizard (Modal shown in screenshot media_1789545136103.jpg)
@@ -733,7 +779,7 @@ function MyProfileContent() {
     return true
   })
 
-  if (loading) {
+  if (loading && !currentUser) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F7FAF7] px-4">
         <div className="flex flex-col items-center gap-3">
@@ -741,6 +787,13 @@ function MyProfileContent() {
           <span className="text-xs text-gray-500 font-semibold tracking-wide">
             Loading your verified profile & passbook...
           </span>
+          <button
+            type="button"
+            onClick={() => setLoading(false)}
+            className="mt-2 text-xs text-[#16A34A] hover:underline font-semibold cursor-pointer"
+          >
+            Click to open profile now
+          </button>
         </div>
       </div>
     )

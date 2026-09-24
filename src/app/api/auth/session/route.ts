@@ -38,29 +38,21 @@ export async function GET() {
       expected_revenue_paise: 0,
     }
 
-    if (user.organization_id) {
-      const { data } = await serviceClient
-        .from('users')
-        .select('id, full_name, email, phone, role, created_at')
-        .eq('organization_id', user.organization_id)
-        .order('created_at', { ascending: false })
-      staffUsers = data || []
+    // ── Task A: Host / Organization Queries ──
+    const orgPromise = (async () => {
+      if (!user.organization_id) return
+      try {
+        const { data } = await serviceClient
+          .from('users')
+          .select('id, full_name, email, phone, role, created_at')
+          .eq('organization_id', user.organization_id)
+          .order('created_at', { ascending: false })
+        staffUsers = data || []
 
-      // If user has host/owner privileges, query hosted properties & capacity stats
-      const isOwnerOrStaff = ['superadmin', 'owner', 'manager', 'accountant', 'staff'].includes(user.role)
-      if (isOwnerOrStaff) {
-        try {
+        const isOwnerOrStaff = ['superadmin', 'owner', 'manager', 'accountant', 'staff'].includes(user.role)
+        if (isOwnerOrStaff) {
           const orgId = user.organization_id
-          if (!orgId || !isValidUUID(orgId)) {
-            propertyStats = {
-              total_residents: 0,
-              total_rooms: 0,
-              total_beds: 0,
-              available_beds: 0,
-              expected_revenue_paise: 0,
-            }
-            hostedProperties = []
-          } else {
+          if (orgId && isValidUUID(orgId)) {
             const [propsRes, assignmentsRes, roomsRes, bedsRes, invoicesRes] = await Promise.allSettled([
               serviceClient
                 .from('properties')
@@ -94,7 +86,6 @@ export async function GET() {
 
             const totalBeds = beds.length > 0 ? beds.length : rooms.reduce((sum: number, r: any) => sum + (r.capacity || 0), 0)
             const assignedResidents = assignmentsRes.status === 'fulfilled' ? (assignmentsRes.value.count || 0) : 0
-            // If total beds is 0 or no properties exist, active residents must strictly be 0
             const activeResidents = totalBeds > 0 ? assignedResidents : 0
             const availableBeds = beds.length > 0 ? beds.filter((b: any) => b.status === 'available').length : Math.max(0, totalBeds - activeResidents)
             const expectedRev = invoices.reduce((sum: number, inv: any) => sum + (inv.total_paise || 0), 0) || rooms.reduce((sum: number, r: any) => sum + (r.base_rent_paise || 0), 0)
@@ -123,47 +114,69 @@ export async function GET() {
                 settings: p.settings || org.settings || {},
                 stats: propertyStats,
               }))
-            } else {
-              hostedProperties = []
             }
           }
-        } catch (err: any) {
-          console.warn('[Session Route Hosted Properties Lookup Error]:', err?.message)
         }
+      } catch (err: any) {
+        console.warn('[Session Route Hosted Properties Lookup Error]:', err?.message)
       }
-    }
+    })()
 
-    // ── 1. Fetch stays / PG history for this user ──
+    // ── Task B: Resident / Stays / Passbook Queries ──
     let userStays: any[] = []
-    if (cleanMobile.length >= 10) {
+    let transactions: any[] = []
+    let residentRow: any = null
+
+    const residentPromise = (async () => {
+      if (cleanMobile.length < 10 && !user.resident_id) return
       try {
+        // Query resident records for this user (single query)
+        const filterStr = user.resident_id
+          ? `id.eq.${user.resident_id},phone.ilike.%${cleanMobile}%,alternate_phone.ilike.%${cleanMobile}%`
+          : `phone.ilike.%${cleanMobile}%,alternate_phone.ilike.%${cleanMobile}%`
+
         const { data: dbResidents } = await serviceClient
           .from('residents')
           .select(`
             id, organization_id, registration_number, full_name, phone, email,
-            status, created_at, updated_at,
+            status, id_type, id_number, date_of_birth, gender, photo_url,
+            permanent_address, permanent_city, permanent_state, permanent_pincode,
+            emergency_name, emergency_phone, emergency_relation, notes,
+            created_at, updated_at,
             organizations ( id, name, slug, address, city, phone )
           `)
-          .or(`phone.ilike.%${cleanMobile}%,alternate_phone.ilike.%${cleanMobile}%`)
+          .or(filterStr)
           .order('created_at', { ascending: false })
 
         if (dbResidents && dbResidents.length > 0) {
-          for (const res of dbResidents) {
-            const { data: currentView } = await serviceClient
+          residentRow = dbResidents[0]
+          const resIds = dbResidents.map((r: any) => r.id)
+
+          // Run v_resident_current and payments concurrently in a single batch!
+          const [viewsRes, paymentsRes] = await Promise.allSettled([
+            serviceClient
               .from('v_resident_current')
               .select('*')
-              .eq('resident_id', res.id)
-              .maybeSingle()
+              .in('resident_id', resIds),
+            serviceClient
+              .from('payments')
+              .select('id, amount_paise, payment_mode, payment_date, status, transaction_reference, notes, resident_id')
+              .in('resident_id', resIds)
+              .order('payment_date', { ascending: false })
+              .limit(20),
+          ])
 
+          const views = viewsRes.status === 'fulfilled' ? (viewsRes.value.data || []) : []
+          const viewsMap = new Map<string, any>(views.map((v: any) => [v.resident_id, v]))
+
+          for (const res of dbResidents) {
+            const currentView = viewsMap.get(res.id)
             const org: any = res.organizations
 
-            // CRITICAL CHECK: An actual stay exists ONLY if resident has an allotted room or is checked out.
-            // If room_number is null and status is not checked_out, this is an unallotted profile, not an active stay.
             const hasRoomAllotment = Boolean(currentView?.room_number)
             const isCompletedStay = res.status === 'checked_out'
 
             if (!hasRoomAllotment && !isCompletedStay) {
-              // Unallotted tenant - skip adding as an active stay
               continue
             }
 
@@ -185,15 +198,31 @@ export async function GET() {
               total_outstanding_paise: currentView?.total_outstanding_paise || 0,
             })
           }
+
+          const dbPayments = paymentsRes.status === 'fulfilled' ? (paymentsRes.value.data || []) : []
+          if (dbPayments.length > 0) {
+            transactions = dbPayments.map((p: any) => ({
+              id: p.id,
+              date: p.payment_date ? p.payment_date.split('T')[0] : 'Recent',
+              description: p.notes || 'Rent / Stay Payment',
+              amount_paise: p.amount_paise || 0,
+              payment_mode: p.payment_mode || 'UPI / Bank',
+              status: p.status === 'success' || p.status === 'completed' ? 'Paid & Verified' : p.status || 'Verified',
+              receipt_id: p.transaction_reference || `RCP-${p.id.slice(0, 8).toUpperCase()}`,
+              property: userStays.find((s) => s.id === p.resident_id)?.property_name || 'PG-Setu Co-Living',
+            }))
+          }
         }
       } catch (err: any) {
         console.warn('[Session GET resident stays lookup warning]:', err?.message)
       }
-    }
+    })()
+
+    // Run Host queries and Resident queries concurrently!
+    await Promise.all([orgPromise, residentPromise])
 
     // ── 2. Passbook Ledger Metrics & Dynamic 0-100 Trust Score ──
     const trustScore = calculateTrustScore(userStays)
-
     const totalRentPaidPaise = userStays.reduce((acc, s) => acc + (s.total_paid_paise || 0), 0)
     const activeDepositsPaise = userStays.filter((s) => s.status === 'active').reduce((acc, s) => acc + (s.deposit_held_paise || 0), 0)
     const totalDuePaise = userStays.reduce((acc, s) => acc + (s.total_outstanding_paise || 0), 0)
@@ -208,130 +237,67 @@ export async function GET() {
       renter_tier: trustScore.tier,
     }
 
-    // ── 3. Recent Transactions Ledger (Queried from Supabase) ──
-    let transactions: any[] = []
-    const residentIds = userStays.map((s) => s.id)
-    if (residentIds.length > 0) {
-      try {
-        const { data: dbPayments } = await serviceClient
-          .from('payments')
-          .select('id, amount_paise, payment_mode, payment_date, status, transaction_reference, notes, resident_id')
-          .in('resident_id', residentIds)
-          .order('payment_date', { ascending: false })
-          .limit(20)
-
-        if (dbPayments && dbPayments.length > 0) {
-          transactions = dbPayments.map((p) => ({
-            id: p.id,
-            date: p.payment_date ? p.payment_date.split('T')[0] : 'Recent',
-            description: p.notes || 'Rent / Stay Payment',
-            amount_paise: p.amount_paise || 0,
-            payment_mode: p.payment_mode || 'UPI / Bank',
-            status: p.status === 'success' || p.status === 'completed' ? 'Paid & Verified' : p.status || 'Verified',
-            receipt_id: p.transaction_reference || `RCP-${p.id.slice(0, 8).toUpperCase()}`,
-            property: userStays.find((s) => s.id === p.resident_id)?.property_name || 'PG-Setu Co-Living',
-          }))
-        }
-      } catch (err: any) {
-        console.warn('[Session Route Payments lookup warning]:', err?.message)
-      }
-    }
-
-    // ── 4. Resolve Profile Metadata from Supabase residents table ──
+    // ── 3. Resolve Profile Metadata from residentRow / user directly (0ms latency, no blocking) ──
     let profileData: any = null
-    try {
-      let residentRow: any = null
-
-      if (user.resident_id) {
-        const { data } = await serviceClient
-          .from('residents')
-          .select('*')
-          .eq('id', user.resident_id)
-          .maybeSingle()
-        residentRow = data
-      }
-
-      if (!residentRow && cleanMobile.length >= 10) {
-        const { data } = await serviceClient
-          .from('residents')
-          .select('*')
-          .or(`phone.ilike.%${cleanMobile}%,alternate_phone.ilike.%${cleanMobile}%`)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-        residentRow = data
-      }
-
-      // Query Firestore tenant_profiles or owner_profiles for dob and onboarding verification
-      let firestoreDoc: any = null
-      if (cleanMobile.length >= 10) {
+    if (residentRow) {
+      let notesObj: Record<string, any> = {}
+      if (residentRow.notes && typeof residentRow.notes === 'string') {
         try {
-          const { queryDocuments } = await import('@/lib/firebase/firestore')
-          const colName = user.role === 'owner' ? 'owner_profiles' : 'tenant_profiles'
-          const fDocs = await queryDocuments(colName, [{ field: 'mobile', operator: '==', value: cleanMobile }])
-          if (fDocs && fDocs.length > 0) {
-            firestoreDoc = fDocs[0]
-          }
-        } catch (fErr) {}
+          notesObj = JSON.parse(residentRow.notes)
+        } catch {}
       }
 
-      if (residentRow) {
-        let notesObj: Record<string, any> = {}
-        if (residentRow.notes) {
-          try {
-            notesObj = JSON.parse(residentRow.notes)
-          } catch {}
-        }
-
-        profileData = {
-          id: residentRow.registration_number || `TN-${cleanMobile.slice(-4) || '2026'}`,
-          full_name: residentRow.full_name || user.full_name,
-          email: residentRow.email || user.email,
-          mobile: residentRow.phone || cleanMobile,
-          gender: residentRow.gender || 'male',
-          dob: notesObj.dob || firestoreDoc?.dob || '',
-          age: notesObj.age || firestoreDoc?.age || null,
-          profession: notesObj.profession || firestoreDoc?.profession || '',
-          college_or_company: notesObj.college_or_company || '',
-          emergency_name: residentRow.emergency_name || '',
-          emergency_phone: residentRow.emergency_phone || '',
-          emergency_relation: residentRow.emergency_relation || '',
-          permanent_address: residentRow.permanent_address || '',
-          permanent_city: residentRow.permanent_city || '',
-          aadhaar_verified: notesObj.aadhaar_verified ?? Boolean(residentRow.id_number),
-          aadhaar_last4: notesObj.aadhaar_last4 || residentRow.id_number || '',
-          aadhaar_verified_date: notesObj.aadhaar_verified_date || '',
-          erp_unlocked: firestoreDoc?.erp_unlocked ?? Boolean(user.organization_id),
-          can_list_properties: firestoreDoc?.can_list_properties ?? Boolean(user.organization_id),
-          onboarding_status: firestoreDoc?.onboarding_status || 'verified',
-        }
-      } else {
-        // Synthesize fallback profile for user from users table or firestore
-        profileData = {
-          id: (user as any).registration_number || `TN-${cleanMobile.slice(-4) || '2026'}`,
-          full_name: user.full_name || firestoreDoc?.full_name || 'PG-Setu Member',
-          email: user.email || firestoreDoc?.email || '',
-          mobile: cleanMobile,
-          gender: (user as any).gender || firestoreDoc?.gender || 'male',
-          dob: (user as any).dob || firestoreDoc?.dob || '',
-          age: (user as any).age || firestoreDoc?.age || null,
-          profession: (user as any).profession || firestoreDoc?.profession || '',
-          college_or_company: '',
-          emergency_name: '',
-          emergency_phone: '',
-          emergency_relation: '',
-          permanent_address: '',
-          permanent_city: firestoreDoc?.city || '',
-          aadhaar_verified: false,
-          aadhaar_last4: '',
-          aadhaar_verified_date: '',
-          erp_unlocked: firestoreDoc?.erp_unlocked ?? Boolean(user.organization_id),
-          can_list_properties: firestoreDoc?.can_list_properties ?? Boolean(user.organization_id),
-          onboarding_status: firestoreDoc?.onboarding_status || (user.organization_id ? 'unlocked' : 'pending_superadmin'),
-        }
+      profileData = {
+        id: residentRow.registration_number || `TN-${cleanMobile.slice(-4) || '2026'}`,
+        full_name: residentRow.full_name || user.full_name,
+        email: residentRow.email || user.email,
+        mobile: residentRow.phone || cleanMobile,
+        gender: residentRow.gender || 'male',
+        dob: residentRow.date_of_birth || notesObj.dob || '',
+        age: notesObj.age || null,
+        profession: notesObj.profession || '',
+        college_or_company: notesObj.college_or_company || '',
+        emergency_name: residentRow.emergency_name || '',
+        emergency_phone: residentRow.emergency_phone || '',
+        emergency_relation: residentRow.emergency_relation || '',
+        permanent_address: residentRow.permanent_address || '',
+        permanent_city: residentRow.permanent_city || '',
+        permanent_state: residentRow.permanent_state || '',
+        permanent_pincode: residentRow.permanent_pincode || '',
+        photo_url: residentRow.photo_url || user.avatar_url || '',
+        aadhaar_verified: Boolean(residentRow.id_number),
+        aadhaar_last4: residentRow.id_number?.replace(/\D/g, '').slice(-4) || '',
+        aadhaar_verified_date: residentRow.updated_at ? residentRow.updated_at.split('T')[0] : '',
+        erp_unlocked: Boolean(user.organization_id),
+        can_list_properties: Boolean(user.organization_id),
+        onboarding_status: 'verified',
       }
-    } catch (err: any) {
-      console.warn('[Session Route Profile Resolution Warning]:', err?.message)
+    } else {
+      profileData = {
+        id: (user as any).registration_number || `TN-${cleanMobile.slice(-4) || '2026'}`,
+        full_name: user.full_name || 'PG-Setu Member',
+        email: user.email || '',
+        mobile: cleanMobile,
+        gender: (user as any).gender || 'male',
+        dob: (user as any).dob || '',
+        age: (user as any).age || null,
+        profession: (user as any).profession || '',
+        college_or_company: '',
+        emergency_name: '',
+        emergency_phone: '',
+        emergency_relation: '',
+        permanent_address: '',
+        permanent_city: '',
+        permanent_state: '',
+        permanent_pincode: '',
+        photo_url: user.avatar_url || '',
+        aadhaar_verified: false,
+        aadhaar_last4: '',
+        aadhaar_verified_date: '',
+        erp_unlocked: Boolean(user.organization_id),
+        can_list_properties: Boolean(user.organization_id),
+        onboarding_status: user.organization_id ? 'unlocked' : 'pending_superadmin',
+      }
     }
 
     const isSuperAdmin = user.role === 'superadmin' || user.email === 'vikramtomar0505@gmail.com'
