@@ -100,15 +100,19 @@ export async function GET(request: NextRequest) {
     ;(users || []).forEach((u: any) => {
       const org = u.organization_id ? orgMap.get(u.organization_id) : null
       const orgProps = u.organization_id ? (orgPropsMap.get(u.organization_id) || []) : []
-      const isOwner = u.role === 'owner' || (org && org.owner_user_id === u.id)
-      const isAdmin = u.role === 'superadmin' || u.role === 'admin'
-      const isStaff = u.role === 'manager' || u.role === 'staff'
+      const isSuper = u.role === 'superadmin' || isKnownSuperAdmin(u.email, u.role, u.id, u.phone)
+      const isAdmin = isSuper || u.role === 'admin'
+      const isOwner = !isAdmin && (u.role === 'owner' || (org && org.owner_user_id === u.id))
+      const isStaff = !isAdmin && (u.role === 'manager' || u.role === 'staff')
 
       let user_type = 'tenant'
       let displayRole = 'Resident / Tenant'
-      if (isAdmin) {
+      if (isSuper) {
         user_type = 'admin'
         displayRole = 'Super Admin'
+      } else if (isAdmin) {
+        user_type = 'admin'
+        displayRole = 'Admin'
       } else if (isOwner) {
         user_type = 'owner'
         displayRole = 'PG Owner'
@@ -144,7 +148,7 @@ export async function GET(request: NextRequest) {
         email: u.email,
         phone: u.phone || matchedRes?.phone || null,
         alternate_phone: matchedRes?.alternate_phone || null,
-        role: u.role,
+        role: isSuper ? 'superadmin' : u.role,
         user_type,
         display_role: displayRole,
         is_active: u.is_active ?? true,
