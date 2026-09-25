@@ -38,31 +38,32 @@ export default function InstantPgFloatingWidget() {
   const [moveIn, setMoveIn] = useState('immediate')
   const [notes, setNotes] = useState('')
   const [formError, setFormError] = useState('')
+  const [isMinimized, setIsMinimized] = useState(false)
 
   // Hide widget inside dashboard, admin consoles, property/portal detail pages, and ALL legal policy pages
-  if (
-    pathname?.startsWith('/dashboard') ||
-    pathname?.startsWith('/admin') ||
-    pathname?.startsWith('/superman') ||
-    pathname?.startsWith('/superadmin') ||
-    pathname?.startsWith('/login') ||
-    pathname?.startsWith('/register') ||
-    pathname?.startsWith('/set-password') ||
-    pathname?.startsWith('/property') ||
-    pathname?.startsWith('/portal') ||
-    pathname?.startsWith('/my-profile') ||
-    pathname?.startsWith('/terms') ||
-    pathname?.startsWith('/privacy') ||
-    pathname?.startsWith('/safety') ||
-    pathname?.startsWith('/refund') ||
-    pathname?.startsWith('/cookies') ||
-    pathname?.startsWith('/erp-terms') ||
-    pathname?.startsWith('/sitemap')
-  ) {
+  const isHidden =
+    !pathname ||
+    pathname.startsWith('/dashboard') ||
+    pathname.startsWith('/admin') ||
+    pathname.startsWith('/superman') ||
+    pathname.startsWith('/superadmin') ||
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/register') ||
+    pathname.startsWith('/set-password') ||
+    pathname.startsWith('/property') ||
+    pathname.startsWith('/portal') ||
+    pathname.startsWith('/my-profile') ||
+    pathname.startsWith('/terms') ||
+    pathname.startsWith('/privacy') ||
+    pathname.startsWith('/safety') ||
+    pathname.startsWith('/refund') ||
+    pathname.startsWith('/cookies') ||
+    pathname.startsWith('/erp-terms') ||
+    pathname.startsWith('/sitemap')
+
+  if (isHidden) {
     return null
   }
-
-  const [isMinimized, setIsMinimized] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -155,6 +156,7 @@ export default function InstantPgFloatingWidget() {
           <div className="flex items-center gap-1.5 p-1 bg-gradient-to-r from-[#14532D] via-[#166534] to-[#15803D] rounded-full shadow-2xl shadow-emerald-950/40 ring-2 ring-emerald-400/40 border border-white/20 backdrop-blur-md transition-all duration-200">
             {/* Main Trigger Button */}
             <button
+              type="button"
               onClick={() => setIsOpen(true)}
               className="flex items-center gap-2 pl-2 pr-3 py-1.5 text-white active:scale-98 transition-transform cursor-pointer"
               title="Book Instant Verified PG in 2 Minutes"
@@ -185,7 +187,9 @@ export default function InstantPgFloatingWidget() {
 
             {/* Quick Minimize Toggle: Let user hide it out of the way anytime */}
             <button
+              type="button"
               onClick={(e) => {
+                e.preventDefault()
                 e.stopPropagation()
                 setIsMinimized(true)
               }}
@@ -201,7 +205,10 @@ export default function InstantPgFloatingWidget() {
 
       {/* POPUP MODAL DRAWER */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200 overscroll-contain">
+        <div
+          onClick={handleReset}
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200 overscroll-contain"
+        >
           <div
             className="relative w-full max-w-lg bg-white rounded-3xl border border-gray-200 shadow-2xl overflow-hidden max-h-[90dvh] sm:max-h-[92vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}

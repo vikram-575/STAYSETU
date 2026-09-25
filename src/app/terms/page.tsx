@@ -1,6 +1,12 @@
 import { MarketplaceNavbar } from "@/components/marketplace/marketplace-navbar";
 import { MarketplaceFooter } from "@/components/marketplace/marketplace-footer";
 import Link from "next/link";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Terms of Service | PG-SETU",
+  description: "Terms and Conditions for using PG-SETU PG rental discovery platform and ERP SaaS services.",
+};
 
 export default function TermsOfServicePage() {
   const lastUpdated = "September 24, 2026";

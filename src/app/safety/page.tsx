@@ -1,7 +1,13 @@
 import { MarketplaceNavbar } from "@/components/marketplace/marketplace-navbar";
 import { MarketplaceFooter } from "@/components/marketplace/marketplace-footer";
 import Link from "next/link";
+import { Metadata } from "next";
 import { Shield, CheckCircle, AlertTriangle, XCircle, Info, Lock, Phone, UserCheck, Eye, Search } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "Safety Guidelines & Trust | PG-SETU",
+  description: "Learn about PG-SETU verification standards, Aadhaar e-KYC, zero brokerage guarantee, and rental safety guidelines.",
+};
 
 export default function SafetyPage() {
   return (
