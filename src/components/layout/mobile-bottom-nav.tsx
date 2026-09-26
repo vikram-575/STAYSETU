@@ -110,6 +110,7 @@ export default function MobileBottomNav() {
                 <Link
                   key={act.href}
                   href={act.href}
+                  prefetch={true}
                   onClick={() => setQuickMenuOpen(false)}
                   className="p-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 hover:bg-slate-100 active:scale-95 transition flex flex-col gap-2 shadow-2xs"
                 >
@@ -162,6 +163,7 @@ export default function MobileBottomNav() {
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch={true}
                 className={cn(
                   'flex flex-col items-center justify-center flex-1 py-1 transition-colors active:scale-95',
                   active ? 'text-[#14532D] font-bold' : 'text-slate-400 hover:text-slate-600'

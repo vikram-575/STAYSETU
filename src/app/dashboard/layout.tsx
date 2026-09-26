@@ -36,42 +36,40 @@ export default async function DashboardLayout({
     redirect('/my-profile')
   }
 
+  // Ensure robust effective organization context is provided once
+  const effectiveOrg = await resolveEffectiveOrg(user)
+
   // Check lock state for un-onboarded owners: ERP platform remains locked until SuperAdmin unlocks
   if (!isSuperAdmin && user.role === 'owner') {
     const cookieStore = await cookies()
     const isCookieLocked = cookieStore.get('erp_locked')?.value === 'true'
+    const isCookieUnlocked = cookieStore.get('erp_unlocked')?.value === 'true'
 
-    if (isCookieLocked) {
+    if (isCookieLocked || !effectiveOrg || !effectiveOrg.id) {
       return <LockedErpScreen owner={user} />
     }
 
-    const effectiveOrg = await resolveEffectiveOrg(user)
-    if (!effectiveOrg || !effectiveOrg.id) {
-      return <LockedErpScreen owner={user} />
-    }
-
-    // Verify against Firestore owner profile
-    try {
-      const { queryDocuments } = await import('@/lib/firebase/firestore')
-      const cleanedMobile = user.phone ? user.phone.replace(/\D/g, '').slice(-10) : ''
-      if (cleanedMobile) {
-        const ownerDocs = await queryDocuments('owner_profiles', [
-          { field: 'mobile', operator: '==', value: cleanedMobile },
-        ])
-        if (ownerDocs && ownerDocs.length > 0) {
-          const ownerDoc = ownerDocs[0]
-          if (ownerDoc.erp_unlocked === false) {
-            return <LockedErpScreen owner={user} />
+    // Only query Firestore if not already confirmed unlocked via session cookie
+    if (!isCookieUnlocked) {
+      try {
+        const { queryDocuments } = await import('@/lib/firebase/firestore')
+        const cleanedMobile = user.phone ? user.phone.replace(/\D/g, '').slice(-10) : ''
+        if (cleanedMobile) {
+          const ownerDocs = await queryDocuments('owner_profiles', [
+            { field: 'mobile', operator: '==', value: cleanedMobile },
+          ])
+          if (ownerDocs && ownerDocs.length > 0) {
+            const ownerDoc = ownerDocs[0]
+            if (ownerDoc.erp_unlocked === false) {
+              return <LockedErpScreen owner={user} />
+            }
           }
         }
+      } catch (err) {
+        console.warn('[Dashboard Layout Owner Check Warning]:', err)
       }
-    } catch (err) {
-      console.warn('[Dashboard Layout Owner Check Warning]:', err)
     }
   }
-
-  // Ensure robust effective organization context is provided
-  const effectiveOrg = await resolveEffectiveOrg(user)
 
   const profile = {
     ...user,
