@@ -216,6 +216,7 @@ export function ResidentsClientView({
                     <div className="flex items-center gap-2.5 min-w-0">
                       <Link
                         href={`/dashboard/residents/${r.resident_id}`}
+                        prefetch={true}
                         className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0 cursor-pointer hover:ring-2 hover:ring-blue-400 transition"
                         title={`View profile of ${r.full_name}`}
                       >
@@ -228,12 +229,14 @@ export function ResidentsClientView({
                       <div className="min-w-0">
                         <Link
                           href={`/dashboard/residents/${r.resident_id}`}
+                          prefetch={true}
                           className="font-bold text-sm text-gray-900 hover:text-blue-600 block truncate cursor-pointer"
                         >
                           {r.full_name}
                         </Link>
                         <Link
                           href={`/dashboard/residents/${r.resident_id}`}
+                          prefetch={true}
                           title={`Resident ID: ${r.registration_number} · Click to view profile`}
                           className="inline-flex items-center gap-1 font-mono text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline bg-blue-50/80 px-1.5 py-0.5 rounded mt-0.5 border border-blue-200/50 cursor-pointer"
                         >
@@ -317,6 +320,7 @@ export function ResidentsClientView({
                     </Link>
                     <Link
                       href={`/dashboard/residents/${r.resident_id}`}
+                      prefetch={true}
                       className="py-1.5 px-3 bg-gray-100 text-gray-800 hover:bg-blue-600 hover:text-white rounded-xl text-xs font-bold active:scale-95 transition cursor-pointer"
                     >
                       Profile →
@@ -372,6 +376,7 @@ export function ResidentsClientView({
                         <div className="flex items-center gap-2.5">
                           <Link
                             href={`/dashboard/residents/${r.resident_id}`}
+                            prefetch={true}
                             className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold shrink-0 hover:ring-2 hover:ring-blue-400 transition cursor-pointer"
                             title={`View profile of ${r.full_name}`}
                           >
@@ -384,12 +389,14 @@ export function ResidentsClientView({
                           <div>
                             <Link
                               href={`/dashboard/residents/${r.resident_id}`}
+                              prefetch={true}
                               className="font-bold text-gray-900 hover:text-blue-600 transition block leading-tight cursor-pointer"
                             >
                               {r.full_name}
                             </Link>
                             <Link
                               href={`/dashboard/residents/${r.resident_id}`}
+                              prefetch={true}
                               title={`Resident ID: ${r.registration_number} · Click to view profile`}
                               className="inline-flex items-center gap-1 font-mono text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline bg-blue-50/80 hover:bg-blue-100 px-1.5 py-0.5 rounded transition mt-0.5 cursor-pointer border border-blue-200/50"
                             >
@@ -452,6 +459,7 @@ export function ResidentsClientView({
                       <td className="py-3 px-3">
                         <Link
                           href={`/dashboard/residents/${r.resident_id}#kyc`}
+                          prefetch={true}
                           title={`View KYC Verification for ${r.full_name}`}
                           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300 hover:border-emerald-400 transition cursor-pointer shadow-2xs active:scale-95"
                         >
@@ -485,6 +493,7 @@ export function ResidentsClientView({
                           </Link>
                           <Link
                             href={`/dashboard/residents/${r.resident_id}`}
+                            prefetch={true}
                             title={`View Profile of ${r.full_name}`}
                             className="px-2.5 py-1 bg-gray-100 hover:bg-blue-600 hover:text-white rounded-lg text-[11px] font-bold text-gray-700 transition active:scale-95 cursor-pointer inline-flex items-center gap-1 shadow-2xs"
                           >

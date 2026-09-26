@@ -252,11 +252,14 @@ export default function RecordElectricityReadingPage() {
           />
         </div>
 
-        <div className="pt-3 border-t border-gray-100 flex justify-end">
+        <div className="pt-3 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <p className="text-[11px] text-gray-500">
+            ℹ️ If a reading was already entered for this billing period, submitting will update the record and adjust ledger charges safely.
+          </p>
           <button
             type="submit"
             disabled={submitting}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-yellow-500 hover:bg-yellow-600 active:scale-95 disabled:bg-yellow-300 text-gray-950 rounded-xl text-xs font-bold transition shadow-xs"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-yellow-500 hover:bg-yellow-600 active:scale-95 disabled:bg-yellow-300 text-gray-950 rounded-xl text-xs font-bold transition shadow-xs shrink-0"
           >
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
             {submitting ? 'Recording...' : 'Post Reading & Split Bill'}

@@ -35,44 +35,76 @@ export default async function ResidentDetailPage({ params, searchParams }: Props
   const orgId = await resolveEffectiveOrgId(user)
   if (!orgId || !isValidUUID(orgId)) notFound()
 
-  // Fetch resident with view info
-  const { data: resident } = await supabase
-    .from('v_resident_current')
-    .select('*')
-    .eq('resident_id', residentId)
-    .eq('organization_id', orgId)
-    .single()
+  // Concurrently fetch resident view and full resident record
+  const [residentRes, fullResidentRes] = await Promise.all([
+    supabase
+      .from('v_resident_current')
+      .select('*')
+      .eq('resident_id', residentId)
+      .eq('organization_id', orgId)
+      .maybeSingle(),
+    supabase
+      .from('residents')
+      .select('*')
+      .eq('id', residentId)
+      .maybeSingle(),
+  ])
+
+  const resident = residentRes.data
+  const fullResident = fullResidentRes.data
 
   if (!resident) notFound()
 
-  // Full resident profile record (personal details)
-  const { data: fullResident } = await supabase
-    .from('residents')
-    .select('*')
-    .eq('id', residentId)
-    .single()
+  // Concurrently fetch all associated sub-records (invoices, payments, ledger, assignments, docs, KYC)
+  const [
+    invoicesRes,
+    paymentsRes,
+    ledgerRes,
+    assignmentsRes,
+    documentsRes,
+    kycRes
+  ] = await Promise.all([
+    supabase
+      .from('invoices')
+      .select('*, invoice_items(*)')
+      .eq('resident_id', residentId)
+      .order('period_start', { ascending: false }),
+    supabase
+      .from('payments')
+      .select('*')
+      .eq('resident_id', residentId)
+      .order('payment_date', { ascending: false }),
+    supabase
+      .from('ledger_entries')
+      .select('*')
+      .eq('resident_id', residentId)
+      .order('entry_date', { ascending: false })
+      .order('entry_time', { ascending: false }),
+    supabase
+      .from('resident_assignments')
+      .select('*, beds(*, rooms(*, floors(*, buildings(*))))')
+      .eq('resident_id', residentId)
+      .order('check_in_date', { ascending: false }),
+    supabase
+      .from('resident_documents')
+      .select('*')
+      .eq('resident_id', residentId)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('tenant_kyc')
+      .select('*')
+      .eq('tenant_id', residentId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ])
 
-  // Invoices
-  const { data: invoices } = await supabase
-    .from('invoices')
-    .select('*, invoice_items(*)')
-    .eq('resident_id', residentId)
-    .order('period_start', { ascending: false })
-
-  // Payments
-  const { data: payments } = await supabase
-    .from('payments')
-    .select('*')
-    .eq('resident_id', residentId)
-    .order('payment_date', { ascending: false })
-
-  // Ledger
-  let { data: ledgerEntries } = await supabase
-    .from('ledger_entries')
-    .select('*')
-    .eq('resident_id', residentId)
-    .order('entry_date', { ascending: false })
-    .order('entry_time', { ascending: false })
+  const invoices = invoicesRes.data || []
+  const payments = paymentsRes.data || []
+  let ledgerEntries = ledgerRes.data || []
+  const assignments = assignmentsRes.data || []
+  const documents = documentsRes.data || []
+  const kycRecord = kycRes.data || null
 
   // If no ledger entries exist yet, auto-provision initial rent & deposit charges
   if (!ledgerEntries || ledgerEntries.length === 0) {
@@ -124,29 +156,6 @@ export default async function ResidentDetailPage({ params, searchParams }: Props
     phone: resident.phone || '',
   })
   const passbookLiveUrl = `/portal?token=${portalToken}&tab=ledger`
-
-  // Assignment history
-  const { data: assignments } = await supabase
-    .from('resident_assignments')
-    .select('*, beds(*, rooms(*, floors(*, buildings(*))))')
-    .eq('resident_id', residentId)
-    .order('check_in_date', { ascending: false })
-
-  // Documents
-  const { data: documents } = await supabase
-    .from('resident_documents')
-    .select('*')
-    .eq('resident_id', residentId)
-    .order('created_at', { ascending: false })
-
-  // Tenant KYC Record
-  const { data: kycRecord } = await supabase
-    .from('tenant_kyc')
-    .select('*')
-    .eq('tenant_id', residentId)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
 
   // Pre-filled WhatsApp message with Direct Live Passbook Link
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pgsetu.onrender.com'

@@ -135,22 +135,38 @@ export default function RentingDashboardTab({
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-800">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Total Inventory</span>
+            <button
+              type="button"
+              onClick={() => onNavigateTab('marketplace')}
+              className="p-3 bg-slate-800/50 hover:bg-slate-800/80 rounded-xl border border-slate-800 hover:border-slate-500 text-left transition group cursor-pointer active:scale-98"
+            >
+              <span className="text-[10px] font-bold text-slate-400 group-hover:text-white uppercase transition">Total Inventory</span>
               <div className="text-xl font-black text-white mt-0.5">{properties.total || 0}</div>
-            </div>
-            <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-800">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Live Marketplace</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigateTab('marketplace')}
+              className="p-3 bg-slate-800/50 hover:bg-slate-800/80 rounded-xl border border-slate-800 hover:border-emerald-500/50 text-left transition group cursor-pointer active:scale-98"
+            >
+              <span className="text-[10px] font-bold text-slate-400 group-hover:text-emerald-400 uppercase transition">Live Marketplace</span>
               <div className="text-xl font-black text-emerald-400 mt-0.5">{properties.active_listings || 0}</div>
-            </div>
-            <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-800">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Pending Review</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigateTab('marketplace')}
+              className="p-3 bg-slate-800/50 hover:bg-slate-800/80 rounded-xl border border-slate-800 hover:border-amber-500/50 text-left transition group cursor-pointer active:scale-98"
+            >
+              <span className="text-[10px] font-bold text-slate-400 group-hover:text-amber-400 uppercase transition">Pending Review</span>
               <div className="text-xl font-black text-amber-400 mt-0.5">{properties.pending_listings || 0}</div>
-            </div>
-            <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-800">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Suspended</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigateTab('safety')}
+              className="p-3 bg-slate-800/50 hover:bg-slate-800/80 rounded-xl border border-slate-800 hover:border-rose-500/50 text-left transition group cursor-pointer active:scale-98"
+            >
+              <span className="text-[10px] font-bold text-slate-400 group-hover:text-rose-400 uppercase transition">Suspended</span>
               <div className="text-xl font-black text-rose-400 mt-0.5">{properties.suspended_listings || 0}</div>
-            </div>
+            </button>
           </div>
         </div>
 
@@ -169,16 +185,24 @@ export default function RentingDashboardTab({
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="p-3.5 bg-slate-800/50 rounded-xl border border-slate-800">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Featured Properties</span>
+            <button
+              type="button"
+              onClick={() => onNavigateTab('promotions')}
+              className="p-3.5 bg-slate-800/50 hover:bg-slate-800/80 rounded-xl border border-slate-800 hover:border-amber-500/50 text-left transition group cursor-pointer active:scale-98"
+            >
+              <span className="text-[10px] font-bold text-slate-400 group-hover:text-amber-300 uppercase transition">Featured Properties</span>
               <div className="text-2xl font-black text-amber-300 mt-1">{kpis.featured_slots_active || 0} Slots Active</div>
               <p className="text-[10px] text-slate-400 mt-0.5">Top rank in city search</p>
-            </div>
-            <div className="p-3.5 bg-slate-800/50 rounded-xl border border-slate-800">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Hero Carousel</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigateTab('promotions')}
+              className="p-3.5 bg-slate-800/50 hover:bg-slate-800/80 rounded-xl border border-slate-800 hover:border-emerald-500/50 text-left transition group cursor-pointer active:scale-98"
+            >
+              <span className="text-[10px] font-bold text-slate-400 group-hover:text-emerald-400 uppercase transition">Hero Carousel</span>
               <div className="text-2xl font-black text-emerald-400 mt-1">{kpis.featured_slots_active ? 'Active' : 'Open'}</div>
               <p className="text-[10px] text-slate-400 mt-0.5">High-visibility placement</p>
-            </div>
+            </button>
           </div>
         </div>
       </div>
@@ -195,13 +219,18 @@ export default function RentingDashboardTab({
             </div>
           ) : (
             kpis.city_distribution.map((c: any, idx: number) => (
-              <div key={idx} className="p-3.5 bg-slate-800/50 rounded-xl border border-slate-800 space-y-1">
-                <div className="font-bold text-slate-200 text-sm">{c.city}</div>
+              <button
+                key={idx}
+                type="button"
+                onClick={() => onNavigateTab('marketplace')}
+                className="p-3.5 bg-slate-800/50 hover:bg-slate-800/80 rounded-xl border border-slate-800 hover:border-blue-500/50 text-left transition group cursor-pointer active:scale-98 space-y-1"
+              >
+                <div className="font-bold text-slate-200 group-hover:text-white text-sm transition">{c.city}</div>
                 <div className="flex items-center justify-between text-xs text-slate-400 pt-1">
                   <span>{c.properties} Listings</span>
                   <span className="font-mono text-emerald-400 font-bold">{c.beds} Available Beds</span>
                 </div>
-              </div>
+              </button>
             ))
           )}
         </div>

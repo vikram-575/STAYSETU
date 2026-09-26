@@ -121,8 +121,8 @@ export default function ErpDashboardTab({
         </button>
 
         <button
-          onClick={() => onNavigateTab('owners')}
-          className="p-3 bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 hover:border-blue-500/40 rounded-xl text-left transition group"
+          onClick={() => onNavigateTab('kyc')}
+          className="p-3 bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 hover:border-blue-500/40 rounded-xl text-left transition group cursor-pointer active:scale-98"
         >
           <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
             <span className="font-semibold">Owner KYC Queue</span>
@@ -179,22 +179,38 @@ export default function ErpDashboardTab({
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-800">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Campuses</span>
+            <button
+              type="button"
+              onClick={() => onNavigateTab('structure')}
+              className="p-3 bg-slate-800/50 hover:bg-slate-800/80 rounded-xl border border-slate-800 hover:border-emerald-500/40 text-left transition group cursor-pointer active:scale-98"
+            >
+              <span className="text-[10px] font-bold text-slate-400 group-hover:text-emerald-400 uppercase transition">Campuses</span>
               <div className="text-xl font-black text-white mt-0.5">{properties.total || 0}</div>
-            </div>
-            <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-800">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">PG Blocks</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigateTab('structure')}
+              className="p-3 bg-slate-800/50 hover:bg-slate-800/80 rounded-xl border border-slate-800 hover:border-emerald-500/40 text-left transition group cursor-pointer active:scale-98"
+            >
+              <span className="text-[10px] font-bold text-slate-400 group-hover:text-emerald-400 uppercase transition">PG Blocks</span>
               <div className="text-xl font-black text-emerald-400 mt-0.5">{properties.pgs || 0}</div>
-            </div>
-            <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-800">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Flat Units</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigateTab('structure')}
+              className="p-3 bg-slate-800/50 hover:bg-slate-800/80 rounded-xl border border-slate-800 hover:border-emerald-500/40 text-left transition group cursor-pointer active:scale-98"
+            >
+              <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-200 uppercase transition">Flat Units</span>
               <div className="text-xl font-black text-slate-200 mt-0.5">{properties.flats || 0}</div>
-            </div>
-            <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-800">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Live Listings</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigateTab('marketplace')}
+              className="p-3 bg-slate-800/50 hover:bg-slate-800/80 rounded-xl border border-slate-800 hover:border-amber-500/40 text-left transition group cursor-pointer active:scale-98"
+            >
+              <span className="text-[10px] font-bold text-slate-400 group-hover:text-amber-400 uppercase transition">Live Listings</span>
               <div className="text-xl font-black text-amber-400 mt-0.5">{properties.active_listings || 0}</div>
-            </div>
+            </button>
           </div>
         </div>
 
@@ -210,18 +226,30 @@ export default function ErpDashboardTab({
           </div>
 
           <div className="grid grid-cols-3 gap-3">
-            <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-800">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Total Beds</span>
+            <button
+              type="button"
+              onClick={() => onNavigateTab('structure')}
+              className="p-3 bg-slate-800/50 hover:bg-slate-800/80 rounded-xl border border-slate-800 hover:border-emerald-500/40 text-left transition group cursor-pointer active:scale-98"
+            >
+              <span className="text-[10px] font-bold text-slate-400 group-hover:text-white uppercase transition">Total Beds</span>
               <div className="text-xl font-black text-white mt-0.5">{beds.total || 0}</div>
-            </div>
-            <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-800">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Occupied</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigateTab('residents')}
+              className="p-3 bg-slate-800/50 hover:bg-slate-800/80 rounded-xl border border-slate-800 hover:border-emerald-500/40 text-left transition group cursor-pointer active:scale-98"
+            >
+              <span className="text-[10px] font-bold text-slate-400 group-hover:text-emerald-400 uppercase transition">Occupied</span>
               <div className="text-xl font-black text-emerald-400 mt-0.5">{beds.occupied || 0}</div>
-            </div>
-            <div className="p-3 bg-slate-800/50 rounded-xl border border-slate-800">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Vacant</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigateTab('structure')}
+              className="p-3 bg-slate-800/50 hover:bg-slate-800/80 rounded-xl border border-slate-800 hover:border-amber-500/40 text-left transition group cursor-pointer active:scale-98"
+            >
+              <span className="text-[10px] font-bold text-slate-400 group-hover:text-amber-400 uppercase transition">Vacant</span>
               <div className="text-xl font-black text-amber-400 mt-0.5">{beds.vacant || 0}</div>
-            </div>
+            </button>
           </div>
 
           {/* Occupancy Progress Bar */}
@@ -258,40 +286,60 @@ export default function ErpDashboardTab({
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <div className="p-3.5 bg-slate-800/60 rounded-xl border border-slate-700/60">
-            <span className="text-[10px] font-bold text-slate-400 uppercase">Gross Invoiced</span>
+          <button
+            type="button"
+            onClick={() => onNavigateTab('money-center')}
+            className="p-3.5 bg-slate-800/60 hover:bg-slate-800/90 rounded-xl border border-slate-700/60 hover:border-emerald-500/40 text-left transition group cursor-pointer active:scale-98"
+          >
+            <span className="text-[10px] font-bold text-slate-400 group-hover:text-white uppercase transition">Gross Invoiced</span>
             <div className="text-base sm:text-lg font-black text-white mt-1">
               {formatCurrency(money.total_billed_paise || 0)}
             </div>
             <span className="text-[10px] text-slate-500">Billed this cycle</span>
-          </div>
+          </button>
 
-          <div className="p-3.5 bg-slate-800/60 rounded-xl border border-slate-700/60">
-            <span className="text-[10px] font-bold text-slate-400 uppercase">Total Collected</span>
+          <button
+            type="button"
+            onClick={() => onNavigateTab('money-center')}
+            className="p-3.5 bg-slate-800/60 hover:bg-slate-800/90 rounded-xl border border-slate-700/60 hover:border-emerald-500/40 text-left transition group cursor-pointer active:scale-98"
+          >
+            <span className="text-[10px] font-bold text-slate-400 group-hover:text-emerald-400 uppercase transition">Total Collected</span>
             <div className="text-base sm:text-lg font-black text-emerald-400 mt-1">
               {formatCurrency(money.total_collected_paise || 0)}
             </div>
             <span className="text-[10px] text-emerald-500">Verified settlements</span>
-          </div>
+          </button>
 
-          <div className="p-3.5 bg-slate-800/60 rounded-xl border border-slate-700/60">
-            <span className="text-[10px] font-bold text-slate-400 uppercase">Outstanding</span>
+          <button
+            type="button"
+            onClick={() => onNavigateTab('money-center')}
+            className="p-3.5 bg-slate-800/60 hover:bg-slate-800/90 rounded-xl border border-slate-700/60 hover:border-amber-500/40 text-left transition group cursor-pointer active:scale-98"
+          >
+            <span className="text-[10px] font-bold text-slate-400 group-hover:text-amber-400 uppercase transition">Outstanding</span>
             <div className="text-base sm:text-lg font-black text-amber-400 mt-1">
               {formatCurrency(money.total_outstanding_paise || 0)}
             </div>
             <span className="text-[10px] text-amber-500">Unsettled rent</span>
-          </div>
+          </button>
 
-          <div className="p-3.5 bg-slate-800/60 rounded-xl border border-slate-700/60">
-            <span className="text-[10px] font-bold text-slate-400 uppercase">Overdue Balance</span>
+          <button
+            type="button"
+            onClick={() => onNavigateTab('money-center')}
+            className="p-3.5 bg-slate-800/60 hover:bg-slate-800/90 rounded-xl border border-slate-700/60 hover:border-rose-500/40 text-left transition group cursor-pointer active:scale-98"
+          >
+            <span className="text-[10px] font-bold text-slate-400 group-hover:text-rose-400 uppercase transition">Overdue Balance</span>
             <div className="text-base sm:text-lg font-black text-rose-400 mt-1">
               {formatCurrency(money.total_overdue_paise || 0)}
             </div>
             <span className="text-[10px] text-rose-500">Past due date</span>
-          </div>
+          </button>
 
           {/* Segregated Deposits Held */}
-          <div className="p-3.5 bg-indigo-950/40 rounded-xl border border-indigo-800/50">
+          <button
+            type="button"
+            onClick={() => onNavigateTab('money-center')}
+            className="p-3.5 bg-indigo-950/40 hover:bg-indigo-950/70 rounded-xl border border-indigo-800/50 hover:border-indigo-400/60 text-left transition group cursor-pointer active:scale-98"
+          >
             <span className="text-[10px] font-black text-indigo-300 uppercase flex items-center gap-1">
               <ShieldCheck className="w-3 h-3 text-indigo-400" /> Deposits in Trust
             </span>
@@ -299,10 +347,14 @@ export default function ErpDashboardTab({
               {formatCurrency(money.deposits_held_paise || 0)}
             </div>
             <span className="text-[10px] text-indigo-400 font-semibold">Strictly Segregated</span>
-          </div>
+          </button>
 
           {/* Platform SaaS MRR */}
-          <div className="p-3.5 bg-emerald-950/40 rounded-xl border border-emerald-800/50">
+          <button
+            type="button"
+            onClick={() => onNavigateTab('money-center')}
+            className="p-3.5 bg-emerald-950/40 hover:bg-emerald-950/70 rounded-xl border border-emerald-800/50 hover:border-emerald-400/60 text-left transition group cursor-pointer active:scale-98"
+          >
             <span className="text-[10px] font-black text-emerald-300 uppercase flex items-center gap-1">
               <Sparkles className="w-3 h-3 text-emerald-400" /> Platform MRR
             </span>
@@ -310,7 +362,7 @@ export default function ErpDashboardTab({
               {formatCurrency(money.platform_mrr_paise || 0)}
             </div>
             <span className="text-[10px] text-emerald-400 font-semibold">SaaS Subscriptions</span>
-          </div>
+          </button>
         </div>
       </div>
 
@@ -321,34 +373,41 @@ export default function ErpDashboardTab({
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <button
+            type="button"
             onClick={() => onNavigateTab('residents')}
-            className="p-4 bg-slate-900/90 hover:bg-slate-850 border border-slate-800 rounded-2xl text-left transition"
+            className="p-4 bg-slate-900/90 hover:bg-slate-800/90 border border-slate-800 hover:border-emerald-500/40 rounded-2xl text-left transition cursor-pointer active:scale-98 group"
           >
-            <span className="text-[11px] font-bold text-slate-400">Tenants & Residents</span>
+            <span className="text-[11px] font-bold text-slate-400 group-hover:text-emerald-400 transition">Tenants & Residents</span>
             <div className="text-2xl font-black text-emerald-400 mt-1">{users.tenants || 0}</div>
             <div className="text-[10px] text-slate-500 mt-1 font-mono">PG-2026-XXXXXX Passbooks</div>
           </button>
           <button
+            type="button"
             onClick={() => onNavigateTab('owners')}
-            className="p-4 bg-slate-900/90 hover:bg-slate-850 border border-slate-800 rounded-2xl text-left transition"
+            className="p-4 bg-slate-900/90 hover:bg-slate-800/90 border border-slate-800 hover:border-blue-500/40 rounded-2xl text-left transition cursor-pointer active:scale-98 group"
           >
-            <span className="text-[11px] font-bold text-slate-400">PG Owners</span>
+            <span className="text-[11px] font-bold text-slate-400 group-hover:text-blue-400 transition">PG Owners</span>
             <div className="text-2xl font-black text-blue-400 mt-1">{users.owners || 0}</div>
             <div className="text-[10px] text-slate-500 mt-1">Active Subscribers</div>
           </button>
           <button
+            type="button"
             onClick={() => onNavigateTab('users')}
-            className="p-4 bg-slate-900/90 hover:bg-slate-850 border border-slate-800 rounded-2xl text-left transition"
+            className="p-4 bg-slate-900/90 hover:bg-slate-800/90 border border-slate-800 hover:border-teal-500/40 rounded-2xl text-left transition cursor-pointer active:scale-98 group"
           >
-            <span className="text-[11px] font-bold text-slate-400">Managers & Staff</span>
+            <span className="text-[11px] font-bold text-slate-400 group-hover:text-teal-400 transition">Managers & Staff</span>
             <div className="text-2xl font-black text-teal-400 mt-1">{users.managers || 0}</div>
             <div className="text-[10px] text-slate-500 mt-1">Campus Staff</div>
           </button>
-          <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl">
-            <span className="text-[11px] font-bold text-slate-400">Super Admins</span>
+          <button
+            type="button"
+            onClick={() => onNavigateTab('users')}
+            className="p-4 bg-slate-900/90 hover:bg-slate-800/90 border border-slate-800 hover:border-purple-500/40 rounded-2xl text-left transition cursor-pointer active:scale-98 group"
+          >
+            <span className="text-[11px] font-bold text-slate-400 group-hover:text-purple-400 transition">Super Admins</span>
             <div className="text-2xl font-black text-purple-400 mt-1">{users.admins || 1}</div>
             <div className="text-[10px] text-slate-500 mt-1">Root Operators</div>
-          </div>
+          </button>
         </div>
       </div>
 
