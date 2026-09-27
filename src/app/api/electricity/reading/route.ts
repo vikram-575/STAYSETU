@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
       period_month,
       period_year,
       notes,
+      photo_url,
       resident_ids,
       resident_id,
       bed_id,
@@ -108,6 +109,13 @@ export async function POST(request: NextRequest) {
     let reading: any = null
     let isUpdate = false
 
+    let effectiveNotes = notes || null
+    if (photo_url) {
+      effectiveNotes = effectiveNotes
+        ? `${effectiveNotes} | Photo: ${photo_url}`
+        : `Photo: ${photo_url}`
+    }
+
     if (!is_meter_reset) {
       const { data: existing } = await serviceClient
         .from('electricity_readings')
@@ -127,7 +135,7 @@ export async function POST(request: NextRequest) {
             previous_reading: prevNum,
             current_reading: currNum,
             rate_per_unit_paise: ratePaise,
-            notes: notes || null,
+            notes: effectiveNotes,
             recorded_by: validUserId,
           })
           .eq('id', existing.id)
@@ -171,7 +179,7 @@ export async function POST(request: NextRequest) {
           is_meter_reset: !!is_meter_reset,
           period_month,
           period_year,
-          notes: notes || null,
+          notes: effectiveNotes,
           recorded_by: validUserId,
         })
         .select()
@@ -274,6 +282,7 @@ export async function POST(request: NextRequest) {
         current_reading: currNum,
         rate_per_unit_paise: ratePaise,
         total_paise: totalPaise,
+        photo_url: photo_url || null,
         billed_residents_count: targetResidentIds.length,
         is_update: isUpdate,
         allocation_method: allocation_method || (allocations ? 'pro_rata_stay' : 'equal_split'),

@@ -130,6 +130,7 @@ export default function RecordElectricityReadingPage() {
         period_month: now.getMonth() + 1,
         period_year: now.getFullYear(),
         notes,
+        photo_url: meterPhotoUrl || null,
         bed_id: selectedMeter?.bed_id || null,
         resident_id: activeResident?.id || null,
         resident_ids: roomResidents.map((r: any) => r.resident_id),
