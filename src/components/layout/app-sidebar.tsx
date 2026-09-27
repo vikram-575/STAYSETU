@@ -55,8 +55,7 @@ export default function AppSidebar({ role, orgName }: Props) {
     try {
       await fetch('/api/auth/logout', { method: 'POST' })
     } catch {}
-    router.push('/login')
-    router.refresh()
+    window.location.href = '/login?logout=true'
   }
 
   return (

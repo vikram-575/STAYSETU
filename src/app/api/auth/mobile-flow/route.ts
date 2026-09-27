@@ -582,6 +582,11 @@ export async function POST(request: NextRequest) {
       }
 
       // Set session cookies
+      cookieStore.delete('impersonated_org_id')
+      if (!isSuper) {
+        cookieStore.delete('superadmin_token')
+      }
+
       cookieStore.set('auth_user_id', targetUserId, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',

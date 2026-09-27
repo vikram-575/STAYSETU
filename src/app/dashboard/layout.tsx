@@ -96,7 +96,7 @@ export default async function DashboardLayout({
       <div className="flex h-screen bg-[#F7FAF7] overflow-hidden">
         <AppSidebar role={profile.role} orgName={profile.organizations?.name ?? 'PG-SETU Management'} />
         <div className="flex-1 flex flex-col min-w-0 w-full overflow-hidden">
-          <AppHeader user={profile as any} />
+          <AppHeader user={profile as any} isImpersonating={Boolean((await cookies()).get('impersonated_org_id')?.value)} />
           <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 pb-28 md:pb-6">
             {children}
           </main>

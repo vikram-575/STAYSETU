@@ -17,12 +17,14 @@ import QuickActions from '@/components/shared/quick-actions'
 
 interface Props {
   user: UserType & { organizations?: { name: string } }
+  isImpersonating?: boolean
 }
 
-export default function AppHeader({ user }: Props) {
+export default function AppHeader({ user, isImpersonating }: Props) {
   const [showSearch, setShowSearch] = useState(false)
   const [showQuickActions, setShowQuickActions] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [exitingImpersonation, setExitingImpersonation] = useState(false)
   const router = useRouter()
   const supabase = createClient()
   const pathname = usePathname()
@@ -34,8 +36,15 @@ export default function AppHeader({ user }: Props) {
       await fetch('/api/auth/logout', { method: 'POST' })
       await supabase.auth.signOut()
     } catch {}
-    router.push('/login')
-    router.refresh()
+    window.location.href = '/login?logout=true'
+  }
+
+  const handleExitImpersonation = async () => {
+    setExitingImpersonation(true)
+    try {
+      await fetch('/api/admin/impersonate', { method: 'DELETE' })
+    } catch {}
+    window.location.href = user.role === 'superadmin' ? '/superadmin' : '/login?logout=true'
   }
 
   const allNavItems = [
@@ -61,6 +70,25 @@ export default function AppHeader({ user }: Props) {
 
   return (
     <>
+      {/* Impersonation Alert Banner */}
+      {isImpersonating && (
+        <div className="bg-amber-500 text-gray-950 px-3 sm:px-6 py-2 text-xs font-bold flex items-center justify-between border-b border-amber-600 shadow-xs sticky top-0 z-40">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-red-700 animate-ping shrink-0" />
+            <span className="truncate">
+              ⚠️ Currently viewing <strong>{orgName}</strong> in Super Admin Mode
+            </span>
+          </div>
+          <button
+            onClick={handleExitImpersonation}
+            disabled={exitingImpersonation}
+            className="bg-gray-950 hover:bg-gray-800 disabled:opacity-50 text-white text-[11px] font-black px-3 py-1 rounded-lg transition active:scale-95 shrink-0 flex items-center gap-1 cursor-pointer"
+          >
+            {exitingImpersonation ? 'Exiting...' : 'Exit & Switch PG →'}
+          </button>
+        </div>
+      )}
+
       <header className="h-14 sm:h-16 bg-white border-b border-gray-200/80 px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4 sticky top-0 z-30 shadow-2xs safe-top">
         
         {/* Left: Mobile Menu & Clean Brand Identity */}
@@ -243,6 +271,15 @@ export default function AppHeader({ user }: Props) {
                   {user.role}
                 </span>
               </div>
+              {isImpersonating && (
+                <button
+                  onClick={handleExitImpersonation}
+                  disabled={exitingImpersonation}
+                  className="w-full mb-2 flex items-center justify-center gap-2 py-2 bg-amber-500 hover:bg-amber-600 text-gray-950 font-black rounded-xl text-xs transition active:scale-95 shadow-xs"
+                >
+                  <span>{exitingImpersonation ? 'Exiting...' : '⚠️ Exit Impersonation / Switch PG'}</span>
+                </button>
+              )}
               <button
                 onClick={handleSignOut}
                 className="w-full flex items-center justify-center gap-2 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs transition active:scale-95"

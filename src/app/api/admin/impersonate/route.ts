@@ -52,3 +52,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: err.message || 'Failed to impersonate PG' }, { status: 500 })
   }
 }
+
+/**
+ * DELETE /api/admin/impersonate
+ * Exits impersonation mode and clears impersonated_org_id cookie.
+ */
+export async function DELETE() {
+  const cookieStore = await cookies()
+  cookieStore.delete('impersonated_org_id')
+  cookieStore.set('impersonated_org_id', '', {
+    maxAge: 0,
+    path: '/',
+    httpOnly: false,
+  })
+
+  const response = NextResponse.json({
+    success: true,
+    message: 'Exited impersonation mode.',
+    redirect: '/superman',
+  })
+  response.cookies.set('impersonated_org_id', '', { maxAge: 0, path: '/' })
+
+  return response
+}

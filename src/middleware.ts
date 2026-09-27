@@ -77,10 +77,39 @@ export async function middleware(request: NextRequest) {
 
   const mustChangePassword = request.cookies.get('must_change_password')?.value === 'true'
 
-  // Anti-loop protection: if request has redirectTo or error, do NOT bounce back to protected pages
+  // Anti-loop & account switch protection: if request has redirectTo, error, logout, or switch params, do NOT bounce
   const hasRedirectTo = request.nextUrl.searchParams.has('redirectTo')
   const hasError = request.nextUrl.searchParams.has('error')
-  const shouldBypassLoginRedirect = hasRedirectTo || hasError
+  const hasLogout = request.nextUrl.searchParams.has('logout')
+  const hasSwitch = request.nextUrl.searchParams.has('switch')
+  const shouldBypassLoginRedirect = hasRedirectTo || hasError || hasLogout || hasSwitch
+
+  if (hasLogout && pathname === '/login') {
+    const cleanResponse = NextResponse.next()
+    ;[
+      'auth_email',
+      'auth_role',
+      'auth_token',
+      'auth_user_id',
+      'auth_mobile',
+      'auth_name',
+      'org_id',
+      'organization_id',
+      'impersonated_org_id',
+      'superadmin_token',
+      'admin_token',
+      'must_change_password',
+      'resident_id',
+      'pgsetu_profile_id',
+      'verified_mobile',
+      'erp_locked',
+      'firebase_token',
+      'firebase_user_id',
+    ].forEach((c) => {
+      cleanResponse.cookies.set(c, '', { maxAge: 0, path: '/' })
+    })
+    return cleanResponse
+  }
 
   const isSuperAdminLoginPage =
     pathname === '/superman/login' ||

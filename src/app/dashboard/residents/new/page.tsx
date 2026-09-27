@@ -353,24 +353,52 @@ export default function CheckInResidentPage() {
         setInventory(data)
 
         if (data.properties && data.properties.length > 0) {
-          const firstProp = data.properties[0]
-          const propBldgs = (data.buildings || []).filter((b: any) => b.property_id === firstProp.id)
-          const firstBldg = propBldgs[0] || (data.buildings || [])[0]
-          const bldgFloors = firstBldg ? (data.floors || []).filter((fl: any) => fl.building_id === firstBldg.id) : []
-          const firstFloor = bldgFloors[0] || (data.floors || [])[0]
-          const floorRooms = firstFloor ? (data.rooms || []).filter((r: any) => r.floor_id === firstFloor.id) : []
-          const firstRoom = floorRooms[0] || (data.rooms || [])[0]
-          const roomBeds = firstRoom ? (data.beds || []).filter((bd: any) => bd.room_id === firstRoom.id && bd.status === 'available') : []
-          const firstBed = roomBeds[0] || null
+          const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+          const paramRoomId = urlParams?.get('room_id') || ''
+          const paramBedId = urlParams?.get('bed_id') || ''
+
+          let targetProp: any = data.properties[0]
+          let targetBldg: any = (data.buildings || [])[0]
+          let targetFloor: any = (data.floors || [])[0]
+          let targetRoom: any = (data.rooms || [])[0]
+          let targetBed: any = null
+
+          if (paramRoomId) {
+            const matchedRoom = (data.rooms || []).find((r: any) => r.id === paramRoomId)
+            if (matchedRoom) {
+              targetRoom = matchedRoom
+              const matchedFloor = (data.floors || []).find((fl: any) => fl.id === matchedRoom.floor_id)
+              if (matchedFloor) {
+                targetFloor = matchedFloor
+                const matchedBldg = (data.buildings || []).find((b: any) => b.id === matchedFloor.building_id)
+                if (matchedBldg) {
+                  targetBldg = matchedBldg
+                  const matchedProp = (data.properties || []).find((p: any) => p.id === matchedBldg.property_id)
+                  if (matchedProp) targetProp = matchedProp
+                }
+              }
+            }
+          }
+
+          const roomBeds = targetRoom ? (data.beds || []).filter((bd: any) => bd.room_id === targetRoom.id) : []
+          if (paramBedId) {
+            targetBed = roomBeds.find((bd: any) => bd.id === paramBedId) || (data.beds || []).find((bd: any) => bd.id === paramBedId)
+          }
+          if (!targetBed) {
+            targetBed = roomBeds.find((bd: any) => bd.status === 'available') || roomBeds[0] || null
+          }
+
+          const suggestedMeter = targetRoom ? generateBedMeterNumber(targetRoom.room_number, targetBed?.bed_label || 'A') : ''
 
           setForm((prev) => ({
             ...prev,
-            property_id: firstProp.id,
-            building_id: firstBldg?.id || '',
-            floor_id: firstFloor?.id || '',
-            room_id: firstRoom?.id || '',
-            bed_id: firstBed?.id || '',
-            monthly_rent_rupees: firstRoom?.base_rent_paise ? firstRoom.base_rent_paise / 100 : prev.monthly_rent_rupees,
+            property_id: targetProp?.id || prev.property_id,
+            building_id: targetBldg?.id || prev.building_id,
+            floor_id: targetFloor?.id || prev.floor_id,
+            room_id: targetRoom?.id || prev.room_id,
+            bed_id: targetBed?.id || prev.bed_id,
+            meter_number: (!prev.meter_number || prev.meter_number.startsWith('MTR-')) ? (suggestedMeter || prev.meter_number) : prev.meter_number,
+            monthly_rent_rupees: targetRoom?.base_rent_paise ? targetRoom.base_rent_paise / 100 : prev.monthly_rent_rupees,
           }))
         }
       } catch (err: any) {

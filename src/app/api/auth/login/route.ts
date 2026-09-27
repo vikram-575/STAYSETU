@@ -21,6 +21,12 @@ export async function POST(request: NextRequest) {
     let cleanEmail = rawInput.toLowerCase()
     const cookieStore = await cookies()
 
+    // Always clear stale session/impersonation cookies on new login attempt
+    cookieStore.delete('impersonated_org_id')
+    cookieStore.delete('org_id')
+    cookieStore.delete('organization_id')
+    cookieStore.delete('resident_id')
+
     // Support Login via Registered Mobile Number or Email
     if (!cleanEmail.includes('@')) {
       const phoneDigits = rawInput.replace(/[^0-9]/g, '')
