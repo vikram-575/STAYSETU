@@ -18,6 +18,27 @@ import { AadhaarVerificationModal } from '@/components/kyc/aadhaar-verification-
 import { AadhaarExtractedData } from '@/lib/kyc/types'
 import { setupRecaptcha, sendPhoneOtp } from '@/lib/firebase/auth'
 import type { ConfirmationResult, RecaptchaVerifier } from 'firebase/auth'
+import {
+  getAllIndianStates,
+  getDistrictsForState,
+  normalizeIndianState,
+  normalizeDistrict,
+} from '@/lib/india-locations'
+
+/**
+ * Splits a full name string into First Name, Middle Name, and Last Name components
+ */
+function splitFullName(fullName: string): { first_name: string; middle_name: string; last_name: string } {
+  const parts = (fullName || '').trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return { first_name: '', middle_name: '', last_name: '' }
+  if (parts.length === 1) return { first_name: parts[0], middle_name: '', last_name: '' }
+  if (parts.length === 2) return { first_name: parts[0], middle_name: '', last_name: parts[1] }
+  return {
+    first_name: parts[0],
+    middle_name: parts.slice(1, -1).join(' '),
+    last_name: parts[parts.length - 1],
+  }
+}
 
 export default function CheckInResidentPage() {
   const router = useRouter()
@@ -31,6 +52,9 @@ export default function CheckInResidentPage() {
   const [verifyingOtp, setVerifyingOtp] = useState(false)
   const [otpError, setOtpError] = useState('')
   const [resendCooldown, setResendCooldown] = useState<number>(0)
+
+  // Fast Lookup Cache Ref to prevent duplicate / slow sequential API calls
+  const lookupCacheRef = useRef<{ phone: string; data: any } | null>(null)
 
   // Firebase Phone Auth Confirmation & Verifier Refs
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null)
@@ -46,15 +70,12 @@ export default function CheckInResidentPage() {
     return () => clearInterval(timer)
   }, [resendCooldown])
 
-  // Recaptcha verifier helper
+  // Recaptcha verifier helper - Reuse existing verifier to make OTP dispatch instant
   const getOrCreateVerifier = () => {
     if (typeof window === 'undefined') return null
     try {
       if (recaptchaVerifierRef.current) {
-        try {
-          recaptchaVerifierRef.current.clear()
-        } catch {}
-        recaptchaVerifierRef.current = null
+        return recaptchaVerifierRef.current
       }
       const verifier = setupRecaptcha('recaptcha-resident-container')
       recaptchaVerifierRef.current = verifier
@@ -64,6 +85,16 @@ export default function CheckInResidentPage() {
       return null
     }
   }
+
+  // Pre-warm recaptcha verifier in background so it's ready when user submits
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        getOrCreateVerifier()
+      } catch {}
+    }, 600)
+    return () => clearTimeout(timer)
+  }, [])
 
   // Active Stay & PG Conflict Verification State
   const [activeStayWarning, setActiveStayWarning] = useState<any | null>(null)
@@ -95,14 +126,20 @@ export default function CheckInResidentPage() {
     const ext = result.extracted_data
     if (ext) {
       const addrParts = [ext.address?.house, ext.address?.street].filter(Boolean).join(', ') || ext.address?.full_address || ''
+      const names = splitFullName(ext.name || '')
+      const matchedState = normalizeIndianState(ext.address?.state)
+      const matchedCity = normalizeDistrict(matchedState, ext.address?.district || ext.address?.locality)
       setForm((prev) => ({
         ...prev,
+        first_name: names.first_name || prev.first_name,
+        middle_name: names.middle_name || prev.middle_name,
+        last_name: names.last_name || prev.last_name,
         full_name: ext.name || prev.full_name,
         date_of_birth: ext.date_of_birth || prev.date_of_birth,
         gender: ext.gender?.toUpperCase() === 'F' ? 'female' : ext.gender?.toUpperCase() === 'M' ? 'male' : (prev.gender || 'male'),
         permanent_address: addrParts || prev.permanent_address,
-        permanent_city: ext.address?.locality || ext.address?.district || prev.permanent_city,
-        permanent_state: ext.address?.state || prev.permanent_state,
+        permanent_state: matchedState || prev.permanent_state,
+        permanent_city: matchedCity || prev.permanent_city,
         permanent_pincode: ext.address?.pincode || prev.permanent_pincode,
         id_type: 'aadhaar',
         id_number: result.masked_aadhaar || prev.id_number,
@@ -247,6 +284,9 @@ export default function CheckInResidentPage() {
   const [form, setForm] = useState({
     tenant_id: '',
     // Step 1: Personal
+    first_name: '',
+    middle_name: '',
+    last_name: '',
     full_name: '',
     phone: '',
     alternate_phone: '',
@@ -284,6 +324,17 @@ export default function CheckInResidentPage() {
 
   // Clean 10-digit mobile
   const cleanPhoneDigits = (m: string) => m.replace(/\D/g, '').slice(-10)
+
+  // 16-year minimum age calculation (Max allowable DOB is exactly 16 years ago from today)
+  const maxDob16YearsAgo = (() => {
+    const d = new Date()
+    d.setFullYear(d.getFullYear() - 16)
+    return d.toISOString().split('T')[0]
+  })()
+
+  // All Indian States & UTs and dynamically cascaded districts
+  const allIndianStates = getAllIndianStates()
+  const availableDistricts = getDistrictsForState(form.permanent_state)
 
   // Load isolated PG inventory from server API on mount
   useEffect(() => {
@@ -388,16 +439,29 @@ export default function CheckInResidentPage() {
     }))
   }
 
-  // Live verification when 10-digit mobile number is entered
+  // Live verification when 10-digit mobile number is entered (with fast ref cache)
   useEffect(() => {
     const clean = cleanPhoneDigits(verifyMobile)
     if (clean.length === 10) {
+      if (lookupCacheRef.current?.phone === clean && lookupCacheRef.current.data) {
+        const cached = lookupCacheRef.current.data
+        if (cached?.is_currently_checked_in && cached?.active_stay) {
+          setActiveStayWarning(cached.active_stay)
+        } else {
+          setActiveStayWarning(null)
+        }
+        return
+      }
+
       let active = true
       setCheckingMobile(true)
       fetch(`/api/tenants/lookup?phone=${clean}`)
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
           if (!active) return
+          if (data) {
+            lookupCacheRef.current = { phone: clean, data }
+          }
           if (data?.is_currently_checked_in && data?.active_stay) {
             setActiveStayWarning(data.active_stay)
           } else {
@@ -419,7 +483,7 @@ export default function CheckInResidentPage() {
   }, [verifyMobile])
 
   // ─────────────────────────────────────────────────────────────
-  // 1. SEND REAL SMS OTP TO RESIDENT MOBILE VIA FIREBASE PHONE AUTH
+  // 1. SEND REAL SMS OTP TO RESIDENT MOBILE VIA FIREBASE PHONE AUTH (FAST PATH)
   // ─────────────────────────────────────────────────────────────
   const handleSendOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
@@ -433,24 +497,33 @@ export default function CheckInResidentPage() {
 
     setSendingOtp(true)
     try {
-      // Step 0: Check if resident already exists and is actively checked in at any PG
-      const lookupRes = await fetch(`/api/tenants/lookup?phone=${clean}`)
-      if (lookupRes.ok) {
-        const lookupData = await lookupRes.json()
-        if (lookupData?.is_currently_checked_in && lookupData?.active_stay) {
+      const verifier = getOrCreateVerifier()
+      if (!verifier) {
+        throw new Error('Security verification (reCAPTCHA) could not be initialized. Please refresh the page.')
+      }
+
+      // Check cache or run lookup in parallel with sendPhoneOtp so OTP send starts immediately
+      const cached = lookupCacheRef.current?.phone === clean ? lookupCacheRef.current.data : null
+      const lookupPromise = cached
+        ? Promise.resolve(cached)
+        : fetch(`/api/tenants/lookup?phone=${clean}`)
+            .then((res) => (res.ok ? res.json() : null))
+            .catch(() => null)
+
+      // Start OTP dispatch immediately without waiting for lookup
+      const otpPromise = sendPhoneOtp(clean, verifier)
+
+      const [confirmation, lookupData] = await Promise.all([otpPromise, lookupPromise])
+
+      if (lookupData) {
+        lookupCacheRef.current = { phone: clean, data: lookupData }
+        if (lookupData.is_currently_checked_in && lookupData.active_stay) {
           setActiveStayWarning(lookupData.active_stay)
         } else {
           setActiveStayWarning(null)
         }
       }
 
-      // Step 1: Send real SMS OTP to the resident's mobile using Firebase Phone Auth
-      const verifier = getOrCreateVerifier()
-      if (!verifier) {
-        throw new Error('Security verification (reCAPTCHA) could not be initialized. Please refresh the page.')
-      }
-
-      const confirmation = await sendPhoneOtp(clean, verifier)
       setConfirmationResult(confirmation)
       confirmationResultRef.current = confirmation
       setResendCooldown(30)
@@ -481,7 +554,7 @@ export default function CheckInResidentPage() {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // 2. VERIFY RESIDENT OTP & AUTO-FILL FROM DATABASE
+  // 2. VERIFY RESIDENT OTP & AUTO-FILL FROM DATABASE (FAST PATH)
   // ─────────────────────────────────────────────────────────────
   const handleVerifyOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
@@ -518,8 +591,8 @@ export default function CheckInResidentPage() {
         }
       }
 
-      // Step B: Server verification / session check
-      const verifyRes = await fetch('/api/auth/mobile-flow', {
+      // Step B: Server verification and cached lookup in parallel
+      const verifyPromise = fetch('/api/auth/mobile-flow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -528,18 +601,23 @@ export default function CheckInResidentPage() {
           otp: code,
           idToken,
         }),
-      })
-      const verifyData = await verifyRes.json()
+      }).then(async (r) => ({ ok: r.ok, data: await r.json().catch(() => ({})) }))
+
+      const cachedLookup = lookupCacheRef.current?.phone === clean ? lookupCacheRef.current.data : null
+      const lookupPromise = cachedLookup
+        ? Promise.resolve(cachedLookup)
+        : fetch(`/api/tenants/lookup?phone=${clean}`)
+            .then((res) => (res.ok ? res.json() : null))
+            .catch(() => null)
+
+      const [verifyRes, lookupData] = await Promise.all([verifyPromise, lookupPromise])
 
       if (!verifyRes.ok && !idToken) {
-        throw new Error(verifyData.error || 'Invalid or expired OTP. Please enter the correct code.')
+        throw new Error(verifyRes.data?.error || 'Invalid or expired OTP. Please enter the correct code.')
       }
 
-      // Step B: Query database for this resident's pre-existing profile
-      const lookupRes = await fetch(`/api/tenants/lookup?phone=${clean}`)
-      let lookupData: any = null
-      if (lookupRes.ok) {
-        lookupData = await lookupRes.json()
+      if (lookupData) {
+        lookupCacheRef.current = { phone: clean, data: lookupData }
       }
 
       const filled = new Set<string>()
@@ -551,22 +629,29 @@ export default function CheckInResidentPage() {
           setActiveStayWarning(lookupData.active_stay)
         }
 
+        const names = splitFullName(lookupData.full_name || form.full_name)
+        const matchedState = normalizeIndianState(lookupData.permanent_state || form.permanent_state)
+        const matchedCity = normalizeDistrict(matchedState, lookupData.permanent_city || form.permanent_city)
+
         // Automatically fill all available fields from database
         const newFormValues = {
           ...form,
           phone: clean,
           tenant_id: lookupData.tenant_id || form.tenant_id,
+          first_name: names.first_name || form.first_name,
+          middle_name: names.middle_name || form.middle_name,
+          last_name: names.last_name || form.last_name,
           full_name: lookupData.full_name || form.full_name,
-          alternate_phone: lookupData.alternate_phone || form.alternate_phone,
+          alternate_phone: (lookupData.alternate_phone || form.alternate_phone || '').replace(/\D/g, '').slice(0, 10),
           email: lookupData.email || form.email,
           date_of_birth: lookupData.date_of_birth || form.date_of_birth,
           gender: lookupData.gender || form.gender || 'male',
           permanent_address: lookupData.permanent_address || form.permanent_address,
-          permanent_city: lookupData.permanent_city || form.permanent_city,
-          permanent_state: lookupData.permanent_state || form.permanent_state,
+          permanent_state: matchedState,
+          permanent_city: matchedCity,
           permanent_pincode: lookupData.permanent_pincode || form.permanent_pincode,
           emergency_name: lookupData.emergency_name || form.emergency_name,
-          emergency_phone: lookupData.emergency_phone || form.emergency_phone,
+          emergency_phone: (lookupData.emergency_phone || form.emergency_phone || '').replace(/\D/g, '').slice(0, 10),
           emergency_relation: lookupData.emergency_relation || form.emergency_relation || 'Parent',
           id_type: lookupData.id_type || form.id_type || 'aadhaar',
           id_number: lookupData.id_number || form.id_number,
@@ -574,14 +659,16 @@ export default function CheckInResidentPage() {
         }
 
         // Track which fields were auto-filled
+        if (names.first_name) filled.add('first_name')
+        if (names.last_name) filled.add('last_name')
         if (lookupData.full_name) filled.add('full_name')
         if (lookupData.email) filled.add('email')
         if (lookupData.alternate_phone) filled.add('alternate_phone')
         if (lookupData.date_of_birth) filled.add('date_of_birth')
         if (lookupData.gender) filled.add('gender')
         if (lookupData.permanent_address) filled.add('permanent_address')
-        if (lookupData.permanent_city) filled.add('permanent_city')
-        if (lookupData.permanent_state) filled.add('permanent_state')
+        if (matchedCity) filled.add('permanent_city')
+        if (matchedState) filled.add('permanent_state')
         if (lookupData.emergency_name) filled.add('emergency_name')
         if (lookupData.emergency_phone) filled.add('emergency_phone')
         if (lookupData.emergency_relation) filled.add('emergency_relation')
@@ -628,12 +715,40 @@ export default function CheckInResidentPage() {
   const nextStep = () => {
     setError('')
     if (currentStep === 1) {
-      if (!form.full_name.trim() || !form.phone.trim()) {
-        setError('Full Name and Phone Number are required.')
+      if (!form.first_name.trim() || !form.last_name.trim()) {
+        setError('First Name and Last Name are required.')
+        return
+      }
+      if (!form.phone.trim()) {
+        setError('Phone Number is required.')
         return
       }
       if (!form.date_of_birth) {
         setError('Date of Birth is compulsory for resident onboarding.')
+        return
+      }
+      const dobDate = new Date(form.date_of_birth)
+      if (isNaN(dobDate.getTime())) {
+        setError('Please enter a valid Date of Birth.')
+        return
+      }
+      const today = new Date()
+      let age = today.getFullYear() - dobDate.getFullYear()
+      const m = today.getMonth() - dobDate.getMonth()
+      if (m < 0 || (m === 0 && today.getDate() < dobDate.getDate())) {
+        age--
+      }
+      if (age < 16) {
+        setError(`Resident must be at least 16 years of age (Current age: ${age} years). Date of birth must be on or before ${maxDob16YearsAgo}.`)
+        return
+      }
+    } else if (currentStep === 2) {
+      if (!form.permanent_state) {
+        setError('Please select Resident Permanent State / Union Territory.')
+        return
+      }
+      if (!form.permanent_city) {
+        setError('Please select Resident District / City.')
         return
       }
     } else if (currentStep === 5) {
@@ -1242,18 +1357,71 @@ export default function CheckInResidentPage() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Full Name * {renderFieldBadge('full_name', true)}
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Rahul Sharma"
-                      value={form.full_name}
-                      onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                      className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#16A34A] outline-none font-semibold"
-                    />
+                  {/* Name Fields: First Name, Middle Name, Last Name */}
+                  <div className="sm:col-span-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">
+                          First Name * {renderFieldBadge('first_name', true)}
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Rahul"
+                          value={form.first_name}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            setForm((prev) => {
+                              const updated = { ...prev, first_name: val }
+                              const combined = [updated.first_name, updated.middle_name, updated.last_name].filter((s) => s && s.trim()).join(' ')
+                              return { ...updated, full_name: combined }
+                            })
+                          }}
+                          className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#16A34A] outline-none font-semibold"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">
+                          Middle Name {renderFieldBadge('middle_name')}
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Kumar (Optional)"
+                          value={form.middle_name}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            setForm((prev) => {
+                              const updated = { ...prev, middle_name: val }
+                              const combined = [updated.first_name, updated.middle_name, updated.last_name].filter((s) => s && s.trim()).join(' ')
+                              return { ...updated, full_name: combined }
+                            })
+                          }}
+                          className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#16A34A] outline-none font-semibold"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">
+                          Last Name * {renderFieldBadge('last_name', true)}
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Sharma"
+                          value={form.last_name}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            setForm((prev) => {
+                              const updated = { ...prev, last_name: val }
+                              const combined = [updated.first_name, updated.middle_name, updated.last_name].filter((s) => s && s.trim()).join(' ')
+                              return { ...updated, full_name: combined }
+                            })
+                          }}
+                          className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#16A34A] outline-none font-semibold"
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   <div>
@@ -1288,29 +1456,36 @@ export default function CheckInResidentPage() {
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Alternate Phone {renderFieldBadge('alternate_phone')}
+                      Alternate Phone (Digits Only) {renderFieldBadge('alternate_phone')}
                     </label>
                     <input
                       type="tel"
-                      placeholder="Optional secondary phone"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={10}
+                      placeholder="10-digit number (digits only)"
                       value={form.alternate_phone}
-                      onChange={(e) => setForm({ ...form, alternate_phone: e.target.value })}
-                      className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#16A34A] outline-none"
+                      onChange={(e) => setForm({ ...form, alternate_phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                      className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#16A34A] outline-none font-semibold"
                     />
+                    <p className="text-[10px] text-gray-400 mt-1">Digits only (max 10 numbers)</p>
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Date of Birth * {renderFieldBadge('date_of_birth', true)}
+                      Date of Birth * (Age 16+) {renderFieldBadge('date_of_birth', true)}
                     </label>
                     <input
                       type="date"
                       required
+                      max={maxDob16YearsAgo}
                       value={form.date_of_birth}
                       onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })}
                       className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#16A34A] outline-none font-medium"
                     />
-                    <p className="text-[10px] text-emerald-800 font-semibold mt-1">Compulsory for resident onboarding &amp; police record.</p>
+                    <p className="text-[10px] text-emerald-800 font-semibold mt-1">
+                      Resident must be 16+ years old (Born on or before {new Date(maxDob16YearsAgo).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}).
+                    </p>
                   </div>
 
                   <div>
@@ -1369,38 +1544,64 @@ export default function CheckInResidentPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1">
-                        City {renderFieldBadge('permanent_city')}
+                        State / Union Territory * {renderFieldBadge('permanent_state', true)}
                       </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Jaipur"
-                        value={form.permanent_city}
-                        onChange={(e) => setForm({ ...form, permanent_city: e.target.value })}
-                        className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#16A34A] outline-none"
-                      />
+                      <select
+                        value={form.permanent_state}
+                        onChange={(e) => {
+                          const selectedState = e.target.value
+                          const districts = getDistrictsForState(selectedState)
+                          setForm((prev) => ({
+                            ...prev,
+                            permanent_state: selectedState,
+                            permanent_city: districts.includes(prev.permanent_city) ? prev.permanent_city : (districts[0] || ''),
+                          }))
+                        }}
+                        className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#16A34A] outline-none font-semibold bg-white cursor-pointer"
+                      >
+                        <option value="">-- Select State / UT --</option>
+                        {allIndianStates.map((st) => (
+                          <option key={st} value={st}>
+                            {st}
+                          </option>
+                        ))}
+                      </select>
                     </div>
+
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1">
-                        State {renderFieldBadge('permanent_state')}
+                        District / City * {renderFieldBadge('permanent_city', true)}
                       </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Rajasthan"
-                        value={form.permanent_state}
-                        onChange={(e) => setForm({ ...form, permanent_state: e.target.value })}
-                        className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#16A34A] outline-none"
-                      />
+                      <select
+                        value={form.permanent_city}
+                        disabled={!form.permanent_state}
+                        onChange={(e) => setForm({ ...form, permanent_city: e.target.value })}
+                        className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#16A34A] outline-none font-semibold bg-white disabled:bg-gray-100 disabled:text-gray-400 cursor-pointer"
+                      >
+                        <option value="">
+                          {!form.permanent_state ? '-- First Select State --' : '-- Select District --'}
+                        </option>
+                        {availableDistricts.map((dst) => (
+                          <option key={dst} value={dst}>
+                            {dst}
+                          </option>
+                        ))}
+                      </select>
                     </div>
+
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1">
                         Pincode {renderFieldBadge('permanent_pincode')}
                       </label>
                       <input
                         type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={6}
                         placeholder="e.g. 302001"
                         value={form.permanent_pincode}
-                        onChange={(e) => setForm({ ...form, permanent_pincode: e.target.value })}
-                        className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#16A34A] outline-none"
+                        onChange={(e) => setForm({ ...form, permanent_pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })}
+                        className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#16A34A] outline-none font-semibold"
                       />
                     </div>
                   </div>
@@ -1424,14 +1625,17 @@ export default function CheckInResidentPage() {
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">
-                          Emergency Phone {renderFieldBadge('emergency_phone')}
+                          Emergency Phone (Digits Only) {renderFieldBadge('emergency_phone')}
                         </label>
                         <input
                           type="tel"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          maxLength={10}
                           placeholder="Parent/Guardian Phone"
                           value={form.emergency_phone}
-                          onChange={(e) => setForm({ ...form, emergency_phone: e.target.value })}
-                          className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#16A34A] outline-none"
+                          onChange={(e) => setForm({ ...form, emergency_phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                          className="w-full px-3.5 py-2.5 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#16A34A] outline-none font-semibold"
                         />
                       </div>
                       <div>
@@ -2071,7 +2275,11 @@ export default function CheckInResidentPage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Resident Name &amp; Phone:</span>
-                    <span className="font-bold text-gray-900">{form.full_name} (+91 {form.phone})</span>
+                    <span className="font-bold text-gray-900">{form.full_name || [form.first_name, form.middle_name, form.last_name].filter(Boolean).join(' ')} (+91 {form.phone})</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Permanent Location:</span>
+                    <span className="font-semibold text-gray-900">{[form.permanent_city, form.permanent_state].filter(Boolean).join(', ') || 'Not specified'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Date of Birth:</span>

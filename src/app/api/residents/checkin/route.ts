@@ -200,6 +200,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Required fields missing: Full Name, Phone, Date of Birth (compulsory for onboarding), Bed, and Monthly Rent.' }, { status: 400 })
     }
 
+    // Validate minimum age requirement: Resident must be at least 16 years old
+    const birthDate = new Date(date_of_birth)
+    if (!isNaN(birthDate.getTime())) {
+      const today = new Date()
+      let age = today.getFullYear() - birthDate.getFullYear()
+      const m = today.getMonth() - birthDate.getMonth()
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--
+      }
+      if (age < 16) {
+        return NextResponse.json(
+          { error: `Resident must be at least 16 years of age for onboarding (Current age: ${age} years).` },
+          { status: 400 }
+        )
+      }
+    }
+
     if (
       isProtectedSuperAdminIdentity({ phone, email }) ||
       (alternate_phone && isProtectedSuperAdminIdentity({ phone: alternate_phone }))

@@ -39,8 +39,8 @@ export async function GET(request: NextRequest) {
 
     const serviceClient = await createServiceClient()
 
-    // 1. Search in Supabase residents table (across all organizations)
-    const { data: residents } = await serviceClient
+    // 1. Parallelize Supabase residents, users, and Firestore searches for speed
+    const residentsPromise = serviceClient
       .from('residents')
       .select(`
         id,
@@ -66,23 +66,31 @@ export async function GET(request: NextRequest) {
       `)
       .or(`phone.ilike.%${cleanedPhone}%,alternate_phone.ilike.%${cleanedPhone}%`)
       .order('created_at', { ascending: false })
+      .limit(10)
 
-    // 2. Search in tenant_profiles (self-registered on website/app)
-    let tenantProfiles: any[] = []
-    try {
-      tenantProfiles = await queryCollection('tenant_profiles', [['mobile', '==', cleanedPhone]])
-    } catch {
-      // Ignore if Firestore is unavailable
-    }
-
-    // 3. Search in Supabase users table (Users registered via mobile OTP or portal)
-    const { data: userRecord } = await serviceClient
+    const userPromise = serviceClient
       .from('users')
       .select('id, full_name, email, phone, role')
       .ilike('phone', `%${cleanedPhone}%`)
       .maybeSingle()
 
-    const primaryProfile = tenantProfiles[0] || null
+    // Query Firestore with a strict 800ms timeout so a cold Firestore never stalls OTP / lookups
+    const firestorePromise = Promise.race([
+      queryCollection('tenant_profiles', [['mobile', '==', cleanedPhone]]),
+      new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 800))
+    ]).catch(() => [])
+
+    const [
+      { data: residents },
+      { data: userRecord },
+      tenantProfiles
+    ] = await Promise.all([
+      residentsPromise,
+      userPromise,
+      firestorePromise,
+    ])
+
+    const primaryProfile = (Array.isArray(tenantProfiles) ? tenantProfiles[0] : null) || null
     const latestResident = residents && residents.length > 0 ? residents[0] : null
 
     // Determine the permanent Unique Tenant ID:
