@@ -2,7 +2,12 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getAuthenticatedUser } from '@/lib/auth-session'
 import { resolveEffectiveOrgId } from '@/lib/org-helper'
-import { parseMeterNotes, formatMeterNotes, generateBedMeterNumber } from '@/lib/electricity-helper'
+import {
+  parseMeterNotes,
+  formatMeterNotes,
+  generateBedMeterNumber,
+  calculateProRataElectricitySplit,
+} from '@/lib/electricity-helper'
 
 const isUuid = (id: string | null | undefined): boolean => {
   if (!id) return false
@@ -12,7 +17,7 @@ const isUuid = (id: string | null | undefined): boolean => {
 /**
  * GET /api/electricity/meters
  * Fetches all electricity meters strictly belonging to the authenticated user's organization,
- * enriched with room, bed, active resident occupant, and latest recorded reading baseline.
+ * enriched with room, bed, active resident occupant, stay duration, and latest recorded reading baseline.
  */
 export async function GET() {
   try {
@@ -44,11 +49,11 @@ export async function GET() {
     const meterIds = meters.map((m) => m.id)
     const roomIds = meters.map((m) => m.room_id).filter(Boolean)
 
-    // 2. Fetch latest readings, beds, and active resident assignments in parallel
-    const [readingsRes, bedsRes, assignmentsRes, roomResidentsRes] = await Promise.all([
+    // 2. Fetch latest readings, beds, assignments, and reading history
+    const [readingsRes, bedsRes, assignmentsRes, allReadingsRes] = await Promise.all([
       serviceClient
         .from('electricity_readings')
-        .select('meter_id, current_reading, reading_date, rate_per_unit_paise, is_meter_reset')
+        .select('meter_id, current_reading, reading_date, rate_per_unit_paise, is_meter_reset, units_consumed, total_paise')
         .eq('organization_id', orgId)
         .in('meter_id', meterIds)
         .order('reading_date', { ascending: false }),
@@ -58,20 +63,20 @@ export async function GET() {
             .select('id, room_id, bed_label, status, base_rent_paise')
             .eq('organization_id', orgId)
             .in('room_id', roomIds)
+            .order('bed_label')
         : Promise.resolve({ data: [] }),
       serviceClient
         .from('resident_assignments')
-        .select('id, resident_id, bed_id, check_in_date, residents(id, full_name, phone, registration_number, email)')
+        .select('id, resident_id, bed_id, check_in_date, check_out_date, residents(id, full_name, phone, registration_number, email)')
         .eq('organization_id', orgId)
         .is('check_out_date', null),
-      roomIds.length > 0
-        ? serviceClient
-            .from('v_resident_current')
-            .select('*')
-            .eq('organization_id', orgId)
-            .eq('status', 'active')
-            .in('room_id', roomIds)
-        : Promise.resolve({ data: [] }),
+      serviceClient
+        .from('electricity_readings')
+        .select('*, electricity_allocations(*, residents(id, full_name))')
+        .eq('organization_id', orgId)
+        .in('meter_id', meterIds)
+        .order('reading_date', { ascending: false })
+        .limit(100),
     ])
 
     // Index latest reading by meter
@@ -82,13 +87,25 @@ export async function GET() {
       }
     })
 
-    // Index beds by ID & by room_id + bed_label
+    // Index all readings by meter
+    const historyByMeter: Record<string, any[]> = {}
+    allReadingsRes.data?.forEach((r) => {
+      if (!historyByMeter[r.meter_id]) historyByMeter[r.meter_id] = []
+      historyByMeter[r.meter_id].push(r)
+    })
+
+    // Index beds by ID & by room_id
     const bedsById: Record<string, any> = {}
+    const bedsByRoomId: Record<string, any[]> = {}
     const bedsByRoomAndLabel: Record<string, any> = {}
     bedsRes.data?.forEach((b) => {
       bedsById[b.id] = b
-      if (b.room_id && b.bed_label) {
-        bedsByRoomAndLabel[`${b.room_id}_${b.bed_label.toUpperCase()}`] = b
+      if (b.room_id) {
+        if (!bedsByRoomId[b.room_id]) bedsByRoomId[b.room_id] = []
+        bedsByRoomId[b.room_id].push(b)
+        if (b.bed_label) {
+          bedsByRoomAndLabel[`${b.room_id}_${b.bed_label.toUpperCase()}`] = b
+        }
       }
     })
 
@@ -100,21 +117,16 @@ export async function GET() {
       }
     })
 
-    // Index room residents
-    const residentsByRoom: Record<string, any[]> = {}
-    roomResidentsRes.data?.forEach((res) => {
-      if (res.room_id) {
-        if (!residentsByRoom[res.room_id]) residentsByRoom[res.room_id] = []
-        residentsByRoom[res.room_id].push(res)
-      }
-    })
+    const now = new Date()
+    const currentMonth = now.getMonth() + 1
+    const currentYear = now.getFullYear()
 
-    // 3. Enrich each meter with bed and active resident details
+    // 3. Enrich each meter with bed, room beds, active resident details, and pro-rata stay preview
     const enrichedMeters = meters.map((m) => {
       const parsedMeta = parseMeterNotes(m.notes)
       let matchedBed = parsedMeta.bed_id ? bedsById[parsedMeta.bed_id] : null
 
-      // If not linked by ID, attempt match by room_id and meter number ending (e.g. MTR-101-A -> Bed A)
+      // Match bed if meter number ends with bed label (e.g. MTR-101-A -> Bed A)
       if (!matchedBed && m.room_id) {
         const lastPart = m.meter_number.split(/[-_]/).pop()?.toUpperCase()
         if (lastPart && lastPart.length <= 2) {
@@ -122,14 +134,55 @@ export async function GET() {
         }
       }
 
-      // Find active resident occupying this bed
+      // Find active resident occupying this specific bed (if bed-wise meter)
       const activeAssignment = matchedBed?.id ? assignmentByBedId[matchedBed.id] : null
       const activeResident = activeAssignment?.residents || null
 
-      const roomResidents = m.room_id ? (residentsByRoom[m.room_id] || []) : []
+      // Find all beds in this room
+      const rawRoomBeds = m.room_id ? (bedsByRoomId[m.room_id] || []) : []
+      const roomResidentsList: any[] = []
+
+      const roomBeds = rawRoomBeds.map((b) => {
+        const assign = assignmentByBedId[b.id]
+        const res = assign?.residents || null
+        if (res) {
+          roomResidentsList.push({
+            resident_id: res.id,
+            resident_name: res.full_name,
+            phone: res.phone,
+            bed_id: b.id,
+            bed_label: b.bed_label,
+            check_in_date: assign.check_in_date,
+            check_out_date: assign.check_out_date || null,
+          })
+        }
+
+        return {
+          id: b.id,
+          bed_label: b.bed_label,
+          status: assign ? 'occupied' : (b.status || 'available'),
+          base_rent_paise: b.base_rent_paise,
+          resident: res ? {
+            id: res.id,
+            full_name: res.full_name,
+            phone: res.phone,
+            check_in_date: assign.check_in_date,
+          } : null,
+        }
+      })
+
       const latestReading = readingsByMeter[m.id]?.current_reading ?? 0
       const latestReadingDate = readingsByMeter[m.id]?.reading_date ?? null
       const defaultRatePaise = readingsByMeter[m.id]?.rate_per_unit_paise ?? 1000
+
+      // Pro-Rata Stay Split Preview for this room
+      const proRataPreview = calculateProRataElectricitySplit({
+        totalUnits: 100, // benchmark 100 kWh
+        ratePerUnitPaise: defaultRatePaise,
+        periodMonth: currentMonth,
+        periodYear: currentYear,
+        residents: roomResidentsList,
+      })
 
       // Compute display title
       const roomLabel = m.rooms?.room_number ? `Room ${m.rooms.room_number}` : 'Common Area'
@@ -141,8 +194,8 @@ export async function GET() {
         } else {
           displayTitle += ` (Vacant)`
         }
-      } else if (roomResidents.length > 0) {
-        displayTitle += ` (${roomResidents.length} Residents)`
+      } else if (roomResidentsList.length > 0) {
+        displayTitle += ` (${roomResidentsList.length} Residents · Equal/Pro-Rata)`
       }
 
       return {
@@ -155,8 +208,11 @@ export async function GET() {
         display_title: displayTitle,
         latest_reading: latestReading,
         latest_reading_date: latestReadingDate,
-        default_rate_paise: defaultRatePaise,
-        room_residents: roomResidents,
+        rate_per_unit_paise: defaultRatePaise,
+        room_residents: roomResidentsList,
+        room_beds: roomBeds,
+        meter_readings: historyByMeter[m.id] || [],
+        pro_rata_preview: proRataPreview,
         parsed_note: parsedMeta.displayNote,
       }
     })

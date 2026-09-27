@@ -12,7 +12,8 @@ const isUuid = (id: string | null | undefined): boolean => {
 /**
  * POST /api/electricity/reading
  * Stores meter reading, calculates differential units (current - previous),
- * and debits the assigned resident's ledger directly (Bed-wise) or splits among room residents.
+ * and debits the assigned resident's ledger directly (Bed-wise) or splits among room residents
+ * using stay-adjusted pro-rata (solo days 100%, shared days 50/50).
  */
 export async function POST(request: NextRequest) {
   try {
@@ -44,6 +45,8 @@ export async function POST(request: NextRequest) {
       resident_id,
       bed_id,
       per_resident_paise,
+      allocation_method,
+      allocations, // Array<{ resident_id: string; resident_name?: string; units_allocated: number; amount_paise: number; explanation?: string }>
     } = body
 
     if (!meter_id || !reading_date || current_reading === undefined || !rate_per_unit_paise) {
@@ -80,11 +83,11 @@ export async function POST(request: NextRequest) {
     // Determine target residents for this meter
     let targetResidentIds: string[] = []
 
-    // A. Bed-Wise: If meter is linked to a specific bed or resident
-    if (resident_id) {
+    if (allocations && Array.isArray(allocations) && allocations.length > 0) {
+      targetResidentIds = allocations.map((a: any) => a.resident_id).filter(Boolean)
+    } else if (resident_id) {
       targetResidentIds = [resident_id]
     } else if (effectiveBedId) {
-      // Find active resident assigned to this bed
       const { data: bedAssignment } = await serviceClient
         .from('resident_assignments')
         .select('resident_id, residents(id, full_name)')
@@ -97,7 +100,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // B. Fallback: If not bed-specific or bed vacant, use provided resident_ids
     if (targetResidentIds.length === 0 && Array.isArray(resident_ids) && resident_ids.length > 0) {
       targetResidentIds = resident_ids
     }
@@ -194,36 +196,67 @@ export async function POST(request: NextRequest) {
     const unitsConsumed = is_meter_reset ? currNum : Math.max(0, currNum - prevNum)
     const totalPaise = Math.round(unitsConsumed * ratePaise)
 
-    if (targetResidentIds.length > 0 && unitsConsumed > 0 && totalPaise > 0) {
-      const unitsPerResident = unitsConsumed / targetResidentIds.length
-      const paisePerResident = Math.round(totalPaise / targetResidentIds.length)
-
+    if (unitsConsumed > 0 && totalPaise > 0) {
       const bedTag = meta.bed_label ? ` · Bed ${meta.bed_label}` : ''
       const roomTag = (meter as any).rooms?.room_number ? ` (Room ${(meter as any).rooms.room_number}${bedTag})` : ''
 
-      for (const resId of targetResidentIds) {
-        // Record allocation
-        await serviceClient.from('electricity_allocations').insert({
-          organization_id: orgId,
-          reading_id: reading.id,
-          resident_id: resId,
-          units_allocated: unitsPerResident,
-          amount_paise: paisePerResident,
-          allocation_method: targetResidentIds.length === 1 ? 'per_resident' : 'equal_split',
-        })
+      if (allocations && Array.isArray(allocations) && allocations.length > 0) {
+        // Stay-Adjusted Pro-Rata Allocations
+        for (const alloc of allocations) {
+          if (!alloc.resident_id) continue
 
-        // Post Direct Debit Entry to Resident's Ledger
-        await serviceClient.from('ledger_entries').insert({
-          organization_id: orgId,
-          resident_id: resId,
-          entry_date: reading_date,
-          description: `Electricity (${meter.meter_number}${roomTag} - ${period_month}/${period_year}): ${unitsPerResident.toFixed(1)} kWh @ ₹${(ratePaise / 100).toFixed(2)}/u (${prevNum} → ${currNum})`,
-          category: 'electricity',
-          entry_type: 'charge',
-          debit_paise: paisePerResident,
-          credit_paise: 0,
-          added_by: validUserId,
-        })
+          const unitsAlloc = Number(alloc.units_allocated) || 0
+          const paiseAlloc = Number(alloc.amount_paise) || 0
+
+          await serviceClient.from('electricity_allocations').insert({
+            organization_id: orgId,
+            reading_id: reading.id,
+            resident_id: alloc.resident_id,
+            units_allocated: unitsAlloc,
+            amount_paise: paiseAlloc,
+            allocation_method: allocation_method || 'pro_rata_stay',
+          })
+
+          const explainTag = alloc.explanation ? ` (${alloc.explanation})` : ''
+          await serviceClient.from('ledger_entries').insert({
+            organization_id: orgId,
+            resident_id: alloc.resident_id,
+            entry_date: reading_date,
+            description: `Electricity (${meter.meter_number}${roomTag} - ${period_month}/${period_year}): ${unitsAlloc.toFixed(1)} kWh @ ₹${(ratePaise / 100).toFixed(2)}/u${explainTag}`,
+            category: 'electricity',
+            entry_type: 'charge',
+            debit_paise: paiseAlloc,
+            credit_paise: 0,
+            added_by: validUserId,
+          })
+        }
+      } else if (targetResidentIds.length > 0) {
+        // Standard equal / single resident split fallback
+        const unitsPerResident = unitsConsumed / targetResidentIds.length
+        const paisePerResident = Math.round(totalPaise / targetResidentIds.length)
+
+        for (const resId of targetResidentIds) {
+          await serviceClient.from('electricity_allocations').insert({
+            organization_id: orgId,
+            reading_id: reading.id,
+            resident_id: resId,
+            units_allocated: unitsPerResident,
+            amount_paise: paisePerResident,
+            allocation_method: targetResidentIds.length === 1 ? 'per_resident' : 'equal_split',
+          })
+
+          await serviceClient.from('ledger_entries').insert({
+            organization_id: orgId,
+            resident_id: resId,
+            entry_date: reading_date,
+            description: `Electricity (${meter.meter_number}${roomTag} - ${period_month}/${period_year}): ${unitsPerResident.toFixed(1)} kWh @ ₹${(ratePaise / 100).toFixed(2)}/u (${prevNum} → ${currNum})`,
+            category: 'electricity',
+            entry_type: 'charge',
+            debit_paise: paisePerResident,
+            credit_paise: 0,
+            added_by: validUserId,
+          })
+        }
       }
     }
 
@@ -243,19 +276,21 @@ export async function POST(request: NextRequest) {
         total_paise: totalPaise,
         billed_residents_count: targetResidentIds.length,
         is_update: isUpdate,
+        allocation_method: allocation_method || (allocations ? 'pro_rata_stay' : 'equal_split'),
       },
     })
 
+    const billedCount = allocations?.length || targetResidentIds.length
     return NextResponse.json({
       success: true,
       reading_id: reading.id,
       units_consumed: unitsConsumed,
       total_amount_rupees: totalPaise / 100,
-      billed_residents: targetResidentIds.length,
+      billed_residents: billedCount,
       updated: isUpdate,
       message: isUpdate
-        ? `Existing reading updated. ${unitsConsumed} kWh allocated to ${targetResidentIds.length} resident(s).`
-        : `Reading recorded successfully. ${unitsConsumed} kWh (${prevNum} → ${currNum}) billed to ${targetResidentIds.length} resident(s).`,
+        ? `Existing reading updated. ${unitsConsumed} kWh allocated to ${billedCount} resident(s).`
+        : `Reading recorded successfully. ${unitsConsumed} kWh (${prevNum} → ${currNum}) billed to ${billedCount} resident(s).`,
     })
   } catch (err: any) {
     const rawMsg = err.message || ''

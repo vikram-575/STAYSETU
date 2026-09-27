@@ -1,15 +1,17 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   Zap, ArrowLeft, CheckCircle2, AlertTriangle,
-  Users, Calculator, Loader2, BedDouble, UserCheck, Shield
+  Users, Calculator, Loader2, BedDouble, UserCheck, Shield,
+  Info
 } from 'lucide-react'
 import { formatCurrency, rupeesToPaise } from '@/lib/money'
 import { FirebaseFileUploader } from '@/components/ui/firebase-file-uploader'
-import { calculateDifferentialUnits } from '@/lib/electricity-helper'
+import { calculateDifferentialUnits, calculateProRataElectricitySplit } from '@/lib/electricity-helper'
+import { formatDate } from '@/lib/utils'
 
 export default function RecordElectricityReadingPage() {
   const router = useRouter()
@@ -31,6 +33,9 @@ export default function RecordElectricityReadingPage() {
   const [meterPhotoUrl, setMeterPhotoUrl] = useState('')
   const [notes, setNotes] = useState('')
   const [selectedMeter, setSelectedMeter] = useState<any | null>(null)
+
+  // Pro-rata strategy selection: 'pro_rata' vs 'equal'
+  const [splitStrategy, setSplitStrategy] = useState<'pro_rata' | 'equal'>('pro_rata')
 
   useEffect(() => {
     async function loadMeters() {
@@ -61,7 +66,7 @@ export default function RecordElectricityReadingPage() {
     const latest = m.latest_reading ?? 0
     setPreviousReading(latest)
     setCurrentReading(latest > 0 ? latest + 15 : 15)
-    setRatePerUnitRupees(m.default_rate_paise ? m.default_rate_paise / 100 : 10)
+    setRatePerUnitRupees(m.rate_per_unit_paise ? m.rate_per_unit_paise / 100 : 10)
   }
 
   const handleMeterChange = (meterId: string) => {
@@ -78,7 +83,25 @@ export default function RecordElectricityReadingPage() {
   // Differential calculation: current - previous
   const unitsConsumed = calculateDifferentialUnits(currentReading, previousReading, isMeterReset)
   const totalAmountRupees = Math.round(unitsConsumed * ratePerUnitRupees * 100) / 100
-  const perResidentShare = !isBedMeter && roomResidents.length > 0
+
+  // Calculate Pro-Rata Stay Split for shared room meters
+  const proRataResult = useMemo(() => {
+    if (isBedMeter || roomResidents.length <= 1) return null
+
+    const d = new Date(readingDate)
+    const month = d.getMonth() + 1
+    const year = d.getFullYear()
+
+    return calculateProRataElectricitySplit({
+      totalUnits: unitsConsumed,
+      ratePerUnitPaise: rupeesToPaise(ratePerUnitRupees),
+      periodMonth: month,
+      periodYear: year,
+      residents: roomResidents,
+    })
+  }, [isBedMeter, roomResidents, unitsConsumed, ratePerUnitRupees, readingDate])
+
+  const perResidentEqualShare = !isBedMeter && roomResidents.length > 0
     ? Math.round((totalAmountRupees / roomResidents.length) * 100) / 100
     : totalAmountRupees
 
@@ -95,24 +118,40 @@ export default function RecordElectricityReadingPage() {
 
     try {
       const now = new Date(readingDate)
+      const isProRataMode = !isBedMeter && roomResidents.length > 1 && splitStrategy === 'pro_rata' && proRataResult
+
+      const payload: any = {
+        meter_id: selectedMeterId,
+        reading_date: readingDate,
+        previous_reading: previousReading,
+        current_reading: currentReading,
+        rate_per_unit_paise: rupeesToPaise(ratePerUnitRupees),
+        is_meter_reset: isMeterReset,
+        period_month: now.getMonth() + 1,
+        period_year: now.getFullYear(),
+        notes,
+        bed_id: selectedMeter?.bed_id || null,
+        resident_id: activeResident?.id || null,
+        resident_ids: roomResidents.map((r: any) => r.resident_id),
+      }
+
+      if (isProRataMode && proRataResult.allocations.length > 0) {
+        payload.allocation_method = 'pro_rata_stay'
+        payload.allocations = proRataResult.allocations.map((a) => ({
+          resident_id: a.resident_id,
+          resident_name: a.resident_name,
+          units_allocated: a.allocated_units,
+          amount_paise: a.allocated_paise,
+          explanation: a.explanation,
+        }))
+      } else {
+        payload.per_resident_paise = rupeesToPaise(perResidentEqualShare)
+      }
+
       const res = await fetch('/api/electricity/reading', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          meter_id: selectedMeterId,
-          reading_date: readingDate,
-          previous_reading: previousReading,
-          current_reading: currentReading,
-          rate_per_unit_paise: rupeesToPaise(ratePerUnitRupees),
-          is_meter_reset: isMeterReset,
-          period_month: now.getMonth() + 1,
-          period_year: now.getFullYear(),
-          notes,
-          bed_id: selectedMeter?.bed_id || null,
-          resident_id: activeResident?.id || null,
-          resident_ids: roomResidents.map((r: any) => r.resident_id),
-          per_resident_paise: rupeesToPaise(perResidentShare),
-        }),
+        body: JSON.stringify(payload),
       })
 
       const data = await res.json()
@@ -135,7 +174,7 @@ export default function RecordElectricityReadingPage() {
           href="/dashboard/electricity"
           className="flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-gray-900 mb-1 transition"
         >
-          <ArrowLeft className="w-4 h-4" /> Cancel & Return
+          <ArrowLeft className="w-4 h-4" /> Cancel &amp; Return
         </Link>
         <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">Record Electricity Reading</h1>
         <p className="text-xs text-gray-500 font-medium">
@@ -206,7 +245,7 @@ export default function RecordElectricityReadingPage() {
                 ) : isBedMeter ? (
                   <span className="text-amber-700 font-semibold">Bed Vacant</span>
                 ) : (
-                  <strong className="text-blue-700 font-bold">{roomResidents.length} Room Occupants (Equal Split)</strong>
+                  <strong className="text-blue-700 font-bold">{roomResidents.length} Room Occupants (Stay-Split)</strong>
                 )}
               </div>
             </div>
@@ -289,7 +328,7 @@ export default function RecordElectricityReadingPage() {
         </div>
 
         {/* Calculated Differential Consumption Strip */}
-        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl sm:rounded-2xl space-y-2.5 text-xs shadow-2xs">
+        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl sm:rounded-2xl space-y-3 text-xs shadow-2xs">
           <div className="flex items-center justify-between">
             <h4 className="font-black text-gray-900 flex items-center gap-1.5">
               <Zap className="w-4 h-4 text-yellow-600 fill-current" />
@@ -319,27 +358,159 @@ export default function RecordElectricityReadingPage() {
             </div>
           </div>
 
-          <div className="pt-2 border-t border-yellow-200/60 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 text-xs">
-            {isBedMeter && activeResident ? (
-              <span className="text-emerald-800 font-bold">
-                ✓ 100% debited directly to {activeResident.full_name}&apos;s ledger (Bed {selectedMeter?.bed_label || 'A'})
-              </span>
-            ) : isBedMeter ? (
-              <span className="text-amber-800 font-semibold">
-                ℹ️ Bed currently vacant. Units recorded for meter baseline history.
-              </span>
-            ) : roomResidents.length > 0 ? (
-              <>
-                <span className="text-gray-700 font-semibold">
-                  Split equally across {roomResidents.length} room residents:
-                </span>
-                <span className="font-black text-blue-700">₹{perResidentShare.toLocaleString('en-IN')} / resident</span>
-              </>
-            ) : (
-              <span className="text-gray-500">No active residents found in room</span>
-            )}
-          </div>
+          {/* Allocation summary footer */}
+          {isBedMeter && activeResident ? (
+            <div className="pt-2 border-t border-yellow-200/60 text-xs text-emerald-800 font-bold">
+              ✓ 100% debited directly to {activeResident.full_name}&apos;s ledger (Bed {selectedMeter?.bed_label || 'A'})
+            </div>
+          ) : isBedMeter ? (
+            <div className="pt-2 border-t border-yellow-200/60 text-xs text-amber-800 font-semibold">
+              ℹ️ Bed currently vacant. Units recorded for meter baseline history.
+            </div>
+          ) : roomResidents.length === 0 ? (
+            <div className="pt-2 border-t border-yellow-200/60 text-xs text-gray-500">
+              No active residents found in room
+            </div>
+          ) : null}
         </div>
+
+        {/* MID-MONTH PRO-RATA USAGE BREAKDOWN FOR SHARED ROOM METERS */}
+        {!isBedMeter && roomResidents.length > 1 && proRataResult && (
+          <div className="p-4 sm:p-5 bg-white border border-gray-200 rounded-xl sm:rounded-2xl space-y-3.5 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Calculator className="w-4 h-4 text-yellow-600" />
+                <h4 className="text-xs sm:text-sm font-bold text-gray-900">
+                  Room Electricity Allocation Strategy
+                </h4>
+              </div>
+
+              {proRataResult.hasMidMonthMovement && (
+                <span className="px-2 py-0.5 bg-amber-100 text-amber-800 border border-amber-200 rounded-full text-[10px] font-bold">
+                  Mid-Month Move-In Detected
+                </span>
+              )}
+            </div>
+
+            {/* Explanatory Banner if Mid-Month Shift occurred */}
+            {proRataResult.hasMidMonthMovement && (
+              <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl space-y-1.5 text-xs">
+                <p className="font-bold text-amber-900 flex items-center gap-1.5">
+                  <Info className="w-3.5 h-3.5 shrink-0 text-amber-700" />
+                  Mid-Month Pro-Rata Formula Applied:
+                </p>
+                <p className="text-[11px] text-amber-800 leading-relaxed">
+                  Solo days before roommate moved in are paid <strong>100% by the early occupant</strong>.
+                  Shared days when both lived together are <strong>divided 50/50 equally</strong>.
+                </p>
+              </div>
+            )}
+
+            {/* Strategy Radio Selector */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <label
+                className={`p-3 rounded-xl border cursor-pointer transition flex items-start gap-2.5 ${
+                  splitStrategy === 'pro_rata'
+                    ? 'bg-yellow-50/60 border-yellow-400 text-gray-900 shadow-2xs'
+                    : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="splitStrategy"
+                  checked={splitStrategy === 'pro_rata'}
+                  onChange={() => setSplitStrategy('pro_rata')}
+                  className="mt-0.5 accent-yellow-500"
+                />
+                <div>
+                  <strong className="block text-xs font-bold">Stay-Adjusted Pro-Rata (Fair)</strong>
+                  <span className="text-[10px] text-gray-500 block mt-0.5">
+                    Calculates bill by exact days lived in room this month.
+                  </span>
+                </div>
+              </label>
+
+              <label
+                className={`p-3 rounded-xl border cursor-pointer transition flex items-start gap-2.5 ${
+                  splitStrategy === 'equal'
+                    ? 'bg-yellow-50/60 border-yellow-400 text-gray-900 shadow-2xs'
+                    : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="splitStrategy"
+                  checked={splitStrategy === 'equal'}
+                  onChange={() => setSplitStrategy('equal')}
+                  className="mt-0.5 accent-yellow-500"
+                />
+                <div>
+                  <strong className="block text-xs font-bold">Simple Equal Split</strong>
+                  <span className="text-[10px] text-gray-500 block mt-0.5">
+                    Divide total bill equally ({roomResidents.length} ways) regardless of stay days.
+                  </span>
+                </div>
+              </label>
+            </div>
+
+            {/* Resident Breakdown Cards */}
+            <div className="space-y-2 pt-2 border-t border-gray-100">
+              <span className="text-[10px] uppercase font-bold text-gray-500 block">
+                Resulting Ledger Charges Per Resident:
+              </span>
+
+              {splitStrategy === 'pro_rata' ? (
+                proRataResult.allocations.map((alloc) => (
+                  <div
+                    key={alloc.resident_id}
+                    className="p-3 bg-gray-50 hover:bg-yellow-50/30 rounded-xl border border-gray-200 transition space-y-1.5"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <strong className="text-xs font-bold text-gray-900">{alloc.resident_name}</strong>
+                        <p className="text-[10px] text-gray-500">
+                          Bed {alloc.bed_label || 'A'} · Checked in {formatDate(alloc.check_in_date)} ·{' '}
+                          <strong className="text-gray-800">{alloc.active_days} of {proRataResult.daysInMonth} days active</strong>
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-sm font-black text-green-700">
+                          {formatCurrency(alloc.allocated_paise)}
+                        </span>
+                        <span className="text-[10px] text-gray-500 block font-mono font-bold">
+                          {alloc.allocated_units} kWh ({alloc.percentage}%)
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-gray-600 font-medium">
+                      ℹ️ {alloc.explanation}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                roomResidents.map((r: any) => (
+                  <div
+                    key={r.resident_id}
+                    className="p-3 bg-gray-50 rounded-xl border border-gray-200 flex items-center justify-between"
+                  >
+                    <div>
+                      <strong className="text-xs font-bold text-gray-900">{r.resident_name}</strong>
+                      <p className="text-[10px] text-gray-500">Bed {r.bed_label || 'A'} · Equal Room Split</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm font-black text-green-700">
+                        {formatCurrency(rupeesToPaise(perResidentEqualShare))}
+                      </span>
+                      <span className="text-[10px] text-gray-500 block font-mono font-bold">
+                        {(unitsConsumed / roomResidents.length).toFixed(1)} kWh ({(100 / roomResidents.length).toFixed(1)}%)
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
 
         <FirebaseFileUploader
           label="Upload Sub-Meter Snapshot Photo (Optional)"
@@ -362,12 +533,12 @@ export default function RecordElectricityReadingPage() {
 
         <div className="pt-3 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-[11px] text-gray-500">
-            ℹ️ Posting this reading will calculate differential units and debit the resident&apos;s ledger directly.
+            ℹ️ Posting this reading will calculate differential units and debit each resident&apos;s ledger directly.
           </p>
           <button
             type="submit"
             disabled={submitting}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-yellow-500 hover:bg-yellow-600 active:scale-95 disabled:bg-yellow-300 text-gray-950 rounded-xl text-xs font-bold transition shadow-xs shrink-0"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-yellow-500 hover:bg-yellow-600 active:scale-95 disabled:bg-yellow-300 text-gray-950 rounded-xl text-xs font-bold transition shadow-xs shrink-0 cursor-pointer"
           >
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
             {submitting ? 'Recording...' : 'Post Reading & Bill Resident'}
