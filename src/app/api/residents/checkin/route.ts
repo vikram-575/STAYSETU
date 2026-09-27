@@ -6,6 +6,7 @@ import { generateTenantId, cleanMobile } from '@/lib/profiles'
 import { createDocument, getDocument, queryCollection } from '@/lib/firebase/firestore'
 import { isProtectedSuperAdminIdentity } from '@/lib/admin-auth'
 import { applyVerifiedKYCToResident, normalizeDobToIso, formatMaskedAadhaar } from '@/lib/kyc/sync-kyc'
+import { formatMeterNotes, generateBedMeterNumber } from '@/lib/electricity-helper'
 
 /**
  * GET /api/residents/checkin
@@ -545,6 +546,129 @@ export async function POST(request: NextRequest) {
             notes: `Aadhaar ID recorded: ${formatMaskedAadhaar(id_number)}`,
           })
         } catch {}
+      }
+    }
+
+    // 5c. Bed Electricity Sub-Meter Setup & Baseline Reading (Differential billing)
+    const {
+      track_electricity,
+      meter_number,
+      initial_meter_reading,
+      electricity_rate_per_unit,
+    } = body
+
+    if (
+      track_electricity &&
+      initial_meter_reading !== undefined &&
+      initial_meter_reading !== null &&
+      initial_meter_reading !== ''
+    ) {
+      try {
+        const startUnits = parseFloat(initial_meter_reading)
+        if (!isNaN(startUnits) && startUnits >= 0) {
+          // Fetch room info for standard naming
+          const { data: roomInfo } = await serviceClient
+            .from('rooms')
+            .select('id, room_number, floors(building_id, buildings(property_id))')
+            .eq('id', bed.room_id)
+            .maybeSingle()
+
+          const roomNumber = roomInfo?.room_number || 'RM'
+          const propertyId = (roomInfo as any)?.floors?.buildings?.property_id || null
+
+          // Fetch bed details
+          const { data: bedDetails } = await serviceClient
+            .from('beds')
+            .select('id, bed_label')
+            .eq('id', bed_id)
+            .maybeSingle()
+
+          const bedLabel = bedDetails?.bed_label || 'A'
+          const cleanMeterNumber = (
+            meter_number?.trim() || generateBedMeterNumber(roomNumber, bedLabel)
+          ).toUpperCase()
+
+          // Check if meter already exists
+          const { data: existingMeter } = await serviceClient
+            .from('electricity_meters')
+            .select('id')
+            .eq('organization_id', orgId)
+            .eq('meter_number', cleanMeterNumber)
+            .maybeSingle()
+
+          const meterNotes = formatMeterNotes({
+            bed_id,
+            bed_label: bedLabel,
+            resident_id: resident.id,
+            resident_name: full_name.trim(),
+            resident_phone: cleanedPhone,
+            room_number: roomNumber,
+            custom_note: `Bed ${bedLabel} sub-meter for ${full_name.trim()}`,
+          })
+
+          let effectiveMeterId: string | null = null
+
+          if (existingMeter) {
+            effectiveMeterId = existingMeter.id
+            await serviceClient
+              .from('electricity_meters')
+              .update({
+                room_id: bed.room_id,
+                allocation_method: 'per_resident',
+                notes: meterNotes,
+                is_active: true,
+              })
+              .eq('id', existingMeter.id)
+          } else {
+            const { data: createdMeter } = await serviceClient
+              .from('electricity_meters')
+              .insert({
+                organization_id: orgId,
+                property_id: propertyId,
+                room_id: bed.room_id,
+                meter_number: cleanMeterNumber,
+                meter_type: 'sub',
+                allocation_method: 'per_resident',
+                notes: meterNotes,
+                is_active: true,
+              })
+              .select('id')
+              .single()
+
+            if (createdMeter) {
+              effectiveMeterId = createdMeter.id
+            }
+          }
+
+          if (effectiveMeterId) {
+            const rateRupees = parseFloat(electricity_rate_per_unit) || 10
+            const ratePaise = Math.round(rateRupees * 100)
+            const checkInDateObj = new Date(effectiveCheckIn)
+            const periodMonth = checkInDateObj.getMonth() + 1
+            const periodYear = checkInDateObj.getFullYear()
+
+            // Save baseline opening reading in electricity_readings
+            // previous_reading = startUnits, current_reading = startUnits, is_meter_reset = true
+            // Result: units_consumed = 0, total_paise = 0
+            // Billing starts from this baseline reading!
+            await serviceClient.from('electricity_readings').insert({
+              organization_id: orgId,
+              meter_id: effectiveMeterId,
+              reading_date: effectiveCheckIn,
+              previous_reading: startUnits,
+              current_reading: startUnits,
+              rate_per_unit_paise: ratePaise,
+              is_meter_reset: true,
+              reset_note: `Resident onboarding baseline: ${startUnits} kWh (${full_name.trim()}, Bed ${bedLabel})`,
+              period_month: periodMonth,
+              period_year: periodYear,
+              notes: `Starting unit baseline: ${startUnits} kWh`,
+              recorded_by: validUserId,
+            })
+          }
+        }
+      } catch (elecErr: any) {
+        console.warn('[Checkin Bed Electricity Setup Warning]:', elecErr?.message)
       }
     }
 

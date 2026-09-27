@@ -9,7 +9,7 @@ import {
   Phone, Lock, Sparkles, RefreshCw, KeyRound, AlertCircle, Check,
   UserCheck, ShieldCheck, MapPin, Contact, ScanFace, ExternalLink,
   AlertTriangle, Camera, Upload, Trash2, Plus, Eye, Paperclip,
-  Image as ImageIcon
+  Image as ImageIcon, Zap
 } from 'lucide-react'
 import { formatCurrency, rupeesToPaise } from '@/lib/money'
 import { FirebaseFileUploader } from '@/components/ui/firebase-file-uploader'
@@ -24,6 +24,7 @@ import {
   normalizeIndianState,
   normalizeDistrict,
 } from '@/lib/india-locations'
+import { generateBedMeterNumber } from '@/lib/electricity-helper'
 
 /**
  * Splits a full name string into First Name, Middle Name, and Last Name components
@@ -317,6 +318,11 @@ export default function CheckInResidentPage() {
     monthly_rent_rupees: 6000,
     billing_cycle_day: 1,
     proration_policy: 'daily',
+    // Bed Electricity Sub-Meter & Baseline Reading (Differential billing)
+    track_electricity: true,
+    meter_number: '',
+    initial_meter_reading: '',
+    electricity_rate_per_unit: 10,
     // Step 6: Security Deposit
     deposit_amount_rupees: 10000,
     deposit_payment_method: 'upi',
@@ -430,12 +436,27 @@ export default function CheckInResidentPage() {
     const roomObj = inventory.rooms.find((rm) => rm.id === roomId)
     const roomBeds = inventory.beds.filter((bd) => bd.room_id === roomId && bd.status === 'available')
     const firstBed = roomBeds[0] || null
+    const suggestedMeter = roomObj && firstBed ? generateBedMeterNumber(roomObj.room_number, firstBed.bed_label) : ''
 
     setForm((prev) => ({
       ...prev,
       room_id: roomId,
       bed_id: firstBed?.id || '',
+      meter_number: (!prev.meter_number || prev.meter_number.startsWith('MTR-')) ? (suggestedMeter || prev.meter_number) : prev.meter_number,
       monthly_rent_rupees: roomObj?.base_rent_paise ? roomObj.base_rent_paise / 100 : prev.monthly_rent_rupees,
+    }))
+  }
+
+  const handleBedSelect = (bedId: string, bedLabel?: string) => {
+    const selectedBed = inventory.beds.find((b) => b.id === bedId)
+    const label = bedLabel || selectedBed?.bed_label || 'A'
+    const currentRoom = inventory.rooms.find((r) => r.id === (selectedBed?.room_id || form.room_id))
+    const suggestedMeter = currentRoom ? generateBedMeterNumber(currentRoom.room_number, label) : ''
+
+    setForm((prev) => ({
+      ...prev,
+      bed_id: bedId,
+      meter_number: (!prev.meter_number || prev.meter_number.startsWith('MTR-')) ? (suggestedMeter || prev.meter_number) : prev.meter_number,
     }))
   }
 
@@ -2158,7 +2179,7 @@ export default function CheckInResidentPage() {
                             <button
                               type="button"
                               key={b.id}
-                              onClick={() => setForm({ ...form, bed_id: b.id })}
+                              onClick={() => handleBedSelect(b.id, b.bed_label)}
                               className={`p-3 rounded-2xl border text-center transition active:scale-95 cursor-pointer ${
                                 form.bed_id === b.id
                                   ? 'bg-[#14532D] text-white border-[#14532D] shadow-xs'
@@ -2225,6 +2246,94 @@ export default function CheckInResidentPage() {
                       <option value={10}>10th of Month</option>
                     </select>
                   </div>
+                </div>
+
+                {/* Bed Electricity Sub-Meter & Baseline Reading (Differential billing) */}
+                <div className="rounded-2xl border border-yellow-200/90 bg-yellow-50/40 p-4 sm:p-5 space-y-3.5 shadow-2xs">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-yellow-500 text-gray-950 flex items-center justify-center font-black shadow-xs">
+                        <Zap className="w-4 h-4 fill-current" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-black text-gray-900">
+                          Bed-Wise Electricity Sub-Meter &amp; Opening Units
+                        </h4>
+                        <p className="text-[11px] text-gray-500">
+                          Set opening meter unit baseline. Billing starts from this reading on future reading uploads.
+                        </p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={form.track_electricity}
+                        onChange={(e) => setForm({ ...form, track_electricity: e.target.checked })}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-yellow-500"></div>
+                    </label>
+                  </div>
+
+                  {form.track_electricity && (
+                    <div className="space-y-3 pt-2 border-t border-yellow-200/60">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-800 mb-1">
+                            Bed Meter Number / Serial *
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. MTR-101-A"
+                            value={form.meter_number}
+                            onChange={(e) => setForm({ ...form, meter_number: e.target.value.toUpperCase() })}
+                            className="w-full px-3.5 py-2.5 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-yellow-500 outline-none font-mono font-bold uppercase bg-white"
+                          />
+                          <p className="text-[10px] text-gray-400 mt-0.5">Assigned sub-meter for this specific bed</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-gray-800 mb-1">
+                            Opening Meter Unit (kWh) *
+                          </label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            placeholder="e.g. 1450.0"
+                            value={form.initial_meter_reading}
+                            onChange={(e) => setForm({ ...form, initial_meter_reading: e.target.value })}
+                            className="w-full px-3.5 py-2.5 text-xs border border-yellow-300 rounded-xl focus:ring-2 focus:ring-yellow-500 outline-none font-mono font-extrabold text-blue-900 bg-white"
+                          />
+                          <p className="text-[10px] text-emerald-700 font-semibold mt-0.5">
+                            Baseline unit (0 units charged on check-in)
+                          </p>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-gray-800 mb-1">
+                            Rate per Unit (₹/kWh) *
+                          </label>
+                          <input
+                            type="number"
+                            step="0.5"
+                            min="1"
+                            value={form.electricity_rate_per_unit}
+                            onChange={(e) => setForm({ ...form, electricity_rate_per_unit: Number(e.target.value) })}
+                            className="w-full px-3.5 py-2.5 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-yellow-500 outline-none font-bold bg-white"
+                          />
+                          <p className="text-[10px] text-gray-400 mt-0.5">Electricity tariff for this bed</p>
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-yellow-100/70 rounded-xl border border-yellow-200/90 text-xs text-yellow-950 leading-relaxed flex items-start gap-2">
+                        <span className="font-black text-yellow-800 shrink-0">⚡ Differential Billing:</span>
+                        <span>
+                          Person bill starts from <strong>{form.initial_meter_reading || '0.0'} kWh</strong>. When the next reading (e.g. <strong>1,520 kWh</strong>) is uploaded, the system will automatically <strong>minus {form.initial_meter_reading || '0.0'}</strong> to charge only the differential units consumed directly to this resident.
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -2297,6 +2406,14 @@ export default function CheckInResidentPage() {
                     <span className="text-gray-500">Security Deposit:</span>
                     <span className="font-bold text-emerald-800">₹{form.deposit_amount_rupees.toLocaleString('en-IN')} ({form.deposit_payment_method.toUpperCase()})</span>
                   </div>
+                  {form.track_electricity && (
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-gray-500">Bed Electricity Meter:</span>
+                      <span className="font-bold text-yellow-800">
+                        {form.meter_number || 'Auto-linked'} (Baseline: {form.initial_meter_reading || '0.0'} kWh @ ₹{form.electricity_rate_per_unit}/u)
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center pt-1 border-t border-gray-200">
                     <span className="text-gray-500">Aadhaar e-KYC:</span>
                     {sandboxAadhaarVerified ? (

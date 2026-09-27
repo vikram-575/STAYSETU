@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getAuthenticatedUser } from '@/lib/auth-session'
 import { resolveEffectiveOrgId } from '@/lib/org-helper'
+import { parseMeterNotes, calculateDifferentialUnits } from '@/lib/electricity-helper'
 
 const isUuid = (id: string | null | undefined): boolean => {
   if (!id) return false
@@ -10,7 +11,8 @@ const isUuid = (id: string | null | undefined): boolean => {
 
 /**
  * POST /api/electricity/reading
- * Stores meter reading, calculates units, splits among room residents and debits their ledgers
+ * Stores meter reading, calculates differential units (current - previous),
+ * and debits the assigned resident's ledger directly (Bed-wise) or splits among room residents.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -29,32 +31,76 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const {
-      meter_id, reading_date, previous_reading, current_reading,
-      rate_per_unit_paise, is_meter_reset, period_month, period_year,
-      notes, resident_ids, per_resident_paise
+      meter_id,
+      reading_date,
+      previous_reading,
+      current_reading,
+      rate_per_unit_paise,
+      is_meter_reset,
+      period_month,
+      period_year,
+      notes,
+      resident_ids,
+      resident_id,
+      bed_id,
+      per_resident_paise,
     } = body
 
     if (!meter_id || !reading_date || current_reading === undefined || !rate_per_unit_paise) {
       return NextResponse.json({ error: 'Missing required reading fields' }, { status: 400 })
     }
 
-    if (!is_meter_reset && current_reading < previous_reading) {
-      return NextResponse.json({ error: 'Current reading cannot be lower than previous reading without meter reset' }, { status: 400 })
+    const prevNum = parseFloat(previous_reading) || 0
+    const currNum = parseFloat(current_reading) || 0
+    const ratePaise = parseInt(rate_per_unit_paise) || 1000
+
+    if (!is_meter_reset && currNum < prevNum) {
+      return NextResponse.json(
+        { error: `Current reading (${currNum}) cannot be lower than previous reading (${prevNum}) without meter reset.` },
+        { status: 400 }
+      )
     }
 
     // Verify meter belongs to organization
-    const { data: meter } = await serviceClient
+    const { data: meter, error: meterFetchErr } = await serviceClient
       .from('electricity_meters')
-      .select('id, meter_number, room_id')
+      .select('id, meter_number, meter_type, allocation_method, room_id, notes, rooms(id, room_number)')
       .eq('id', meter_id)
       .eq('organization_id', orgId)
       .single()
 
-    if (!meter) {
+    if (meterFetchErr || !meter) {
       return NextResponse.json({ error: 'Meter not found in this organization' }, { status: 404 })
     }
 
     const validUserId = isUuid(user.id) ? user.id : null
+    const meta = parseMeterNotes(meter.notes)
+    const effectiveBedId = bed_id || meta.bed_id
+
+    // Determine target residents for this meter
+    let targetResidentIds: string[] = []
+
+    // A. Bed-Wise: If meter is linked to a specific bed or resident
+    if (resident_id) {
+      targetResidentIds = [resident_id]
+    } else if (effectiveBedId) {
+      // Find active resident assigned to this bed
+      const { data: bedAssignment } = await serviceClient
+        .from('resident_assignments')
+        .select('resident_id, residents(id, full_name)')
+        .eq('bed_id', effectiveBedId)
+        .is('check_out_date', null)
+        .maybeSingle()
+
+      if (bedAssignment?.resident_id) {
+        targetResidentIds = [bedAssignment.resident_id]
+      }
+    }
+
+    // B. Fallback: If not bed-specific or bed vacant, use provided resident_ids
+    if (targetResidentIds.length === 0 && Array.isArray(resident_ids) && resident_ids.length > 0) {
+      targetResidentIds = resident_ids
+    }
 
     // 1. Check if a reading for this meter and period already exists (non-reset)
     let reading: any = null
@@ -76,9 +122,9 @@ export async function POST(request: NextRequest) {
           .from('electricity_readings')
           .update({
             reading_date,
-            previous_reading,
-            current_reading,
-            rate_per_unit_paise,
+            previous_reading: prevNum,
+            current_reading: currNum,
+            rate_per_unit_paise: ratePaise,
             notes: notes || null,
             recorded_by: validUserId,
           })
@@ -87,42 +133,39 @@ export async function POST(request: NextRequest) {
           .single()
 
         if (updateError || !updated) {
-          return NextResponse.json({
-            error: updateError?.message || 'Failed to update existing meter reading'
-          }, { status: 500 })
+          return NextResponse.json(
+            { error: updateError?.message || 'Failed to update existing meter reading' },
+            { status: 500 }
+          )
         }
         reading = updated
 
-        // Delete previous allocations for this reading to recreate them cleanly
-        await serviceClient
-          .from('electricity_allocations')
-          .delete()
-          .eq('reading_id', existing.id)
+        // Delete previous allocations and ledger entries for this reading to recreate them cleanly
+        await serviceClient.from('electricity_allocations').delete().eq('reading_id', existing.id)
 
-        // Clean up previous electricity ledger entries for this meter and period if replacing
-        if (resident_ids && resident_ids.length > 0) {
+        if (targetResidentIds.length > 0) {
           await serviceClient
             .from('ledger_entries')
             .delete()
             .eq('organization_id', orgId)
             .eq('category', 'electricity')
             .like('description', `Electricity (${meter.meter_number}%`)
-            .in('resident_id', resident_ids)
+            .in('resident_id', targetResidentIds)
         }
       }
     }
 
     if (!reading) {
-      // Insert new Reading
+      // Insert new Reading (PostgreSQL generated columns compute units_consumed & total_paise)
       const { data: inserted, error: readError } = await serviceClient
         .from('electricity_readings')
         .insert({
           organization_id: orgId,
           meter_id,
           reading_date,
-          previous_reading,
-          current_reading,
-          rate_per_unit_paise,
+          previous_reading: prevNum,
+          current_reading: currNum,
+          rate_per_unit_paise: ratePaise,
           is_meter_reset: !!is_meter_reset,
           period_month,
           period_year,
@@ -134,37 +177,50 @@ export async function POST(request: NextRequest) {
 
       if (readError || !inserted) {
         if (readError?.code === '23505' || readError?.message?.includes('idx_unique_meter_reading_period')) {
-          return NextResponse.json({
-            error: `A reading for this meter has already been recorded for period ${period_month}/${period_year}. You can modify the reading date or update the existing period.`
-          }, { status: 409 })
+          return NextResponse.json(
+            {
+              error: `A reading for meter ${meter.meter_number} has already been recorded for period ${period_month}/${period_year}. You can update or re-record with a different period.`,
+            },
+            { status: 409 }
+          )
         }
         return NextResponse.json({ error: readError?.message || 'Failed to record meter reading' }, { status: 500 })
       }
       reading = inserted
     }
 
-    // 2. Post Split Charges to Resident Ledgers
-    if (resident_ids && resident_ids.length > 0 && per_resident_paise > 0) {
-      const unitsPerResident = (reading.units_consumed || Math.max(0, current_reading - previous_reading)) / resident_ids.length
-      for (const resId of resident_ids) {
+    // 2. Compute Differential Units and Post Ledger Charges
+    // Differential units = current_reading - previous_reading
+    const unitsConsumed = is_meter_reset ? currNum : Math.max(0, currNum - prevNum)
+    const totalPaise = Math.round(unitsConsumed * ratePaise)
+
+    if (targetResidentIds.length > 0 && unitsConsumed > 0 && totalPaise > 0) {
+      const unitsPerResident = unitsConsumed / targetResidentIds.length
+      const paisePerResident = Math.round(totalPaise / targetResidentIds.length)
+
+      const bedTag = meta.bed_label ? ` · Bed ${meta.bed_label}` : ''
+      const roomTag = (meter as any).rooms?.room_number ? ` (Room ${(meter as any).rooms.room_number}${bedTag})` : ''
+
+      for (const resId of targetResidentIds) {
+        // Record allocation
         await serviceClient.from('electricity_allocations').insert({
           organization_id: orgId,
           reading_id: reading.id,
           resident_id: resId,
           units_allocated: unitsPerResident,
-          amount_paise: per_resident_paise,
-          allocation_method: 'equal_split',
+          amount_paise: paisePerResident,
+          allocation_method: targetResidentIds.length === 1 ? 'per_resident' : 'equal_split',
         })
 
-        // Post Debit Entry to Resident's Ledger
+        // Post Direct Debit Entry to Resident's Ledger
         await serviceClient.from('ledger_entries').insert({
           organization_id: orgId,
           resident_id: resId,
           entry_date: reading_date,
-          description: `Electricity (${meter.meter_number} - ${period_month}/${period_year}): ${unitsPerResident.toFixed(1)} units @ ₹${(rate_per_unit_paise / 100).toFixed(2)}/u`,
+          description: `Electricity (${meter.meter_number}${roomTag} - ${period_month}/${period_year}): ${unitsPerResident.toFixed(1)} kWh @ ₹${(ratePaise / 100).toFixed(2)}/u (${prevNum} → ${currNum})`,
           category: 'electricity',
           entry_type: 'charge',
-          debit_paise: per_resident_paise,
+          debit_paise: paisePerResident,
           credit_paise: 0,
           added_by: validUserId,
         })
@@ -178,22 +234,38 @@ export async function POST(request: NextRequest) {
       action: isUpdate ? 'update' : 'create',
       entity_type: 'electricity_reading',
       entity_id: reading.id,
-      entity_label: `${isUpdate ? 'Updated' : 'Recorded'} reading ${current_reading} on meter ${meter.meter_number}`,
-      after_data: { units_consumed: reading.units_consumed, rate_per_unit_paise, is_update: isUpdate },
+      entity_label: `${isUpdate ? 'Updated' : 'Recorded'} reading ${currNum} on meter ${meter.meter_number} (${unitsConsumed} units)`,
+      after_data: {
+        units_consumed: unitsConsumed,
+        previous_reading: prevNum,
+        current_reading: currNum,
+        rate_per_unit_paise: ratePaise,
+        total_paise: totalPaise,
+        billed_residents_count: targetResidentIds.length,
+        is_update: isUpdate,
+      },
     })
 
     return NextResponse.json({
       success: true,
       reading_id: reading.id,
+      units_consumed: unitsConsumed,
+      total_amount_rupees: totalPaise / 100,
+      billed_residents: targetResidentIds.length,
       updated: isUpdate,
-      message: isUpdate ? 'Existing reading updated successfully' : 'Meter reading recorded successfully'
+      message: isUpdate
+        ? `Existing reading updated. ${unitsConsumed} kWh allocated to ${targetResidentIds.length} resident(s).`
+        : `Reading recorded successfully. ${unitsConsumed} kWh (${prevNum} → ${currNum}) billed to ${targetResidentIds.length} resident(s).`,
     })
   } catch (err: any) {
     const rawMsg = err.message || ''
     if (rawMsg.includes('idx_unique_meter_reading_period') || rawMsg.includes('duplicate key')) {
-      return NextResponse.json({
-        error: 'A reading has already been recorded for this meter in the selected period. The system prevented a duplicate entry.'
-      }, { status: 409 })
+      return NextResponse.json(
+        {
+          error: 'A reading has already been recorded for this meter in the selected period.',
+        },
+        { status: 409 }
+      )
     }
     return NextResponse.json({ error: rawMsg || 'Electricity reading submission failed' }, { status: 500 })
   }
