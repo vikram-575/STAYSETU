@@ -174,8 +174,47 @@ export async function applyVerifiedKYCToResident(params: ApplyKYCParams) {
       .eq('id', existingAadhaarDoc.id)
   }
 
-  // 5. If Photo exists, ensure photo document exists in resident_documents
+  // 5a. Ensure Official Aadhaar KYC Photo is permanently preserved in resident_documents
+  const officialAadhaarPhoto = extractedData?.photo_base64 || null
+  if (officialAadhaarPhoto) {
+    const { data: existingAadhaarPhotoDoc } = await supabase
+      .from('resident_documents')
+      .select('id')
+      .eq('resident_id', residentId)
+      .eq('doc_type', 'aadhaar_photo')
+      .maybeSingle()
+
+    if (!existingAadhaarPhotoDoc) {
+      await supabase.from('resident_documents').insert({
+        id: crypto.randomUUID(),
+        organization_id: effectiveOrgId,
+        resident_id: residentId,
+        doc_type: 'aadhaar_photo',
+        doc_name: 'Official UIDAI Aadhaar KYC Photo',
+        file_url: officialAadhaarPhoto,
+        status: 'verified',
+        verified_by: actorUserId,
+        verified_at: now,
+        notes: 'Official UIDAI photo fetched via Sandbox Aadhaar e-KYC. Permanent government record.',
+        created_at: now,
+        updated_at: now,
+      })
+    } else {
+      await supabase
+        .from('resident_documents')
+        .update({
+          file_url: officialAadhaarPhoto,
+          status: 'verified',
+          verified_at: now,
+          updated_at: now,
+        })
+        .eq('id', existingAadhaarPhotoDoc.id)
+    }
+  }
+
+  // 5b. If Profile Photo exists, ensure active profile photo document exists in resident_documents
   if (effectivePhoto) {
+    const isCustom = photoUrl && photoUrl !== officialAadhaarPhoto
     const { data: existingPhotoDoc } = await supabase
       .from('resident_documents')
       .select('id')
@@ -189,12 +228,12 @@ export async function applyVerifiedKYCToResident(params: ApplyKYCParams) {
         organization_id: effectiveOrgId,
         resident_id: residentId,
         doc_type: 'photo',
-        doc_name: 'Resident Live Photo (Profile)',
+        doc_name: isCustom ? 'Resident Custom Profile Photo' : 'Resident Live Photo (Profile)',
         file_url: effectivePhoto,
         status: 'verified',
         verified_by: actorUserId,
         verified_at: now,
-        notes: 'Captured and verified during Aadhaar KYC',
+        notes: isCustom ? 'Uploaded custom profile picture' : 'Captured and verified during Aadhaar KYC',
         created_at: now,
         updated_at: now,
       })
@@ -203,6 +242,7 @@ export async function applyVerifiedKYCToResident(params: ApplyKYCParams) {
         .from('resident_documents')
         .update({
           file_url: effectivePhoto,
+          doc_name: isCustom ? 'Resident Custom Profile Photo' : 'Resident Live Photo (Profile)',
           status: 'verified',
           verified_at: now,
           updated_at: now,

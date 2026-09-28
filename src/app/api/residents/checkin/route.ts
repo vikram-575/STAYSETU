@@ -191,7 +191,7 @@ export async function POST(request: NextRequest) {
       full_name, phone, alternate_phone, email, date_of_birth, gender,
       permanent_address, permanent_city, permanent_state, permanent_pincode,
       emergency_name, emergency_phone, emergency_relation,
-      id_type, id_number, photo_url, notes,
+      id_type, id_number, photo_url, aadhaar_photo_url, custom_photo_url, notes,
       bed_id, check_in_date, monthly_rent_paise, billing_cycle_day, proration_policy,
       deposit_amount_paise, deposit_payment_method,
       sandbox_kyc,
@@ -510,12 +510,28 @@ export async function POST(request: NextRequest) {
           extractedData: sandbox_kyc.extracted_data,
           provider: 'UIDAI Official Aadhaar e-KYC',
           actorUserId: validUserId,
-          photoUrl: photo_url || sandbox_kyc.extracted_data?.photo_base64 || null,
+          photoUrl: custom_photo_url || photo_url || sandbox_kyc.extracted_data?.photo_base64 || null,
         })
       } catch (kycSyncErr: any) {
         console.warn('[Checkin KYC Sync Warning]:', kycSyncErr?.message)
       }
     } else {
+      if (aadhaar_photo_url) {
+        try {
+          await serviceClient.from('resident_documents').insert({
+            id: crypto.randomUUID(),
+            organization_id: orgId,
+            resident_id: resident.id,
+            doc_type: 'aadhaar_photo',
+            doc_name: 'Official UIDAI Aadhaar KYC Photo',
+            file_url: aadhaar_photo_url,
+            status: 'verified',
+            verified_by: validUserId,
+            verified_at: new Date().toISOString(),
+            notes: 'Official UIDAI photo fetched via Aadhaar e-KYC. Immutable.',
+          })
+        } catch {}
+      }
       if (photo_url) {
         try {
           await serviceClient.from('resident_documents').insert({
@@ -523,7 +539,7 @@ export async function POST(request: NextRequest) {
             organization_id: orgId,
             resident_id: resident.id,
             doc_type: 'photo',
-            doc_name: 'Resident Live Photo (Profile)',
+            doc_name: custom_photo_url ? 'Resident Custom Profile Photo' : 'Resident Live Photo (Profile)',
             file_url: photo_url,
             status: 'verified',
             verified_by: validUserId,

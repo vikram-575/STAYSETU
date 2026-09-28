@@ -144,7 +144,8 @@ export default function CheckInResidentPage() {
         permanent_pincode: ext.address?.pincode || prev.permanent_pincode,
         id_type: 'aadhaar',
         id_number: result.masked_aadhaar || prev.id_number,
-        photo_url: ext.photo_base64 || prev.photo_url,
+        aadhaar_photo_url: ext.photo_base64 || prev.aadhaar_photo_url,
+        photo_url: prev.custom_photo_url || ext.photo_base64 || prev.photo_url,
       }))
     } else {
       setForm((prev) => ({
@@ -183,37 +184,62 @@ export default function CheckInResidentPage() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [docUploadError, setDocUploadError] = useState('')
 
-  // Handle live photo from camera or storage
+  // Handle extra/custom live photo from camera or storage
   const handleLivePhotoCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     setError('')
     setUploadingPhoto(true)
     try {
+      // 1. Instant local preview - 0ms wait!
       const reader = new FileReader()
       reader.onload = () => {
         if (typeof reader.result === 'string') {
-          setForm((prev) => ({ ...prev, photo_url: reader.result as string }))
+          const dataUrl = reader.result as string
+          setForm((prev) => ({
+            ...prev,
+            custom_photo_url: dataUrl,
+            photo_url: dataUrl,
+          }))
+          setUploadingPhoto(false)
         }
       }
       reader.readAsDataURL(file)
 
-      // Also try background upload to cloud storage
+      // 2. Background upload to cloud storage without blocking UI
       try {
         const path = `residents/photos/${form.phone || 'profile'}_${Date.now()}`
-        const uploadResult = await uploadFileToStorage(path, file)
-        if (uploadResult?.downloadUrl) {
-          setForm((prev) => ({ ...prev, photo_url: uploadResult.downloadUrl }))
-        }
+        uploadFileToStorage(path, file)
+          .then((uploadResult) => {
+            if (uploadResult?.downloadUrl) {
+              setForm((prev) => ({
+                ...prev,
+                custom_photo_url: uploadResult.downloadUrl,
+                photo_url: uploadResult.downloadUrl,
+              }))
+            }
+          })
+          .catch((cloudErr) => {
+            console.warn('Live photo cloud upload warning (using data URL):', cloudErr)
+          })
       } catch (cloudErr) {
         console.warn('Live photo cloud upload warning (using data URL):', cloudErr)
       }
     } catch (err: any) {
       setError(err?.message || 'Failed to process photo')
-    } finally {
       setUploadingPhoto(false)
+    } finally {
       e.target.value = ''
     }
+  }
+
+  // Remove custom photo and revert to official Aadhaar photo
+  const handleRemoveCustomPhoto = () => {
+    setForm((prev) => ({
+      ...prev,
+      custom_photo_url: '',
+      photo_url: prev.aadhaar_photo_url || '',
+    }))
   }
 
   // Handle uploading supporting documents
@@ -306,6 +332,8 @@ export default function CheckInResidentPage() {
     id_type: 'aadhaar',
     id_number: '',
     photo_url: '',
+    aadhaar_photo_url: '',
+    custom_photo_url: '',
     kyc_doc_url: '',
     notes: '',
     // Step 5: Room & Rent Assignment
@@ -834,6 +862,9 @@ export default function CheckInResidentPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
+          photo_url: form.custom_photo_url || form.aadhaar_photo_url || form.photo_url,
+          aadhaar_photo_url: form.aadhaar_photo_url,
+          custom_photo_url: form.custom_photo_url,
           documents,
           monthly_rent_paise: rupeesToPaise(form.monthly_rent_rupees),
           deposit_amount_paise: rupeesToPaise(form.deposit_amount_rupees),
@@ -1856,95 +1887,214 @@ export default function CheckInResidentPage() {
                   <span className="text-xs text-gray-500 font-medium">Official resident profile &amp; paperwork</span>
                 </div>
 
-                {/* 1. Live Resident Profile Picture */}
+                {/* 1. Live Resident Profile Picture & Aadhaar Photo Section */}
                 <div className="p-4 sm:p-5 bg-gradient-to-br from-emerald-50/80 via-white to-teal-50/80 border-2 border-emerald-300/80 rounded-2xl space-y-4 shadow-2xs">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <div>
                       <h4 className="text-xs sm:text-sm font-black text-gray-900 flex items-center gap-2">
                         <ScanFace className="w-4 h-4 text-emerald-700" />
-                        <span>Resident Profile Picture</span>
+                        <span>Resident Profile Picture &amp; Identity Photo</span>
                       </h4>
                       <p className="text-[11px] text-gray-600 mt-0.5">
-                        Capture a live photo from your device camera or upload from internal storage. This is saved as the official profile avatar.
+                        Official UIDAI Aadhaar photo is preserved. You can optionally add a separate profile picture.
                       </p>
                     </div>
-                    {form.photo_url && (
-                      <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-600 text-white shadow-xs">
-                        Photo Ready ✓
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-center gap-4 pt-1">
-                    {/* Photo Preview Box */}
-                    <div className="relative group shrink-0">
-                      {form.photo_url ? (
-                        <div className="relative">
-                          <img
-                            src={form.photo_url}
-                            alt="Resident Profile"
-                            className="w-24 h-28 object-cover rounded-2xl border-2 border-emerald-500 shadow-sm"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setForm((prev) => ({ ...prev, photo_url: '' }))}
-                            className="absolute -top-2 -right-2 p-1 bg-red-600 text-white rounded-full shadow-md hover:bg-red-700 transition"
-                            title="Remove photo"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="w-24 h-28 rounded-2xl bg-gray-100 border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 p-2 text-center">
-                          <Camera className="w-7 h-7 mb-1 text-gray-400" />
-                          <span className="text-[10px] font-bold">No Photo</span>
-                        </div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {form.aadhaar_photo_url && (
+                        <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                          Aadhaar Photo Verified ✓
+                        </span>
+                      )}
+                      {(form.custom_photo_url || form.photo_url) && (
+                        <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-600 text-white shadow-xs">
+                          Avatar Active ✓
+                        </span>
                       )}
                     </div>
+                  </div>
 
-                    {/* Action Buttons for Camera or Internal Storage */}
-                    <div className="flex-1 w-full space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        {/* Option A: Device Camera */}
-                        <label className="cursor-pointer flex-1 sm:flex-initial py-2.5 px-4 bg-[#14532D] hover:bg-[#166534] text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-xs active:scale-95">
-                          <Camera className="w-4 h-4" />
-                          <span>Take Live Photo (Camera)</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            capture="user"
-                            disabled={uploadingPhoto}
-                            onChange={handleLivePhotoCapture}
-                            className="hidden"
-                          />
-                        </label>
+                  {/* If Aadhaar photo was fetched via Sandbox */}
+                  {form.aadhaar_photo_url ? (
+                    <div className="space-y-3.5 pt-1">
+                      {/* CARD A: Official Aadhaar Photo (IMMUTABLE - CANNOT BE REMOVED) */}
+                      <div className="p-3.5 bg-white rounded-2xl border-2 border-emerald-200/90 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3.5">
+                          <div className="relative shrink-0">
+                            <img
+                              src={form.aadhaar_photo_url}
+                              alt="Official Aadhaar KYC Photo"
+                              className="w-20 h-24 sm:w-22 sm:h-26 object-cover rounded-xl border-2 border-emerald-500 shadow-sm"
+                            />
+                            <div className="absolute -bottom-1.5 -right-1.5 bg-emerald-600 text-white rounded-full p-1 shadow-sm" title="UIDAI Official Photo">
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-xs sm:text-sm font-black text-gray-900">
+                                Official Aadhaar KYC Photo
+                              </span>
+                              <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
+                                UIDAI Sandbox Verified
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-gray-600 leading-relaxed">
+                              Fetched automatically from UIDAI server during e-KYC. Preserved permanently in official records.
+                            </p>
+                            <div className="pt-0.5">
+                              {!form.custom_photo_url ? (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                  Currently Active as Official Profile Picture
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-500 bg-gray-50 px-2.5 py-0.5 rounded-md border border-gray-200">
+                                  Preserved in KYC Vault (Custom avatar active below)
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
 
-                        {/* Option B: Internal Storage / Device Files */}
-                        <label className="cursor-pointer flex-1 sm:flex-initial py-2.5 px-4 bg-white hover:bg-emerald-50 text-gray-800 border border-gray-300 hover:border-emerald-400 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-2xs active:scale-95">
-                          <ImageIcon className="w-4 h-4 text-emerald-700" />
-                          <span>Choose from Device / Storage</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            disabled={uploadingPhoto}
-                            onChange={handleLivePhotoCapture}
-                            className="hidden"
-                          />
-                        </label>
+                        <div className="shrink-0 w-full sm:w-auto text-left sm:text-right">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
+                            🔒 Permanent Government Record · Cannot be Deleted
+                          </span>
+                        </div>
                       </div>
 
-                      {uploadingPhoto && (
-                        <div className="flex items-center gap-2 text-xs text-emerald-800 font-bold animate-pulse">
-                          <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
-                          <span>Saving resident photo...</span>
+                      {/* CARD B: Extra Profile Picture (Optional) */}
+                      <div className="p-3.5 bg-emerald-50/40 rounded-2xl border border-emerald-200/60 space-y-3">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div>
+                            <h5 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                              <Camera className="w-3.5 h-3.5 text-emerald-700" />
+                              <span>Extra Profile Picture (Optional)</span>
+                            </h5>
+                            <p className="text-[11px] text-gray-500 mt-0.5">
+                              {!form.custom_photo_url
+                                ? 'No photo upload required! The official Aadhaar photo above is automatically used. Upload here only if the resident requests a separate selfie/avatar.'
+                                : 'Custom profile picture active. The official Aadhaar photo above remains permanently verified in the vault.'}
+                            </p>
+                          </div>
                         </div>
-                      )}
 
-                      <p className="text-[11px] text-gray-500">
-                        Recommended: Bright lighting, clear front-facing face photo. Auto-syncs to ERP resident ID and portal.
-                      </p>
+                        <div className="flex flex-col sm:flex-row items-center gap-3">
+                          {form.custom_photo_url && (
+                            <div className="relative group shrink-0">
+                              <img
+                                src={form.custom_photo_url}
+                                alt="Custom Profile Avatar"
+                                className="w-16 h-20 sm:w-20 sm:h-24 object-cover rounded-xl border-2 border-teal-500 shadow-sm"
+                              />
+                              <button
+                                type="button"
+                                onClick={handleRemoveCustomPhoto}
+                                className="absolute -top-1.5 -right-1.5 p-1 bg-red-600 text-white rounded-full shadow-md hover:bg-red-700 transition"
+                                title="Remove custom photo and use Aadhaar photo"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
+
+                          <div className="flex flex-wrap items-center gap-2 w-full">
+                            <label className="cursor-pointer flex-1 sm:flex-initial py-2 px-3.5 bg-[#14532D] hover:bg-[#166534] text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs active:scale-95">
+                              <Camera className="w-3.5 h-3.5" />
+                              <span>{form.custom_photo_url ? 'Retake Photo' : 'Take Live Photo (Camera)'}</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                capture="user"
+                                onChange={handleLivePhotoCapture}
+                                className="hidden"
+                              />
+                            </label>
+
+                            <label className="cursor-pointer flex-1 sm:flex-initial py-2 px-3.5 bg-white hover:bg-emerald-50 text-gray-800 border border-gray-300 hover:border-emerald-400 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-2xs active:scale-95">
+                              <ImageIcon className="w-3.5 h-3.5 text-emerald-700" />
+                              <span>{form.custom_photo_url ? 'Change File' : 'Choose from Device / Storage'}</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleLivePhotoCapture}
+                                className="hidden"
+                              />
+                            </label>
+
+                            {form.custom_photo_url && (
+                              <button
+                                type="button"
+                                onClick={handleRemoveCustomPhoto}
+                                className="py-2 px-3 text-xs font-bold text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl border border-red-200 transition"
+                              >
+                                Revert to Aadhaar Photo
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    /* Standard capture when Aadhaar has not been fetched */
+                    <div className="flex flex-col sm:flex-row items-center gap-4 pt-1">
+                      <div className="relative group shrink-0">
+                        {form.photo_url ? (
+                          <div className="relative">
+                            <img
+                              src={form.photo_url}
+                              alt="Resident Profile"
+                              className="w-24 h-28 object-cover rounded-2xl border-2 border-emerald-500 shadow-sm"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setForm((prev) => ({ ...prev, photo_url: '', custom_photo_url: '' }))}
+                              className="absolute -top-2 -right-2 p-1 bg-red-600 text-white rounded-full shadow-md hover:bg-red-700 transition"
+                              title="Remove photo"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="w-24 h-28 rounded-2xl bg-gray-100 border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 p-2 text-center">
+                            <Camera className="w-7 h-7 mb-1 text-gray-400" />
+                            <span className="text-[10px] font-bold">No Photo</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex-1 w-full space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <label className="cursor-pointer flex-1 sm:flex-initial py-2.5 px-4 bg-[#14532D] hover:bg-[#166534] text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-xs active:scale-95">
+                            <Camera className="w-4 h-4" />
+                            <span>Take Live Photo (Camera)</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="user"
+                              onChange={handleLivePhotoCapture}
+                              className="hidden"
+                            />
+                          </label>
+
+                          <label className="cursor-pointer flex-1 sm:flex-initial py-2.5 px-4 bg-white hover:bg-emerald-50 text-gray-800 border border-gray-300 hover:border-emerald-400 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-2xs active:scale-95">
+                            <ImageIcon className="w-4 h-4 text-emerald-700" />
+                            <span>Choose from Device / Storage</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleLivePhotoCapture}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
+
+                        <p className="text-[11px] text-gray-500">
+                          Recommended: Bright lighting, clear front-facing face photo. Auto-syncs to ERP resident ID and portal.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* 2. Supporting Document Vault (Add Multiple Documents) */}
@@ -2454,12 +2604,16 @@ export default function CheckInResidentPage() {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-500">Profile Picture:</span>
-                    {form.photo_url ? (
+                    {form.custom_photo_url ? (
                       <span className="text-emerald-700 font-bold flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Live Photo Ready ✓
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Custom Avatar Active ✓
+                      </span>
+                    ) : form.aadhaar_photo_url || form.photo_url ? (
+                      <span className="text-emerald-700 font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Official Aadhaar Photo Active ✓
                       </span>
                     ) : (
-                      <span className="text-gray-400">Not Uploaded</span>
+                      <span className="text-gray-400">Not Uploaded (Optional)</span>
                     )}
                   </div>
                   <div className="flex justify-between items-center">

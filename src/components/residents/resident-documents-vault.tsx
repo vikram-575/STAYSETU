@@ -113,6 +113,8 @@ export default function ResidentDocumentsVault({
     switch (type) {
       case 'aadhaar':
         return <FileBadge className="w-5 h-5 text-blue-600 shrink-0" />
+      case 'aadhaar_photo':
+        return <ImageIcon className="w-5 h-5 text-emerald-600 shrink-0" />
       case 'photo':
         return <ImageIcon className="w-5 h-5 text-purple-600 shrink-0" />
       case 'agreement':
@@ -150,6 +152,7 @@ export default function ResidentDocumentsVault({
           documents.map((doc) => {
             const isAadhaarCard = doc.doc_type === 'aadhaar' || doc.file_url.includes('aadhaar-card')
             const viewUrl = isAadhaarCard ? `/api/residents/${residentId}/documents/aadhaar-card` : doc.file_url
+            const isImage = (doc.doc_type === 'photo' || doc.doc_type === 'aadhaar_photo') && (doc.file_url?.startsWith('data:image') || doc.file_url?.startsWith('http'))
 
             return (
               <div
@@ -158,8 +161,12 @@ export default function ResidentDocumentsVault({
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-start gap-2.5 min-w-0">
-                    <div className="p-2 rounded-xl bg-gray-50 border border-gray-100 shrink-0">
-                      {getDocIcon(doc.doc_type)}
+                    <div className="p-1.5 rounded-xl bg-gray-50 border border-gray-100 shrink-0 flex items-center justify-center w-10 h-10 overflow-hidden">
+                      {isImage ? (
+                        <img src={doc.file_url} alt={doc.doc_name} className="w-full h-full object-cover rounded-lg" />
+                      ) : (
+                        getDocIcon(doc.doc_type)
+                      )}
                     </div>
                     <div className="min-w-0">
                       <p className="font-bold text-gray-900 truncate" title={doc.doc_name}>
