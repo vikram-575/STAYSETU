@@ -304,7 +304,7 @@ export function ListPropertyModal({ isOpen, onClose, onListingCreated }: ListPro
 
   const handleNext = () => {
     if (currentStep === 8 && formData.imageUrls.length < 5 && !hasConfirmedPhotoNotice) {
-      setPhotoError(`Notice: Minimum 5 photos recommended (Currently ${formData.imageUrls.length}/5). Click "+ Add 5 Sample Photos" or click "Next Step" again to proceed.`)
+      setPhotoError(`Notice: Minimum 5 photos recommended (Currently ${formData.imageUrls.length}/5). Upload photos or click "Next Step" again to proceed.`)
       setHasConfirmedPhotoNotice(true)
       return
     }
@@ -961,15 +961,6 @@ export function ListPropertyModal({ isOpen, onClose, onListingCreated }: ListPro
                         </div>
                       </div>
 
-                      {/* 1-Click Quick Fill Button */}
-                      <button
-                        type="button"
-                        onClick={handleAddSamplePhotos}
-                        className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-white px-3 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-50 transition shadow-2xs cursor-pointer"
-                      >
-                        <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                        <span>+ Add 5 Verified Sample Photos</span>
-                      </button>
                     </div>
                   </div>
 
@@ -986,7 +977,7 @@ export function ListPropertyModal({ isOpen, onClose, onListingCreated }: ListPro
 
                     {formData.imageUrls.length === 0 ? (
                       <div className="rounded-2xl border border-dashed border-gray-300 p-6 text-center text-xs text-gray-500">
-                        No photos added yet. Click &quot;Upload from device&quot; or &quot;Add 5 Verified Sample Photos&quot; above.
+                        No photos added yet. Snap with your phone camera or upload images from your device above.
                       </div>
                     ) : (
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 max-h-[290px] overflow-y-auto pr-1">

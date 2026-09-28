@@ -849,8 +849,8 @@ function MyProfileContent() {
               <span className="text-sm sm:text-base font-black text-[#14532D] tracking-tight block">
                 {isOwner ? 'PG Owner & Host Portal' : 'PG-Setu Member'}
               </span>
-              <span className="text-[10px] text-gray-400 font-semibold block sm:hidden">
-                {isOwner ? `Host ID: ${uniqueId.slice(0, 12)}` : `Universal ID: ${uniqueId.slice(0, 10)}...`}
+              <span className="text-[10px] text-emerald-600 font-bold block sm:hidden">
+                {isOwner ? '✓ Verified PG Host' : '✓ Verified Member'}
               </span>
             </div>
           </div>
@@ -969,33 +969,38 @@ function MyProfileContent() {
               </div>
             </div>
 
-            {/* Universal ID Box */}
-            <div className="w-full sm:w-auto rounded-2xl bg-black/25 backdrop-blur-md p-3 border border-white/10 flex items-center justify-between sm:justify-end gap-3">
-              <div>
-                <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-300/80 block">
-                  {isOwner ? 'PG Owner Host ID' : 'Unique Tenant ID'}
-                </span>
-                <span className="font-mono text-xs sm:text-sm font-black tracking-wide text-white block">
-                  {uniqueId}
-                </span>
+            {/* Direct Scannable QR Code on Card (Replaces Host ID) */}
+            <div
+              onClick={() => setIsQrModalOpen(true)}
+              className="w-full sm:w-auto rounded-2xl bg-black/35 backdrop-blur-md p-2.5 sm:p-3 border border-white/15 flex items-center justify-between sm:justify-end gap-3 cursor-pointer hover:bg-black/45 hover:border-white/25 active:scale-98 transition group shadow-md"
+              title="Click to view full-size QR code"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-xl bg-white p-1 shadow-sm flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(
+                      isOwner
+                        ? (hostedProperties[0]?.upi_id ? `upi://pay?pa=${hostedProperties[0].upi_id}&pn=${encodeURIComponent(currentUser?.full_name || 'PG Owner')}` : (currentUser?.upi_id ? `upi://pay?pa=${currentUser.upi_id}` : 'upi://pay?pa=pg--ukqu@upi'))
+                        : `PGSETU:${uniqueId}`
+                    )}`}
+                    alt="Direct Scannable QR"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <div className="text-left">
+                  <div className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-emerald-300">
+                    <QrCode className="h-3 w-3 text-emerald-400" />
+                    <span>{isOwner ? 'Scannable UPI QR' : 'Identity Pass QR'}</span>
+                  </div>
+                  <span className="font-mono text-xs sm:text-sm font-black text-white block truncate max-w-[140px] sm:max-w-[160px]">
+                    {isOwner ? (hostedProperties[0]?.upi_id || currentUser?.upi_id || 'pg--ukqu@upi') : uniqueId}
+                  </span>
+                  <span className="text-[10px] text-emerald-200/80 font-medium group-hover:text-emerald-200 flex items-center gap-1 mt-0.5">
+                    <span>Tap to view QR</span>
+                    <span>🔍</span>
+                  </span>
+                </div>
               </div>
-              <button
-                onClick={() => handleCopyId(uniqueId)}
-                className="flex items-center gap-1 rounded-xl bg-white/15 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-white/25 active:scale-95 transition cursor-pointer"
-                title="Copy ID"
-              >
-                {copied ? (
-                  <>
-                    <Check className="h-3.5 w-3.5 text-emerald-300" />
-                    <span className="text-[10px]">Copied</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-3.5 w-3.5 text-emerald-200" />
-                    <span className="text-[10px]">Copy</span>
-                  </>
-                )}
-              </button>
             </div>
           </div>
 
@@ -2921,29 +2926,34 @@ function MyProfileContent() {
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#DCFCE7] text-[#14532D] mb-3">
               <QrCode className="h-6 w-6 text-[#16A34A]" />
             </div>
-            <h3 className="text-base font-black text-gray-900">Gate & Identity QR Code</h3>
-            <p className="text-xs text-gray-500 mt-0.5">Show this to PG Warden or biometric gate reader</p>
+            <h3 className="text-base font-black text-gray-900">
+              {isOwner ? 'PG UPI & Check-In QR' : 'Gate & Identity QR Code'}
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {isOwner
+                ? 'Scan with any UPI app to pay rent directly to PG bank account'
+                : 'Show this to PG Warden or biometric gate reader'}
+            </p>
 
-            {/* Simulated Vector QR Graphic */}
+            {/* Real High-Res QR Graphic */}
             <div className="my-4 p-4 rounded-2xl bg-gray-50 border border-gray-200 flex flex-col items-center justify-center">
-              <div className="h-40 w-40 bg-white p-3 rounded-xl shadow-xs border border-gray-200 flex flex-col items-center justify-center gap-2">
-                <div className="grid grid-cols-6 gap-1 w-full h-full p-2">
-                  {[...Array(36)].map((_, i) => (
-                    <div
-                      key={i}
-                      className={`rounded-xs ${
-                        (i % 2 === 0 && i % 3 !== 0) || i === 0 || i === 5 || i === 30 || i === 35
-                          ? 'bg-gray-900'
-                          : 'bg-transparent'
-                      }`}
-                    />
-                  ))}
-                </div>
+              <div className="h-48 w-48 bg-white p-3 rounded-2xl shadow-sm border border-gray-200 flex items-center justify-center">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
+                    isOwner
+                      ? (hostedProperties[0]?.upi_id ? `upi://pay?pa=${hostedProperties[0].upi_id}&pn=${encodeURIComponent(currentUser?.full_name || 'PG Owner')}` : (currentUser?.upi_id ? `upi://pay?pa=${currentUser.upi_id}` : 'upi://pay?pa=pg--ukqu@upi'))
+                      : `PGSETU:${uniqueId}`
+                  )}`}
+                  alt="Scannable QR Code"
+                  className="w-full h-full object-contain"
+                />
               </div>
-              <span className="font-mono text-xs font-black text-[#14532D] mt-2 block">
-                {uniqueId}
+              <span className="font-mono text-xs font-black text-[#14532D] mt-3 block">
+                {isOwner ? (hostedProperties[0]?.upi_id || currentUser?.upi_id || 'pg--ukqu@upi') : uniqueId}
               </span>
-              <span className="text-[10px] text-gray-400">Scan for instant security gate clearance</span>
+              <span className="text-[10px] text-gray-400 mt-0.5">
+                {isOwner ? 'Official Verified UPI Collection QR' : 'Scan for instant security gate clearance'}
+              </span>
             </div>
 
             <button
@@ -3297,8 +3307,8 @@ function MyProfileContent() {
                 </p>
 
                 {/* Upload Action Area */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                  <label className="sm:col-span-2 relative flex flex-col items-center justify-center border-2 border-dashed border-emerald-400 hover:border-emerald-600 bg-emerald-50/40 hover:bg-emerald-50 rounded-2xl p-4 cursor-pointer transition text-center group">
+                <div className="w-full">
+                  <label className="relative flex flex-col items-center justify-center border-2 border-dashed border-emerald-400 hover:border-emerald-600 bg-emerald-50/40 hover:bg-emerald-50 rounded-2xl p-5 cursor-pointer transition text-center group">
                     <input
                       type="file"
                       multiple
@@ -3306,28 +3316,14 @@ function MyProfileContent() {
                       onChange={handleLocalPhotoUpload}
                       className="sr-only"
                     />
-                    <UploadCloud className="h-7 w-7 text-[#14532D] mb-1 group-hover:scale-110 transition" />
+                    <UploadCloud className="h-8 w-8 text-[#14532D] mb-1.5 group-hover:scale-110 transition" />
                     <span className="text-xs font-black text-[#14532D]">
-                      {isUploadingPhotos ? 'Compressing & Adding Photos...' : 'Click to Upload Local Photos'}
+                      {isUploadingPhotos ? 'Compressing & Adding Photos...' : 'Take Camera Photo or Upload from Device'}
                     </span>
                     <span className="text-[10px] text-gray-500 mt-0.5">
-                      Select multiple JPG, PNG, WebP from phone/PC (Auto-optimized)
+                      Select JPG, PNG, WebP or snap directly from phone camera (Auto-compressed)
                     </span>
                   </label>
-
-                  <button
-                    type="button"
-                    onClick={handleAddSamplePhotos}
-                    className="flex flex-col items-center justify-center border border-emerald-200 bg-white hover:bg-emerald-50/60 rounded-2xl p-4 text-center transition cursor-pointer"
-                  >
-                    <Sparkles className="h-5 w-5 text-amber-500 mb-1" />
-                    <span className="text-xs font-bold text-gray-800">
-                      + Add Sample Photos
-                    </span>
-                    <span className="text-[10px] text-gray-500 mt-0.5">
-                      Auto-fill 5 verified sample PG photos
-                    </span>
-                  </button>
                 </div>
 
                 {/* Uploaded Photos Grid */}

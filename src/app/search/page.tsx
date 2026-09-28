@@ -31,6 +31,7 @@ import { PropertyListing, PropertyType, GenderPreference, SharingType } from '@/
 import { MarketplaceNavbar } from '@/components/marketplace/marketplace-navbar'
 import { MarketplaceFooter } from '@/components/marketplace/marketplace-footer'
 import { PropertyCard } from '@/components/marketplace/property-card'
+import { getDistanceKm } from '@/lib/geo-distance'
 import dynamic from 'next/dynamic'
 import { MobileBottomNav } from '@/components/marketplace/mobile-bottom-nav'
 import { SavedPropertiesModal } from '@/components/marketplace/saved-properties-modal'
@@ -129,6 +130,25 @@ function SearchPGContent() {
   const [filterSavedOnly, setFilterSavedOnly] = useState(false)
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
   const [copySuccess, setCopySuccess] = useState(false)
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null)
+
+  // Auto-detect browser geolocation to prioritize nearest PGs
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setUserCoords({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+          })
+        },
+        (err) => {
+          console.warn('Geolocation skipped in search page:', err?.message)
+        },
+        { timeout: 8000, enableHighAccuracy: false }
+      )
+    }
+  }, [])
 
   // Filter States initialized from URL params
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || searchParams.get('locality') || '')
@@ -145,7 +165,7 @@ function SearchPGContent() {
   const [foodOnly, setFoodOnly] = useState(searchParams.get('quickChip') === 'food' || false)
   const [zeroBrokerageOnly, setZeroBrokerageOnly] = useState(true)
   const [verifiedOnly, setVerifiedOnly] = useState(false)
-  const [sortBy, setSortBy] = useState<'recommended' | 'price_low' | 'price_high' | 'rating'>('recommended')
+  const [sortBy, setSortBy] = useState<'recommended' | 'price_low' | 'price_high' | 'rating' | 'distance'>('recommended')
 
   // Load properties from API
   useEffect(() => {
@@ -379,6 +399,18 @@ function SearchPGContent() {
         if (sortBy === 'price_low') return a.price - b.price
         if (sortBy === 'price_high') return b.price - a.price
         if (sortBy === 'rating') return (b.rating || 0) - (a.rating || 0)
+
+        // Always sort nearest to user first if distance sort is selected OR if user location is detected
+        if (sortBy === 'distance' || (userCoords && sortBy === 'recommended')) {
+          const distA = userCoords && a.coordinates?.lat && a.coordinates?.lng
+            ? getDistanceKm(userCoords.lat, userCoords.lng, a.coordinates.lat, a.coordinates.lng)
+            : 99999
+          const distB = userCoords && b.coordinates?.lat && b.coordinates?.lng
+            ? getDistanceKm(userCoords.lat, userCoords.lng, b.coordinates.lat, b.coordinates.lng)
+            : 99999
+          if (distA !== distB) return distA - distB
+        }
+
         // Recommended default: featured, superhost, verified first
         const scoreA = (a.featured ? 4 : 0) + (a.superHost ? 2 : 0) + (a.verified ? 1 : 0)
         const scoreB = (b.featured ? 4 : 0) + (b.superHost ? 2 : 0) + (b.verified ? 1 : 0)
@@ -398,6 +430,7 @@ function SearchPGContent() {
     sortBy,
     filterSavedOnly,
     savedIds,
+    userCoords,
   ])
 
   return (
@@ -704,6 +737,12 @@ function SearchPGContent() {
                     in {selectedCity}
                   </span>
                 )}
+                {userCoords && (
+                  <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-emerald-100/90 border border-emerald-300/60 px-2 py-0.5 text-[10px] font-bold text-[#14532D]">
+                    <MapPin className="h-2.5 w-2.5 text-[#16A34A] shrink-0" />
+                    <span>Nearest to you</span>
+                  </span>
+                )}
                 {activeFiltersCount > 0 && (
                   <button
                     onClick={handleResetFilters}
@@ -722,6 +761,7 @@ function SearchPGContent() {
                   className="rounded-lg sm:rounded-xl border border-gray-200 bg-[#F7FAF7] py-1 pl-2 pr-6 text-[11px] sm:text-xs font-bold text-[#17211B] focus:border-[#16A34A] focus:outline-hidden transition"
                 >
                   <option value="recommended">Recommended</option>
+                  <option value="distance">Nearest to You</option>
                   <option value="price_low">Price: Low to High</option>
                   <option value="price_high">Price: High to Low</option>
                   <option value="rating">Top Rated</option>
@@ -825,6 +865,11 @@ function SearchPGContent() {
                   <PropertyCard
                     key={prop.id}
                     property={prop}
+                    distanceKm={
+                      userCoords && prop.coordinates?.lat && prop.coordinates?.lng
+                        ? getDistanceKm(userCoords.lat, userCoords.lng, prop.coordinates.lat, prop.coordinates.lng)
+                        : undefined
+                    }
                     onSelectDetails={(p) => router.push(`/property/${p.id}`)}
                     isSaved={savedIds.includes(prop.id)}
                     onToggleSave={handleToggleSave}

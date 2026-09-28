@@ -29,6 +29,7 @@ interface PropertyCardProps {
   onToggleSave?: (propertyId: string) => void
   isCompared?: boolean
   onToggleCompare?: (property: PropertyListing) => void
+  distanceKm?: number
 }
 
 function formatAmenity(raw: string): string {
@@ -49,6 +50,7 @@ export function PropertyCard({
   onToggleSave,
   isCompared = false,
   onToggleCompare,
+  distanceKm,
 }: PropertyCardProps) {
   const router = useRouter()
   const [currentImageIdx, setCurrentImageIdx] = useState(0)
@@ -78,13 +80,6 @@ export function PropertyCard({
     }
   }
 
-  const handleCompareClick = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (onToggleCompare) {
-      onToggleCompare(property)
-    }
-  }
-
   const getGenderBadge = () => {
     switch (property.genderPreference) {
       case 'girls':
@@ -99,6 +94,9 @@ export function PropertyCard({
   }
 
   const gender = getGenderBadge()
+
+  // Format Street Address
+  const streetAddress = property.fullAddress || (property.locality && property.locality.toLowerCase() !== property.city.toLowerCase() ? `${property.locality}, ${property.city}` : `${property.city || 'India'}`)
 
   return (
     <div
@@ -128,9 +126,10 @@ export function PropertyCard({
               Zero Brokerage
             </span>
           )}
-          {property.superHost && (
-            <span className="hidden sm:inline-block rounded-md bg-[#FEF3C7] px-2 py-0.5 text-[10px] font-bold text-[#F59E0B] shadow-xs">
-              ★ Super Host
+          {distanceKm !== undefined && (
+            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-950/85 backdrop-blur-xs px-2 py-0.5 text-[9px] sm:text-[10px] font-black text-emerald-300 border border-emerald-400/40 shadow-xs">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>{distanceKm < 1 ? `${Math.round(distanceKm * 1000)}m away` : `${distanceKm.toFixed(1)} km away`}</span>
             </span>
           )}
         </div>
@@ -150,7 +149,7 @@ export function PropertyCard({
           </button>
         </div>
 
-        {/* Carousel Controls (Always touch accessible on mobile, hover on desktop) */}
+        {/* Carousel Controls */}
         {property.images.length > 1 && (
           <div className="absolute inset-y-0 inset-x-1 sm:inset-x-2 flex items-center justify-between opacity-80 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 z-10">
             <button
@@ -198,8 +197,8 @@ export function PropertyCard({
         )}
       </div>
 
-      {/* Card Body */}
-      <div className="flex flex-1 flex-col justify-between p-2 sm:p-4">
+      {/* Card Body - Required Information Only */}
+      <div className="flex flex-1 flex-col justify-between p-2.5 sm:p-4">
         <div>
           {/* Gender & Availability Pill */}
           <div className="flex items-center justify-between text-xs gap-1">
@@ -208,39 +207,33 @@ export function PropertyCard({
             </span>
             <span className="font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-lg truncate text-xs">
               {property.availableBeds > 0
-                ? `${property.availableBeds} beds`
-                : 'Limited'}
+                ? `${property.availableBeds} beds available`
+                : 'Full / Limited'}
             </span>
           </div>
 
-          {/* Title */}
-          <h3 className="mt-1 sm:mt-2 text-xs sm:text-base font-bold text-[#17211B] line-clamp-1 group-hover:text-[#16A34A] transition leading-tight">
+          {/* PG Name */}
+          <h3 className="mt-1.5 text-sm sm:text-base font-black text-[#17211B] line-clamp-1 group-hover:text-[#16A34A] transition leading-tight">
             {property.title}
           </h3>
 
-          {/* Locality */}
-          <div className="mt-0.5 sm:mt-1 flex items-center gap-1 text-xs text-[#647067]">
-            <MapPin className="h-3.5 w-3.5 text-[#16A34A] shrink-0" />
-            <span className="truncate">
-              {property.locality}, {property.city}
+          {/* Street Address */}
+          <div className="mt-1 flex items-start gap-1 text-xs text-[#647067]">
+            <MapPin className="h-3.5 w-3.5 text-[#16A34A] shrink-0 mt-0.5" />
+            <span className="line-clamp-1 font-medium" title={streetAddress}>
+              {streetAddress}
             </span>
           </div>
 
-          {/* Distance to Metro (Issue 5 Fix: standardized text-xs (12px) for readability) */}
-          <div className="hidden sm:flex mt-0.5 items-center gap-1.5 text-xs text-[#647067]">
-            <Train className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-            <span className="truncate">{property.distanceToMetro}</span>
-          </div>
-
           {/* Key Amenities Preview */}
-          <div className="mt-1 sm:mt-2.5 flex flex-wrap gap-1 sm:gap-1.5 border-t border-gray-100 pt-1 sm:pt-2">
+          <div className="mt-2 flex flex-wrap gap-1 border-t border-gray-100 pt-2">
             {property.foodIncluded && (
               <span className="inline-flex items-center gap-1 rounded-lg bg-[#DCFCE7]/70 px-2 py-0.5 text-xs font-semibold text-[#14532D]">
                 <Utensils className="h-2.5 w-2.5" />
                 <span>Meals</span>
               </span>
             )}
-            {property.amenities.slice(0, 1).map((amenity, i) => (
+            {property.amenities.slice(0, 2).map((amenity, i) => (
               <span
                 key={i}
                 className="rounded-lg bg-gray-100 px-2 py-0.5 text-xs font-medium text-[#17211B] truncate max-w-[110px]"
@@ -248,70 +241,33 @@ export function PropertyCard({
                 {formatAmenity(amenity)}
               </span>
             ))}
-            {property.amenities.slice(1, 3).map((amenity, i) => (
-              <span
-                key={i}
-                className="hidden sm:inline-block rounded-lg bg-gray-100 px-2 py-0.5 text-xs font-medium text-[#17211B]"
-              >
-                {formatAmenity(amenity)}
-              </span>
-            ))}
-            {property.amenities.length > 3 && (
-              <span className="hidden sm:inline-block rounded-lg bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-[#647067]">
-                +{property.amenities.length - 3}
+            {property.amenities.length > 2 && (
+              <span className="rounded-lg bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-[#647067]">
+                +{property.amenities.length - 2}
               </span>
             )}
           </div>
         </div>
 
-        {/* Pricing & Bottom Action Row */}
-        <div className="mt-2 sm:mt-3 border-t border-gray-100 pt-2 sm:pt-2.5">
-          <div className="flex items-center justify-between gap-1.5 sm:gap-2">
+        {/* Pricing Row - Clean and Direct (No View Button) */}
+        <div className="mt-3 border-t border-gray-100 pt-2.5">
+          <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
               <div className="flex items-baseline gap-1">
-                <span className="text-sm sm:text-xl font-extrabold text-[#14532D]">
+                <span className="text-base sm:text-xl font-black text-[#14532D]">
                   ₹{property.price.toLocaleString('en-IN')}
                 </span>
                 <span className="text-xs text-[#647067]">/mo</span>
               </div>
-              <p className="hidden sm:block text-xs text-[#647067] truncate">
+              <p className="text-[11px] text-[#647067] truncate">
                 Deposit: ₹{property.deposit.toLocaleString('en-IN')}
               </p>
             </div>
 
-            {/* Quick Action Buttons (Issues 16 & 22 Fix: Prominent View CTA + Labeled Compare Button) */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              {/* Compare Button (Issue 22 Fix: Explicit label & tooltip) */}
-              <button
-                type="button"
-                onClick={handleCompareClick}
-                aria-label={isCompared ? 'Remove from comparison' : 'Compare this property'}
-                title={isCompared ? 'Remove from comparison' : 'Compare this property'}
-                className={`hidden sm:flex h-9 px-2.5 items-center gap-1 rounded-xl border text-xs transition active:scale-95 cursor-pointer ${
-                  isCompared
-                    ? 'border-[#16A34A] bg-[#DCFCE7] text-[#14532D] font-bold'
-                    : 'border-gray-200 text-[#647067] hover:border-gray-300 hover:text-[#17211B]'
-                }`}
-              >
-                <GitCompare className="h-3.5 w-3.5" aria-hidden="true" />
-                <span className="text-xs font-semibold hidden md:inline">Compare</span>
-              </button>
-
-              {/* View Details CTA (Issue 16 Fix: Prominent height & visual emphasis) */}
-              <Link
-                href={`/property/${property.id}`}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  if (onSelectDetails) {
-                    onSelectDetails(property)
-                  }
-                }}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#14532D] hover:bg-[#166534] px-3.5 py-2 sm:px-4 sm:py-2 text-xs font-bold text-white shadow-xs transition active:scale-95 cursor-pointer"
-              >
-                <span>View</span>
-                <Eye className="h-3.5 w-3.5" aria-hidden="true" />
-              </Link>
-            </div>
+            <span className="text-xs font-bold text-[#16A34A] group-hover:underline flex items-center gap-0.5">
+              <span>Explore</span>
+              <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+            </span>
           </div>
         </div>
       </div>

@@ -142,6 +142,42 @@ export async function GET(request: NextRequest) {
         ? settings.images
         : PROPERTY_IMAGE_SETS[index % PROPERTY_IMAGE_SETS.length]
 
+      const CITY_COORDINATES: Record<string, { lat: number; lng: number }> = {
+        banda: { lat: 25.4754, lng: 80.3347 },
+        noida: { lat: 28.5355, lng: 77.391 },
+        'greater noida': { lat: 28.4744, lng: 77.504 },
+        delhi: { lat: 28.6139, lng: 77.209 },
+        'delhi ncr': { lat: 28.6139, lng: 77.209 },
+        gurgaon: { lat: 28.4595, lng: 77.0266 },
+        gurugram: { lat: 28.4595, lng: 77.0266 },
+        bangalore: { lat: 12.9716, lng: 77.5946 },
+        bengaluru: { lat: 12.9716, lng: 77.5946 },
+        pune: { lat: 18.5204, lng: 73.8567 },
+        hyderabad: { lat: 17.385, lng: 78.4867 },
+        mumbai: { lat: 19.076, lng: 72.8777 },
+        chennai: { lat: 13.0827, lng: 80.2707 },
+        kolkata: { lat: 22.5726, lng: 88.3639 },
+        lucknow: { lat: 26.8467, lng: 80.9462 },
+        kanpur: { lat: 26.4499, lng: 80.3319 },
+        jaipur: { lat: 26.9124, lng: 75.7873 },
+        ahmedabad: { lat: 23.0225, lng: 72.5714 },
+        indore: { lat: 22.7196, lng: 75.8577 },
+        bhopal: { lat: 23.2599, lng: 77.4126 },
+        varanasi: { lat: 25.3176, lng: 82.9739 },
+        prayagraj: { lat: 25.4358, lng: 81.8463 },
+        allahabad: { lat: 25.4358, lng: 81.8463 },
+        chandigarh: { lat: 30.7333, lng: 76.7794 },
+        dehradun: { lat: 30.3165, lng: 78.0322 },
+        kota: { lat: 25.2138, lng: 75.8648 },
+      }
+
+      const defaultCityCoords = prop.city
+        ? CITY_COORDINATES[prop.city.toLowerCase().trim()] || { lat: 28.5355, lng: 77.391 }
+        : { lat: 28.5355, lng: 77.391 }
+
+      const resolvedCoords = settings.coordinates || defaultCityCoords
+      const resolvedAddress = prop.address || settings.street_address || settings.address || `${prop.name}, ${prop.city || 'India'}`
+
       return {
         id: prop.id,
         title: prop.name,
@@ -151,7 +187,7 @@ export async function GET(request: NextRequest) {
         genderPreference: settings.gender_preference || 'coed',
         city: prop.city || 'India',
         locality: settings.locality || prop.city || 'Central',
-        fullAddress: prop.address || `${prop.name}, ${prop.city}`,
+        fullAddress: resolvedAddress,
         pincode: prop.pincode || '',
         distanceToMetro: settings.distance_to_metro || 'Accessible to transit',
         nearestLandmark: settings.nearest_landmark || 'Main Road',
@@ -177,7 +213,7 @@ export async function GET(request: NextRequest) {
         rules: Array.isArray(settings.rules) && typeof settings.rules[0] === 'string'
           ? settings.rules
           : ['Gate closes at 11:00 PM', 'Visitors allowed during day only'],
-        coordinates: settings.coordinates || { lat: 28.5355, lng: 77.391 },
+        coordinates: resolvedCoords,
         availableFrom: settings.available_from || 'Immediate',
         totalBeds,
         availableBeds,

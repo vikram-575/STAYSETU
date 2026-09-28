@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import {
   SlidersHorizontal,
@@ -19,6 +19,7 @@ import {
 import dynamic from 'next/dynamic'
 import { PropertyListing, PropertyType, GenderPreference } from '@/types/marketplace'
 import { PropertyCard } from './property-card'
+import { getDistanceKm } from '@/lib/geo-distance'
 
 const MapDiscoveryModal = dynamic(
   () => import('./map-discovery-modal').then((mod) => mod.MapDiscoveryModal),
@@ -69,6 +70,25 @@ export function FeaturedListings({
   )
   const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid')
   const [showFilterDrawer, setShowFilterDrawer] = useState(false)
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null)
+
+  // Auto-detect user geolocation to always prioritize nearby PGs
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setUserCoords({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+          })
+        },
+        (err) => {
+          console.warn('Geolocation access skipped or unavailable:', err?.message)
+        },
+        { timeout: 8000, enableHighAccuracy: false }
+      )
+    }
+  }, [])
 
   // Dynamically compute unique cities present in actual listings
   const availableCities = useMemo(() => {
@@ -129,9 +149,21 @@ export function FeaturedListings({
         if (sortBy === 'price_low') return a.price - b.price
         if (sortBy === 'price_high') return b.price - a.price
         if (sortBy === 'rating') return b.rating - a.rating
-        return b.reviewCount - a.reviewCount // recommended
+
+        // Proximity first: if user location is detected, sort nearest properties first
+        if (userCoords) {
+          const distA = a.coordinates?.lat && a.coordinates?.lng
+            ? getDistanceKm(userCoords.lat, userCoords.lng, a.coordinates.lat, a.coordinates.lng)
+            : 99999
+          const distB = b.coordinates?.lat && b.coordinates?.lng
+            ? getDistanceKm(userCoords.lat, userCoords.lng, b.coordinates.lat, b.coordinates.lng)
+            : 99999
+          if (distA !== distB) return distA - distB
+        }
+
+        return b.reviewCount - a.reviewCount // recommended fallback
       })
-  }, [properties, activeCity, activeTab, searchQuery, selectedSharing, maxBudget, foodOnly, sortBy])
+  }, [properties, activeCity, activeTab, searchQuery, selectedSharing, maxBudget, foodOnly, sortBy, userCoords])
 
   const resetFilters = () => {
     setActiveTab('all')
@@ -148,9 +180,17 @@ export function FeaturedListings({
         {/* Section Header */}
         <div className="flex flex-col gap-2 sm:gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <div className="inline-flex items-center gap-1.5 rounded-full bg-[#DCFCE7] px-3 py-1 text-xs font-bold text-[#14532D]">
-              <Sparkles className="h-3.5 w-3.5 text-[#16A34A]" />
-              <span>Verified Market Feed</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-[#DCFCE7] px-3 py-1 text-xs font-bold text-[#14532D]">
+                <Sparkles className="h-3.5 w-3.5 text-[#16A34A]" />
+                <span>Verified Market Feed</span>
+              </div>
+              {userCoords && (
+                <div className="inline-flex items-center gap-1 rounded-full bg-emerald-100/90 border border-emerald-300/60 px-2.5 py-0.5 text-[11px] font-bold text-[#14532D] animate-in fade-in">
+                  <MapPin className="h-3 w-3 text-[#16A34A] shrink-0" />
+                  <span>Showing spaces nearest to your location</span>
+                </div>
+              )}
             </div>
             <Link href="/search" className="group flex items-center gap-2 mt-1.5">
               <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-[#14532D] group-hover:text-[#16A34A] transition">
@@ -284,6 +324,11 @@ export function FeaturedListings({
                   <PropertyCard
                     key={property.id}
                     property={property}
+                    distanceKm={
+                      userCoords && property.coordinates?.lat && property.coordinates?.lng
+                        ? getDistanceKm(userCoords.lat, userCoords.lng, property.coordinates.lat, property.coordinates.lng)
+                        : undefined
+                    }
                     onSelectDetails={onSelectDetails}
                     isSaved={savedIds.includes(property.id)}
                     onToggleSave={onToggleSave}
