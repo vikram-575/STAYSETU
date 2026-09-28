@@ -9,7 +9,7 @@ import {
   CheckCircle2, Clock, Tag, Bed, ShieldCheck, Copy, Check,
   KeyRound, PlusCircle, ExternalLink, ShieldAlert, AlertCircle, X,
   Download, FileText, Wallet, Receipt, CreditCard, ChevronRight, Award, Shield,
-  CheckCircle, MapPin, QrCode, Share2, Sparkles, Zap, Smartphone,
+  CheckCircle, MapPin, Share2, Sparkles, Zap, Smartphone,
   HeartHandshake, ChevronDown, Filter, AlertTriangle, BedDouble, TrendingUp, Plus,
   Camera, UploadCloud, Trash2, Image as ImageIcon,
   Lock, MessageSquare
@@ -52,7 +52,6 @@ function MyProfileContent() {
   const [propNoticePeriod, setPropNoticePeriod] = useState('30')
   const [propLockIn, setPropLockIn] = useState('3')
   const [propGateClosing, setPropGateClosing] = useState('11:00 PM')
-  const [propUpiId, setPropUpiId] = useState('')
   const [propAmenities, setPropAmenities] = useState<string[]>([
     'High-Speed WiFi', 'Power Backup', 'RO Water', '3 Daily Meals', 'Air Conditioning', 'CCTV Security', 'Housekeeping', 'Washing Machine'
   ])
@@ -229,8 +228,6 @@ function MyProfileContent() {
   // Modals state
   const [isEditing, setIsEditing] = useState(false)
   const [isAadhaarModalOpen, setIsAadhaarModalOpen] = useState(false)
-  const [isQrModalOpen, setIsQrModalOpen] = useState(false)
-  const [isUpiPayModalOpen, setIsUpiPayModalOpen] = useState(false)
   const [isGatePassModalOpen, setIsGatePassModalOpen] = useState(false)
 
   // Edit Profile Form State
@@ -477,7 +474,6 @@ function MyProfileContent() {
     setPropNoticePeriod(s.notice_period_days ? String(s.notice_period_days) : '30')
     setPropLockIn(s.lock_in_months ? String(s.lock_in_months) : '3')
     setPropGateClosing(s.gate_closing_time || '11:00 PM')
-    setPropUpiId(s.upi_id || currentUser?.organizations?.settings?.upi_id || '')
     if (Array.isArray(s.amenities) && s.amenities.length > 0) {
       setPropAmenities(s.amenities)
     } else {
@@ -527,7 +523,6 @@ function MyProfileContent() {
           gate_closing_time: propGateClosing,
           amenities: propAmenities,
           rules: propRules,
-          upi_id: propUpiId,
           images: propPhotos,
           coverImage: propPhotos[0] || '',
         }),
@@ -559,7 +554,6 @@ function MyProfileContent() {
           gate_closing_time: propGateClosing,
           amenities: propAmenities,
           rules: propRules,
-          upi_id: propUpiId,
           images: propPhotos,
           coverImage: propPhotos[0] || '',
         },
@@ -968,40 +962,6 @@ function MyProfileContent() {
                 </p>
               </div>
             </div>
-
-            {/* Direct Scannable QR Code on Card (Replaces Host ID) */}
-            <div
-              onClick={() => setIsQrModalOpen(true)}
-              className="w-full sm:w-auto rounded-2xl bg-black/35 backdrop-blur-md p-2.5 sm:p-3 border border-white/15 flex items-center justify-between sm:justify-end gap-3 cursor-pointer hover:bg-black/45 hover:border-white/25 active:scale-98 transition group shadow-md"
-              title="Click to view full-size QR code"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-xl bg-white p-1 shadow-sm flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform">
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(
-                      isOwner
-                        ? (hostedProperties[0]?.upi_id ? `upi://pay?pa=${hostedProperties[0].upi_id}&pn=${encodeURIComponent(currentUser?.full_name || 'PG Owner')}` : (currentUser?.upi_id ? `upi://pay?pa=${currentUser.upi_id}` : 'upi://pay?pa=pg--ukqu@upi'))
-                        : `PGSETU:${uniqueId}`
-                    )}`}
-                    alt="Direct Scannable QR"
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-                <div className="text-left">
-                  <div className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-emerald-300">
-                    <QrCode className="h-3 w-3 text-emerald-400" />
-                    <span>{isOwner ? 'Scannable UPI QR' : 'Identity Pass QR'}</span>
-                  </div>
-                  <span className="font-mono text-xs sm:text-sm font-black text-white block truncate max-w-[140px] sm:max-w-[160px]">
-                    {isOwner ? (hostedProperties[0]?.upi_id || currentUser?.upi_id || 'pg--ukqu@upi') : uniqueId}
-                  </span>
-                  <span className="text-[10px] text-emerald-200/80 font-medium group-hover:text-emerald-200 flex items-center gap-1 mt-0.5">
-                    <span>Tap to view QR</span>
-                    <span>🔍</span>
-                  </span>
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Current Stay or Hosted Property Footer */}
@@ -1064,13 +1024,7 @@ function MyProfileContent() {
                   <span>Edit</span>
                 </button>
               )}
-              <button
-                onClick={() => setIsQrModalOpen(true)}
-                className="inline-flex items-center gap-1 rounded-xl bg-white/15 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-white/25 active:scale-95 transition cursor-pointer"
-              >
-                <QrCode className="h-3 w-3 text-emerald-300" />
-                <span>Show QR</span>
-              </button>
+
               <button
                 onClick={handleShareIdCard}
                 className="inline-flex items-center gap-1 rounded-xl bg-emerald-500/30 border border-emerald-400/30 px-2.5 py-1 text-[11px] font-bold text-emerald-200 hover:bg-emerald-500/40 active:scale-95 transition cursor-pointer"
@@ -1194,18 +1148,18 @@ function MyProfileContent() {
         ) : (
           <div className="grid grid-cols-4 gap-2 sm:gap-3">
             {/* Quick Pay Rent */}
-            <button
-              onClick={() => setIsUpiPayModalOpen(true)}
+            <Link
+              href="/portal?tab=payments"
               className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-gray-200/80 shadow-xs hover:border-emerald-300 active:scale-95 transition text-center group cursor-pointer"
             >
               <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white transition">
-                <Zap className="h-4 w-4 sm:h-5 sm:w-5" />
+                <CreditCard className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
               <span className="mt-1.5 text-[10px] sm:text-xs font-bold text-gray-800 line-clamp-1">
                 Pay Rent
               </span>
-              <span className="text-[9px] text-gray-400 hidden sm:block">Instant UPI</span>
-            </button>
+              <span className="text-[9px] text-gray-400 hidden sm:block">Passbook</span>
+            </Link>
 
             {/* Quick Gate Pass */}
             <button
@@ -1626,23 +1580,7 @@ function MyProfileContent() {
                       </div>
                     </div>
 
-                    {/* UPI Auto Collection Details */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-2xl bg-emerald-50/70 border border-emerald-200/70 p-3 text-xs">
-                      <div className="flex items-center gap-2">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600 text-white">
-                          <Zap className="h-3.5 w-3.5" />
-                        </div>
-                        <div>
-                          <span className="font-bold text-[#14532D] block text-xs">Direct UPI Collection ID</span>
-                          <span className="text-[11px] font-mono text-emerald-800 font-semibold">
-                            {s.upi_id || prop.upi_id || 'Configured via Owner ERP Settings'}
-                          </span>
-                        </div>
-                      </div>
-                      <span className="text-[10px] text-emerald-700 bg-white/80 px-2 py-0.5 rounded-md border border-emerald-200 w-fit">
-                        0% Commission Direct Settlement
-                      </span>
-                    </div>
+
 
                     {/* Amenities Chips */}
                     <div>
@@ -1879,9 +1817,9 @@ function MyProfileContent() {
                       </span>
                     </div>
                     <div className="rounded-xl bg-white/80 p-2 border border-emerald-100">
-                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Direct UPI VPA</span>
-                      <span className="font-bold text-[#14532D] text-xs mt-0.5 block truncate">
-                        {hostedProperties[0]?.settings?.upi_id || currentUser?.organizations?.settings?.upi_id || 'Configured in ERP'}
+                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Gate Closing</span>
+                      <span className="font-bold text-gray-800 text-xs mt-0.5 block truncate">
+                        {hostedProperties[0]?.settings?.gate_closing_time || '11:00 PM'}
                       </span>
                     </div>
                   </div>
@@ -2063,13 +2001,13 @@ function MyProfileContent() {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setIsUpiPayModalOpen(true)}
+                      <Link
+                        href="/portal?tab=payments"
                         className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#14532D] px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#166534] active:scale-95 transition"
                       >
                         <CreditCard className="h-3.5 w-3.5" />
                         <span>Pay Due</span>
-                      </button>
+                      </Link>
                       <Link
                         href="/portal?tab=gatepass"
                         className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50 active:scale-95 transition"
@@ -2402,13 +2340,13 @@ function MyProfileContent() {
 
                   <div className="rounded-2xl bg-white p-3 space-y-1 border border-emerald-100">
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
-                      Direct Rent Payout UPI ID
+                      Primary Property Location
                     </span>
-                    <p className="font-mono font-bold text-[#14532D] text-sm truncate">
-                      {hostedProperties[0]?.settings?.upi_id || currentUser?.organizations?.settings?.upi_id || 'Not Set — Click Below to Add'}
+                    <p className="font-bold text-gray-900 text-sm truncate">
+                      {hostedProperties[0]?.address || hostedProperties[0]?.city || 'Location Configured'}
                     </p>
                     <span className="text-[10px] text-emerald-600 font-semibold block">
-                      0% Commission Direct Settlement
+                      Verified Host Location
                     </span>
                   </div>
                 </div>
@@ -2419,7 +2357,7 @@ function MyProfileContent() {
                     className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-600 bg-white px-3.5 py-2 text-xs font-bold text-[#14532D] hover:bg-emerald-50 transition cursor-pointer"
                   >
                     <Edit className="h-3.5 w-3.5" />
-                    <span>Update UPI Payout & Tariffs</span>
+                    <span>Update Property & Tariffs</span>
                   </button>
                   <a
                     href="/dashboard/settings"
@@ -2910,119 +2848,7 @@ function MyProfileContent() {
         </div>
       )}
 
-      {/* ---------------------------------------------------------- */}
-      {/* 7. MODAL 3: SHOW QR CODE MODAL */}
-      {/* ---------------------------------------------------------- */}
-      {isQrModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-          <div className="relative w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl text-center">
-            <button
-              onClick={() => setIsQrModalOpen(false)}
-              className="absolute right-4 top-4 text-gray-400 hover:text-gray-700"
-            >
-              <X className="h-5 w-5" />
-            </button>
 
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#DCFCE7] text-[#14532D] mb-3">
-              <QrCode className="h-6 w-6 text-[#16A34A]" />
-            </div>
-            <h3 className="text-base font-black text-gray-900">
-              {isOwner ? 'PG UPI & Check-In QR' : 'Gate & Identity QR Code'}
-            </h3>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {isOwner
-                ? 'Scan with any UPI app to pay rent directly to PG bank account'
-                : 'Show this to PG Warden or biometric gate reader'}
-            </p>
-
-            {/* Real High-Res QR Graphic */}
-            <div className="my-4 p-4 rounded-2xl bg-gray-50 border border-gray-200 flex flex-col items-center justify-center">
-              <div className="h-48 w-48 bg-white p-3 rounded-2xl shadow-sm border border-gray-200 flex items-center justify-center">
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
-                    isOwner
-                      ? (hostedProperties[0]?.upi_id ? `upi://pay?pa=${hostedProperties[0].upi_id}&pn=${encodeURIComponent(currentUser?.full_name || 'PG Owner')}` : (currentUser?.upi_id ? `upi://pay?pa=${currentUser.upi_id}` : 'upi://pay?pa=pg--ukqu@upi'))
-                      : `PGSETU:${uniqueId}`
-                  )}`}
-                  alt="Scannable QR Code"
-                  className="w-full h-full object-contain"
-                />
-              </div>
-              <span className="font-mono text-xs font-black text-[#14532D] mt-3 block">
-                {isOwner ? (hostedProperties[0]?.upi_id || currentUser?.upi_id || 'pg--ukqu@upi') : uniqueId}
-              </span>
-              <span className="text-[10px] text-gray-400 mt-0.5">
-                {isOwner ? 'Official Verified UPI Collection QR' : 'Scan for instant security gate clearance'}
-              </span>
-            </div>
-
-            <button
-              onClick={handleShareIdCard}
-              className="w-full py-2.5 rounded-xl bg-[#14532D] text-white text-xs font-bold hover:bg-[#166534] transition active:scale-95"
-            >
-              Share Digital Pass
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ---------------------------------------------------------- */}
-      {/* 8. MODAL 4: QUICK UPI PAY BOTTOM SHEET */}
-      {/* ---------------------------------------------------------- */}
-      {isUpiPayModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4 backdrop-blur-xs">
-          <div className="relative w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-white p-5 sm:p-6 shadow-2xl">
-            <div className="sm:hidden w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-3" />
-
-            <button
-              onClick={() => setIsUpiPayModalOpen(false)}
-              className="absolute right-4 top-4 text-gray-400 hover:text-gray-700"
-            >
-              <X className="h-5 w-5" />
-            </button>
-
-            <div className="flex items-center gap-2.5 mb-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-                <Zap className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-black text-gray-900">Instant UPI Rent Settlement</h3>
-                <p className="text-xs text-gray-500">Zero surcharge UPI auto-reconciliation</p>
-              </div>
-            </div>
-
-            <div className="rounded-2xl bg-gray-50 p-4 border border-gray-200 text-center my-3">
-              <span className="text-[10px] text-gray-400 uppercase font-bold block">Current Monthly Rent Due</span>
-              <span className="text-2xl font-black text-gray-900 block mt-0.5">
-                ₹{((activeStay?.monthly_rent_paise || 0) / 100).toLocaleString('en-IN')}
-              </span>
-              <span className="text-[11px] text-emerald-700 font-semibold block mt-0.5">
-                For {activeStay?.property_name || 'PG-Setu Member'} ({activeStay?.room_number || 'Room Pending'})
-              </span>
-            </div>
-
-            <div className="space-y-2">
-              <a
-                href={`upi://pay?pa=pgsetu@icici&pn=PGSetu%20Residency&am=${(activeStay?.monthly_rent_paise || 0) / 100}&cu=INR&tn=Rent%20Settlement`}
-                className="w-full py-3 rounded-2xl bg-gradient-to-r from-[#14532D] to-[#16A34A] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-xs active:scale-95 transition"
-              >
-                <Smartphone className="h-4 w-4" />
-                <span>Launch UPI App (GPay / PhonePe / Paytm)</span>
-              </a>
-
-              <button
-                onClick={() => {
-                  handleCopyId('pgsetu@icici')
-                  alert('UPI ID copied: pgsetu@icici')
-                }}
-                className="w-full py-2.5 rounded-2xl border border-gray-200 bg-white text-xs font-bold text-gray-700 hover:bg-gray-50 transition"
-              >
-                Copy Host UPI ID: pgsetu@icici
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ---------------------------------------------------------- */}
       {/* 9. MODAL 5: INSTANT GUEST GATE PASS */}
@@ -3441,21 +3267,7 @@ function MyProfileContent() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
-                    Direct UPI ID for Auto Rent Collection
-                  </label>
-                  <input
-                    type="text"
-                    value={propUpiId}
-                    onChange={(e) => setPropUpiId(e.target.value)}
-                    placeholder="e.g. vikram@okhdfcbank or 9876543210@upi"
-                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-300 outline-none focus:border-[#16A34A]"
-                  />
-                  <p className="text-[10px] text-gray-400 mt-1">
-                    Residents scanning the QR on profile or invoice will transfer directly to this UPI handle.
-                  </p>
-                </div>
+
               </div>
 
               {/* Amenities Selector */}
