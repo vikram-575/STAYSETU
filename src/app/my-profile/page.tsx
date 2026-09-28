@@ -229,6 +229,8 @@ function MyProfileContent() {
   const [isEditing, setIsEditing] = useState(false)
   const [isAadhaarModalOpen, setIsAadhaarModalOpen] = useState(false)
   const [isGatePassModalOpen, setIsGatePassModalOpen] = useState(false)
+  const [expandedRules, setExpandedRules] = useState<Record<string, boolean>>({})
+  const [expandedAmenities, setExpandedAmenities] = useState<Record<string, boolean>>({})
 
   // Edit Profile Form State
   const [editName, setEditName] = useState('')
@@ -1463,11 +1465,11 @@ function MyProfileContent() {
                 return (
                   <div
                     key={prop.id || idx}
-                    className="rounded-3xl border border-gray-200/80 bg-white p-4 sm:p-6 shadow-xs space-y-4"
+                    className="rounded-3xl border border-gray-200/80 bg-white p-3.5 sm:p-6 shadow-xs space-y-3 sm:space-y-4"
                   >
                     {/* Header: Title + Status + Action Buttons */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
-                      <div className="space-y-1">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 sm:pb-3 border-b border-gray-100">
+                      <div className="space-y-0.5">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="text-base sm:text-lg font-black text-gray-900">
                             {prop.name || 'PG-Setu Residence'}
@@ -1475,9 +1477,6 @@ function MyProfileContent() {
                           <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-[#14532D] flex items-center gap-1">
                             <CheckCircle2 className="h-3 w-3" />
                             Live & Verified
-                          </span>
-                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-800">
-                            Auto-Sync Supabase
                           </span>
                         </div>
                         <p className="text-xs text-gray-500 flex items-center gap-1.5 flex-wrap">
@@ -1488,21 +1487,10 @@ function MyProfileContent() {
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDeletingProperty(prop)
-                            setDeleteError('')
-                          }}
-                          className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition active:scale-95 cursor-pointer"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          <span>Delete Property</span>
-                        </button>
+                      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                         <button
                           onClick={() => handleOpenPropertyModal(prop)}
-                          className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-600 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-[#14532D] hover:bg-emerald-100 transition active:scale-95 cursor-pointer"
+                          className="inline-flex items-center gap-1 sm:gap-1.5 rounded-xl border border-emerald-600 bg-emerald-50 px-2.5 py-1.5 sm:px-3 text-xs font-bold text-[#14532D] hover:bg-emerald-100 transition active:scale-95 cursor-pointer"
                         >
                           <Edit className="h-3.5 w-3.5" />
                           <span>Edit Details</span>
@@ -1511,11 +1499,23 @@ function MyProfileContent() {
                           href="/dashboard"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#166534] transition active:scale-95 shadow-xs"
+                          className="inline-flex items-center gap-1 sm:gap-1.5 rounded-xl bg-[#14532D] px-2.5 py-1.5 sm:px-3 text-xs font-bold text-white hover:bg-[#166534] transition active:scale-95 shadow-xs"
                         >
                           <Building2 className="h-3.5 w-3.5" />
                           <span>Open ERP ↗</span>
                         </a>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDeletingProperty(prop)
+                            setDeleteError('')
+                          }}
+                          title="Delete Property"
+                          className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-2 py-1.5 sm:px-2.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition active:scale-95 cursor-pointer"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span className="hidden sm:inline">Delete</span>
+                        </button>
                       </div>
                     </div>
 
@@ -1528,14 +1528,14 @@ function MyProfileContent() {
                             <span>Property Photos ({s.images.length})</span>
                           </span>
                           <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                            {s.images.length >= 5 ? '✓ 5+ Photos Verified' : `${s.images.length}/5 Photos`}
+                            {s.images.length >= 5 ? '✓ 5+ Photos' : `${s.images.length}/5 Photos`}
                           </span>
                         </div>
                         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
                           {s.images.map((imgUrl: string, pIdx: number) => (
                             <div
                               key={pIdx}
-                              className="relative h-20 w-28 shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-gray-100 group shadow-2xs"
+                              className="relative h-16 w-24 sm:h-20 sm:w-28 shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-gray-100 group shadow-2xs"
                             >
                               <img
                                 src={imgUrl}
@@ -1555,13 +1555,31 @@ function MyProfileContent() {
 
                     {/* Description */}
                     {prop.description && (
-                      <p className="text-xs text-gray-600 leading-relaxed bg-gray-50/80 p-3 rounded-2xl border border-gray-100">
+                      <p className="text-xs text-gray-600 leading-relaxed bg-gray-50/80 p-2.5 sm:p-3 rounded-2xl border border-gray-100 line-clamp-2 sm:line-clamp-none">
                         {prop.description}
                       </p>
                     )}
 
-                    {/* Key Property Specs Grid */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 text-xs">
+                    {/* Key Property Specs */}
+                    {/* 1. Mobile Compact Bar (sm:hidden) */}
+                    <div className="sm:hidden flex items-center justify-between p-2.5 rounded-2xl bg-gradient-to-r from-[#F7FAF7] to-emerald-50/60 border border-emerald-100">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase text-gray-400 block leading-tight">Starting Rent</span>
+                        <span className="text-base font-black text-[#14532D]">{rentFormatted} <span className="text-[10px] font-normal text-gray-500">/mo</span></span>
+                      </div>
+                      <div className="flex flex-col items-end gap-0.5 text-right">
+                        <span className="inline-flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-emerald-100 text-[10px] font-bold text-gray-700">
+                          <Clock className="h-2.5 w-2.5 text-emerald-600" />
+                          <span>{s.notice_period_days || 30}d notice · {s.lock_in_months || 3}m lock</span>
+                        </span>
+                        <span className="text-[10px] text-gray-500 font-semibold">
+                          Gate: {s.gate_closing_time || '11:00 PM'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 2. Desktop Specs Grid (hidden sm:grid) */}
+                    <div className="hidden sm:grid sm:grid-cols-4 gap-3 text-xs">
                       <div className="p-2.5 rounded-xl bg-[#F7FAF7] border border-emerald-100/60">
                         <span className="text-[10px] font-bold uppercase text-gray-400 block">Starting Rent</span>
                         <span className="text-sm font-black text-[#14532D]">{rentFormatted} /mo</span>
@@ -1580,76 +1598,105 @@ function MyProfileContent() {
                       </div>
                     </div>
 
-
-
-                    {/* Amenities Chips */}
+                    {/* Amenities Chips: Responsive with mobile +X More toggle */}
                     <div>
-                      <span className="text-[11px] font-bold text-gray-600 block uppercase tracking-wider mb-2">
-                        Verified Amenities ({amenitiesList.length})
-                      </span>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">
+                          Verified Amenities ({amenitiesList.length})
+                        </span>
+                        {amenitiesList.length > 4 && (
+                          <button
+                            type="button"
+                            onClick={() => setExpandedAmenities((prev) => ({ ...prev, [prop.id]: !prev[prop.id] }))}
+                            className="text-[10px] font-bold text-[#14532D] hover:underline cursor-pointer flex items-center gap-0.5"
+                          >
+                            <span>{expandedAmenities[prop.id] ? 'Show Less' : `+${amenitiesList.length - 4} More`}</span>
+                            <ChevronDown className={`h-3 w-3 transition-transform ${expandedAmenities[prop.id] ? 'rotate-180' : ''}`} />
+                          </button>
+                        )}
+                      </div>
                       <div className="flex flex-wrap gap-1.5">
-                        {amenitiesList.map((amenity, i) => (
+                        {(expandedAmenities[prop.id] ? amenitiesList : amenitiesList.slice(0, 4)).map((amenity, i) => (
                           <span
                             key={i}
-                            className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-700"
+                            className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-0.5 sm:px-2.5 sm:py-1 text-[10px] sm:text-[11px] font-semibold text-gray-700"
                           >
-                            <Check className="h-3 w-3 text-emerald-600" />
-                            {amenity}
+                            <Check className="h-3 w-3 text-emerald-600 shrink-0" />
+                            <span>{amenity}</span>
                           </span>
                         ))}
                       </div>
                     </div>
 
-                    {/* House Rules */}
-                    <div>
-                      <span className="text-[11px] font-bold text-gray-600 block uppercase tracking-wider mb-2">
-                        House Rules & Code of Conduct
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {rulesList.map((rule, i) => (
-                          <span
-                            key={i}
-                            className="inline-flex items-center gap-1 rounded-lg bg-amber-50 border border-amber-200/60 px-2.5 py-1 text-[11px] font-semibold text-amber-900"
-                          >
-                            <Shield className="h-3 w-3 text-amber-600" />
-                            {rule}
+                    {/* House Rules: Collapsed Accordion on Mobile */}
+                    <div className="rounded-2xl border border-amber-200/70 bg-amber-50/50 p-2 sm:p-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedRules((prev) => ({ ...prev, [prop.id]: !prev[prop.id] }))}
+                        className="flex w-full items-center justify-between text-left cursor-pointer"
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Shield className="h-3.5 w-3.5 text-amber-700 shrink-0" />
+                          <span className="text-[11px] font-bold text-amber-950 truncate">
+                            House Rules & Code of Conduct ({rulesList.length})
                           </span>
-                        ))}
-                      </div>
+                          <span className="text-[10px] text-amber-800 font-medium hidden sm:inline">
+                            · Gate {s.gate_closing_time || '11:00 PM'}
+                          </span>
+                        </div>
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-900 bg-amber-200/60 px-2 py-0.5 rounded-md border border-amber-300 shrink-0 ml-2">
+                          <span>{expandedRules[prop.id] ? 'Hide' : 'View'}</span>
+                          <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${expandedRules[prop.id] ? 'rotate-180' : ''}`} />
+                        </span>
+                      </button>
+
+                      {expandedRules[prop.id] && (
+                        <div className="mt-2 pt-2 border-t border-amber-200/60 flex flex-wrap gap-1.5 animate-fadeIn">
+                          {rulesList.map((rule, i) => (
+                            <span
+                              key={i}
+                              className="inline-flex items-center gap-1 rounded-lg bg-white border border-amber-200 px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold text-amber-900 shadow-2xs"
+                            >
+                              <Shield className="h-2.5 w-2.5 text-amber-600 shrink-0" />
+                              <span>{rule}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
-                    {/* Management Quick Sub-Routes (All Open in New Tab) */}
-                    <div className="pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-xs text-gray-500 font-medium">
+                    {/* Management Quick Sub-Routes */}
+                    <div className="pt-2 sm:pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <span className="text-xs text-gray-500 font-medium hidden sm:inline">
                         Quick ERP Access:
                       </span>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto justify-between sm:justify-start">
                         <a
                           href="/dashboard/rooms"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 rounded-xl bg-gray-100 px-2.5 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-200 transition"
+                          className="inline-flex flex-1 sm:flex-initial justify-center items-center gap-1 rounded-xl bg-gray-100 px-2 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-bold text-gray-700 hover:bg-gray-200 transition"
                         >
                           <BedDouble className="h-3 w-3" />
-                          <span>Rooms & Tariffs ↗</span>
+                          <span>Rooms ↗</span>
                         </a>
                         <a
                           href="/dashboard/residents"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 rounded-xl bg-gray-100 px-2.5 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-200 transition"
+                          className="inline-flex flex-1 sm:flex-initial justify-center items-center gap-1 rounded-xl bg-gray-100 px-2 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-bold text-gray-700 hover:bg-gray-200 transition"
                         >
                           <Users className="h-3 w-3" />
-                          <span>Tenants CRM ↗</span>
+                          <span>Tenants ↗</span>
                         </a>
                         <a
                           href="/dashboard/billing"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 rounded-xl bg-gray-100 px-2.5 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-200 transition"
+                          className="inline-flex flex-1 sm:flex-initial justify-center items-center gap-1 rounded-xl bg-gray-100 px-2 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-bold text-gray-700 hover:bg-gray-200 transition"
                         >
                           <Receipt className="h-3 w-3" />
-                          <span>Billing & Rent ↗</span>
+                          <span>Billing ↗</span>
                         </a>
                       </div>
                     </div>
@@ -1797,7 +1844,26 @@ function MyProfileContent() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-emerald-100/80 text-xs">
+                  {/* Mobile Compact Overview Specs (sm:hidden) */}
+                  <div className="sm:hidden flex items-center justify-between pt-2 border-t border-emerald-100/80 text-xs">
+                    <div>
+                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Starting Rent</span>
+                      <span className="font-black text-[#14532D] text-sm mt-0.5 block">
+                        ₹{(hostedProperties[0]?.settings?.starting_rent_paise ? hostedProperties[0].settings.starting_rent_paise / 100 : (hostedProperties[0]?.settings?.starting_rent || 7500)).toLocaleString('en-IN')}/mo
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] font-bold text-gray-700 bg-white px-2 py-0.5 rounded-md border border-emerald-200 block">
+                        {hostedProperties[0]?.settings?.notice_period_days || 30}d notice · {hostedProperties[0]?.settings?.lock_in_months || 3}m lock
+                      </span>
+                      <span className="text-[10px] text-gray-500 font-semibold block mt-0.5">
+                        Gate: {hostedProperties[0]?.settings?.gate_closing_time || '11:00 PM'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Desktop 4-Card Overview Specs (hidden sm:grid) */}
+                  <div className="hidden sm:grid sm:grid-cols-4 gap-2 pt-2 border-t border-emerald-100/80 text-xs">
                     <div className="rounded-xl bg-white/80 p-2 border border-emerald-100">
                       <span className="text-[10px] text-gray-400 uppercase font-bold block">Starting Rent</span>
                       <span className="font-bold text-gray-800 text-xs mt-0.5 block">
