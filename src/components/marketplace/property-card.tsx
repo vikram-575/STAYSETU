@@ -1,24 +1,17 @@
 'use client'
 
 import React, { useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   Heart,
   Star,
   MapPin,
-  Train,
-  CheckCircle2,
   ShieldCheck,
   Utensils,
-  Wifi,
-  Wind,
-  Zap,
-  GitCompare,
-  Eye,
   ChevronLeft,
   ChevronRight,
-  Share2,
+  Sparkles,
+  ArrowRight,
 } from 'lucide-react'
 import { PropertyListing } from '@/types/marketplace'
 
@@ -48,12 +41,14 @@ export function PropertyCard({
   onSelectDetails,
   isSaved = false,
   onToggleSave,
-  isCompared = false,
-  onToggleCompare,
   distanceKm,
 }: PropertyCardProps) {
   const router = useRouter()
   const [currentImageIdx, setCurrentImageIdx] = useState(0)
+
+  // Mobile Touch Swipe State
+  const [touchStartX, setTouchStartX] = useState<number | null>(null)
+  const [touchEndX, setTouchEndX] = useState<number | null>(null)
 
   const handleCardClick = () => {
     if (onSelectDetails) {
@@ -73,6 +68,33 @@ export function PropertyCard({
     setCurrentImageIdx((prev) => (prev < property.images.length - 1 ? prev + 1 : 0))
   }
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartX(e.targetTouches[0].clientX)
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEndX(e.targetTouches[0].clientX)
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX === null || touchEndX === null) return
+    const distance = touchStartX - touchEndX
+    const minSwipeDistance = 40
+
+    if (distance > minSwipeDistance && property.images.length > 1) {
+      // Swiped Left -> Next image
+      e.stopPropagation()
+      setCurrentImageIdx((prev) => (prev < property.images.length - 1 ? prev + 1 : 0))
+    } else if (distance < -minSwipeDistance && property.images.length > 1) {
+      // Swiped Right -> Previous image
+      e.stopPropagation()
+      setCurrentImageIdx((prev) => (prev > 0 ? prev - 1 : property.images.length - 1))
+    }
+
+    setTouchStartX(null)
+    setTouchEndX(null)
+  }
+
   const handleSaveClick = (e: React.MouseEvent) => {
     e.stopPropagation()
     if (onToggleSave) {
@@ -83,113 +105,135 @@ export function PropertyCard({
   const getGenderBadge = () => {
     switch (property.genderPreference) {
       case 'girls':
-        return { label: 'Girls Only', bg: 'bg-rose-50 text-rose-700 border-rose-200' }
+        return { label: 'Girls Only', bg: 'bg-rose-50 text-rose-700 border-rose-200/80' }
       case 'boys':
-        return { label: 'Boys Only', bg: 'bg-blue-50 text-blue-700 border-blue-200' }
+        return { label: 'Boys Only', bg: 'bg-blue-50 text-blue-700 border-blue-200/80' }
       case 'coed':
-        return { label: 'Co-ed Living', bg: 'bg-purple-50 text-purple-700 border-purple-200' }
+        return { label: 'Co-ed Living', bg: 'bg-purple-50 text-purple-700 border-purple-200/80' }
       default:
-        return { label: 'All Welcome', bg: 'bg-gray-100 text-gray-700 border-gray-200' }
+        return { label: 'All Welcome', bg: 'bg-gray-100 text-gray-700 border-gray-200/80' }
     }
   }
 
   const gender = getGenderBadge()
 
   // Format Street Address
-  const streetAddress = property.fullAddress || (property.locality && property.locality.toLowerCase() !== property.city.toLowerCase() ? `${property.locality}, ${property.city}` : `${property.city || 'India'}`)
+  const streetAddress =
+    property.fullAddress ||
+    (property.locality && property.locality.toLowerCase() !== property.city.toLowerCase()
+      ? `${property.locality}, ${property.city}`
+      : `${property.city || 'India'}`)
 
   return (
     <div
       onClick={handleCardClick}
-      className="group relative flex flex-col overflow-hidden rounded-xl sm:rounded-2xl border border-gray-200/90 bg-white shadow-xs transition-all duration-200 hover:-translate-y-1 hover:border-[#16A34A]/60 hover:shadow-xl cursor-pointer"
+      className="group relative flex flex-col overflow-hidden rounded-2xl border border-gray-200/85 bg-white shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-[#16A34A]/50 hover:shadow-xl cursor-pointer"
     >
-      {/* Aspect Ratio Image Container */}
-      <div className="relative aspect-[16/11] sm:aspect-4/3 w-full overflow-hidden bg-gray-100">
+      {/* Aspect Ratio Image Container with Touch Swipe */}
+      <div
+        className="relative aspect-[16/10] sm:aspect-4/3 w-full overflow-hidden bg-gray-100 select-none"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         <img
           src={property.images[currentImageIdx] || property.coverImage}
           alt={property.title}
-          className="h-full w-full object-cover transition duration-300 group-hover:scale-103"
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           loading="lazy"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/20 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/25 pointer-events-none" />
 
         {/* Top Badges Left */}
-        <div className="absolute top-1.5 sm:top-2.5 left-1.5 sm:left-2.5 flex flex-wrap items-center gap-1 sm:gap-1.5 z-10 max-w-[calc(100%-36px)]">
+        <div className="absolute top-2.5 left-2.5 flex flex-wrap items-center gap-1.5 z-10 max-w-[calc(100%-48px)]">
           {property.verified && (
-            <span className="inline-flex items-center gap-0.5 sm:gap-1 rounded-md bg-[#16A34A] px-1 sm:px-2 py-0.5 text-[8px] sm:text-[10px] font-bold text-white shadow-xs">
-              <ShieldCheck className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#16A34A]/95 backdrop-blur-xs px-2.5 py-0.5 text-[10px] font-bold text-white shadow-xs">
+              <ShieldCheck className="h-3 w-3" />
               <span>Verified</span>
             </span>
           )}
           {property.zeroBrokerage && (
-            <span className="hidden xs:inline-block sm:inline-block rounded-md bg-[#DCFCE7] px-1 sm:px-2 py-0.5 text-[8px] sm:text-[10px] font-bold text-[#14532D] shadow-xs">
+            <span className="hidden xs:inline-block rounded-full bg-emerald-950/80 backdrop-blur-xs px-2 py-0.5 text-[10px] font-bold text-white shadow-xs">
               Zero Brokerage
             </span>
           )}
           {distanceKm !== undefined && (
-            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-950/85 backdrop-blur-xs px-2 py-0.5 text-[9px] sm:text-[10px] font-black text-emerald-300 border border-emerald-400/40 shadow-xs">
+            <span className="inline-flex items-center gap-1 rounded-full bg-black/75 backdrop-blur-xs px-2 py-0.5 text-[10px] font-black text-emerald-300 shadow-xs">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>{distanceKm < 1 ? `${Math.round(distanceKm * 1000)}m away` : `${distanceKm.toFixed(1)} km away`}</span>
+              <span>
+                {distanceKm < 1
+                  ? `${Math.round(distanceKm * 1000)}m away`
+                  : `${distanceKm.toFixed(1)} km`}
+              </span>
             </span>
           )}
         </div>
 
-        {/* Top Actions Right: Wishlist Heart */}
-        <div className="absolute top-1.5 sm:top-2.5 right-1.5 sm:right-2.5 flex items-center gap-1 z-10">
+        {/* Top Action Right: Wishlist Heart */}
+        <div className="absolute top-2.5 right-2.5 flex items-center z-10">
           <button
             onClick={handleSaveClick}
-            className={`flex h-6 w-6 sm:h-8 sm:w-8 items-center justify-center rounded-full backdrop-blur-md transition shadow-xs ${
+            className={`flex h-8 w-8 items-center justify-center rounded-full backdrop-blur-md transition-all shadow-sm active:scale-90 ${
               isSaved
-                ? 'bg-rose-500 text-white shadow-md'
-                : 'bg-white/85 text-gray-700 hover:bg-white hover:text-rose-500'
+                ? 'bg-rose-500 text-white shadow-rose-500/30'
+                : 'bg-white/90 text-gray-700 hover:bg-white hover:text-rose-500'
             }`}
             aria-label="Save to favorites"
           >
-            <Heart className={`h-3 w-3 sm:h-4 sm:w-4 ${isSaved ? 'fill-white' : ''}`} />
+            <Heart className={`h-4 w-4 ${isSaved ? 'fill-white' : ''}`} />
           </button>
         </div>
 
-        {/* Carousel Controls */}
+        {/* Desktop Carousel Controls (Hover only, hidden on mobile touch) */}
         {property.images.length > 1 && (
-          <div className="absolute inset-y-0 inset-x-1 sm:inset-x-2 flex items-center justify-between opacity-80 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 z-10">
+          <div className="hidden sm:flex absolute inset-y-0 inset-x-2 items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 pointer-events-none">
             <button
               onClick={handlePrevImage}
-              className="flex h-5 w-5 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 active:scale-90 transition"
+              className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/90 active:scale-90 transition shadow-sm"
               aria-label="Previous image"
             >
-              <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+              <ChevronLeft className="h-4 w-4" />
             </button>
             <button
               onClick={handleNextImage}
-              className="flex h-5 w-5 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 active:scale-90 transition"
+              className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/90 active:scale-90 transition shadow-sm"
               aria-label="Next image"
             >
-              <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+              <ChevronRight className="h-4 w-4" />
             </button>
           </div>
         )}
 
         {/* Bottom Image Overlay: Sharing & Rating */}
-        <div className="absolute bottom-1.5 sm:bottom-2.5 inset-x-1.5 sm:inset-x-2.5 flex items-center justify-between text-white z-10">
-          <span className="rounded-lg bg-black/60 px-2 py-0.5 text-xs font-semibold backdrop-blur-xs">
+        <div className="absolute bottom-2.5 inset-x-2.5 flex items-center justify-between text-white z-10">
+          <span className="rounded-full bg-black/65 backdrop-blur-md px-2.5 py-0.5 text-[11px] font-semibold tracking-wide">
             {property.sharingType}
           </span>
 
-          <div className="flex items-center gap-1 rounded-lg bg-white/95 px-2 py-0.5 text-xs font-bold text-[#17211B] shadow-xs">
-            <Star className="h-3 w-3 fill-[#F59E0B] text-[#F59E0B]" />
-            <span>{property.rating.toFixed(1)}</span>
-            <span className="hidden xs:inline sm:inline text-xs text-[#647067]">({property.reviewCount})</span>
-          </div>
+          {property.rating > 0 ? (
+            <div className="flex items-center gap-1 rounded-full bg-white/95 backdrop-blur-md px-2.5 py-0.5 text-[11px] font-bold text-[#17211B] shadow-xs">
+              <Star className="h-3 w-3 fill-[#F59E0B] text-[#F59E0B]" />
+              <span>{property.rating.toFixed(1)}</span>
+              {property.reviewCount > 0 && (
+                <span className="text-[10px] text-[#647067] font-medium">({property.reviewCount})</span>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 rounded-full bg-white/95 backdrop-blur-md px-2.5 py-0.5 text-[11px] font-bold text-emerald-800 shadow-xs">
+              <Sparkles className="h-3 w-3 text-emerald-600" />
+              <span>New</span>
+            </div>
+          )}
         </div>
 
-        {/* Image Dots Indicator */}
+        {/* Carousel Dots */}
         {property.images.length > 1 && (
-          <div className="absolute bottom-0.5 inset-x-0 flex justify-center gap-1">
-            {property.images.slice(0, 4).map((_, i) => (
+          <div className="absolute bottom-1 inset-x-0 flex justify-center gap-1 z-10 pointer-events-none">
+            {property.images.slice(0, 5).map((_, i) => (
               <span
                 key={i}
-                className={`h-1 rounded-full transition-all ${
-                  i === currentImageIdx ? 'w-3 bg-white' : 'w-1 bg-white/50'
+                className={`h-1 rounded-full transition-all duration-300 ${
+                  i === currentImageIdx ? 'w-3.5 bg-white shadow-xs' : 'w-1 bg-white/50'
                 }`}
               />
             ))}
@@ -197,38 +241,38 @@ export function PropertyCard({
         )}
       </div>
 
-      {/* Card Body - Required Information Only */}
-      <div className="flex flex-1 flex-col justify-between p-2.5 sm:p-4">
+      {/* Card Body */}
+      <div className="flex flex-1 flex-col justify-between p-3.5 sm:p-4">
         <div>
-          {/* Gender & Availability Pill */}
-          <div className="flex items-center justify-between text-xs gap-1">
-            <span className={`rounded-lg border px-2 py-0.5 font-bold shrink-0 text-xs ${gender.bg}`}>
+          {/* Gender & Availability Pill Row */}
+          <div className="flex items-center justify-between gap-1.5 text-xs">
+            <span className={`rounded-md border px-2 py-0.5 font-bold shrink-0 text-[11px] ${gender.bg}`}>
               {gender.label}
             </span>
-            <span className="font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-lg truncate text-xs">
+            <span className="font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md truncate text-[11px] border border-emerald-200/50">
               {property.availableBeds > 0
                 ? `${property.availableBeds} beds available`
-                : 'Full / Limited'}
+                : 'Fast Filling'}
             </span>
           </div>
 
           {/* PG Name */}
-          <h3 className="mt-1.5 text-sm sm:text-base font-black text-[#17211B] line-clamp-1 group-hover:text-[#16A34A] transition leading-tight">
+          <h3 className="mt-2 text-base sm:text-lg font-black text-[#17211B] line-clamp-1 group-hover:text-[#16A34A] transition leading-snug">
             {property.title}
           </h3>
 
           {/* Street Address */}
-          <div className="mt-1 flex items-start gap-1 text-xs text-[#647067]">
-            <MapPin className="h-3.5 w-3.5 text-[#16A34A] shrink-0 mt-0.5" />
-            <span className="line-clamp-1 font-medium" title={streetAddress}>
+          <div className="mt-1 flex items-center gap-1.5 text-xs text-[#647067]">
+            <MapPin className="h-3.5 w-3.5 text-[#16A34A] shrink-0" />
+            <span className="truncate font-medium" title={streetAddress}>
               {streetAddress}
             </span>
           </div>
 
           {/* Key Amenities Preview */}
-          <div className="mt-2 flex flex-wrap gap-1 border-t border-gray-100 pt-2">
+          <div className="mt-2.5 flex flex-wrap items-center gap-1 border-t border-gray-100 pt-2">
             {property.foodIncluded && (
-              <span className="inline-flex items-center gap-1 rounded-lg bg-[#DCFCE7]/70 px-2 py-0.5 text-xs font-semibold text-[#14532D]">
+              <span className="inline-flex items-center gap-1 rounded-md bg-[#DCFCE7] px-2 py-0.5 text-[11px] font-semibold text-[#14532D]">
                 <Utensils className="h-2.5 w-2.5" />
                 <span>Meals</span>
               </span>
@@ -236,38 +280,38 @@ export function PropertyCard({
             {property.amenities.slice(0, 2).map((amenity, i) => (
               <span
                 key={i}
-                className="rounded-lg bg-gray-100 px-2 py-0.5 text-xs font-medium text-[#17211B] truncate max-w-[110px]"
+                className="rounded-md bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-[#17211B] truncate max-w-[120px]"
               >
                 {formatAmenity(amenity)}
               </span>
             ))}
             {property.amenities.length > 2 && (
-              <span className="rounded-lg bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-[#647067]">
+              <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium text-[#647067]">
                 +{property.amenities.length - 2}
               </span>
             )}
           </div>
         </div>
 
-        {/* Pricing Row - Clean and Direct (No View Button) */}
-        <div className="mt-3 border-t border-gray-100 pt-2.5">
+        {/* Pricing & CTA Row */}
+        <div className="mt-3.5 border-t border-gray-100 pt-3">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
               <div className="flex items-baseline gap-1">
-                <span className="text-base sm:text-xl font-black text-[#14532D]">
+                <span className="text-lg sm:text-xl font-black text-[#14532D] tracking-tight">
                   ₹{property.price.toLocaleString('en-IN')}
                 </span>
-                <span className="text-xs text-[#647067]">/mo</span>
+                <span className="text-xs text-[#647067] font-semibold">/mo</span>
               </div>
-              <p className="text-[11px] text-[#647067] truncate">
+              <p className="text-[11px] text-[#647067] truncate font-medium">
                 Deposit: ₹{property.deposit.toLocaleString('en-IN')}
               </p>
             </div>
 
-            <span className="text-xs font-bold text-[#16A34A] group-hover:underline flex items-center gap-0.5">
+            <div className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#DCFCE7] text-[#14532D] text-xs font-black group-hover:bg-[#16A34A] group-hover:text-white transition shadow-2xs shrink-0">
               <span>Explore</span>
-              <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-            </span>
+              <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
+            </div>
           </div>
         </div>
       </div>

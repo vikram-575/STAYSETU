@@ -312,7 +312,7 @@ export function FeaturedListings({
           <div className="mt-5">
             {filteredProperties.length > 0 ? (
               <div
-                className={`grid gap-3 sm:gap-6 ${
+                className={`grid gap-4 sm:gap-6 ${
                   filteredProperties.length === 1
                     ? 'grid-cols-1 max-w-sm sm:max-w-md'
                     : filteredProperties.length === 2

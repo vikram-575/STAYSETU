@@ -26,6 +26,7 @@ import {
   Share2,
   ChevronDown,
   Heart,
+  Square,
 } from 'lucide-react'
 import { PropertyListing, PropertyType, GenderPreference, SharingType } from '@/types/marketplace'
 import { MarketplaceNavbar } from '@/components/marketplace/marketplace-navbar'
@@ -166,6 +167,7 @@ function SearchPGContent() {
   const [zeroBrokerageOnly, setZeroBrokerageOnly] = useState(true)
   const [verifiedOnly, setVerifiedOnly] = useState(false)
   const [sortBy, setSortBy] = useState<'recommended' | 'price_low' | 'price_high' | 'rating' | 'distance'>('recommended')
+  const [viewMode, setViewMode] = useState<'single' | 'grid'>('single')
 
   // Load properties from API
   useEffect(() => {
@@ -754,6 +756,34 @@ function SearchPGContent() {
               </div>
 
               <div className="flex items-center gap-1.5 shrink-0">
+                {/* Mobile View Switcher (Single Card vs 2-Column Compact) */}
+                <div className="flex sm:hidden items-center rounded-lg border border-gray-200 bg-[#F7FAF7] p-0.5">
+                  <button
+                    onClick={() => setViewMode('single')}
+                    className={`p-1 rounded-md transition ${
+                      viewMode === 'single'
+                        ? 'bg-white text-[#14532D] shadow-2xs font-bold'
+                        : 'text-gray-400 hover:text-gray-600'
+                    }`}
+                    title="Single Card View"
+                    aria-label="Single Card View"
+                  >
+                    <Square className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('grid')}
+                    className={`p-1 rounded-md transition ${
+                      viewMode === 'grid'
+                        ? 'bg-white text-[#14532D] shadow-2xs font-bold'
+                        : 'text-gray-400 hover:text-gray-600'
+                    }`}
+                    title="2-Column Compact View"
+                    aria-label="2-Column Compact View"
+                  >
+                    <LayoutGrid className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
                 <ArrowUpDown className="h-3 w-3 text-[#16A34A] hidden sm:inline" />
                 <select
                   value={sortBy}
@@ -860,7 +890,13 @@ function SearchPGContent() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-2 sm:gap-4 xl:grid-cols-3">
+              <div
+                className={`grid ${
+                  viewMode === 'grid'
+                    ? 'grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-3'
+                    : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6'
+                }`}
+              >
                 {filteredProperties.map((prop) => (
                   <PropertyCard
                     key={prop.id}
