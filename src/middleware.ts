@@ -12,11 +12,13 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
 
-  // Fast-path bypass for static files, favicon, manifest, etc.
+  // Fast-path bypass for static files, favicon, manifest, and health checks
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/static') ||
-    pathname.includes('.')
+    pathname.includes('.') ||
+    pathname === '/api/health' ||
+    pathname === '/health'
   ) {
     return response
   }
