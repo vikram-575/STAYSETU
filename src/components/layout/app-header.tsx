@@ -104,8 +104,8 @@ export default function AppHeader({ user, isImpersonating }: Props) {
 
           {/* Clean Executive Logo & Org Brand on Mobile */}
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#14532D] to-[#16A34A] text-white flex items-center justify-center font-black text-xs shadow-xs ring-2 ring-[#DCFCE7] shrink-0">
-              <Building2 className="w-4 h-4 stroke-[2.2]" />
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 overflow-hidden shadow-xs">
+              <img src="/logo.png" alt="PG-SETU Logo" className="w-full h-full object-contain" />
             </div>
             <div className="min-w-0 flex flex-col justify-center">
               <div className="flex items-center gap-1.5 leading-none">

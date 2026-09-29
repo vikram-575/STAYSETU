@@ -97,8 +97,8 @@ export default function SetPermanentPasswordPage() {
       <header className="border-b border-slate-800/80 bg-slate-950/60 backdrop-blur-md px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/25 border border-blue-400/30">
-              <Building2 className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-2xl flex items-center justify-center overflow-hidden shadow-lg border border-emerald-400/30 shrink-0">
+              <img src="/logo.png" alt="PG-SETU Logo" className="w-full h-full object-contain" />
             </div>
             <div>
               <div className="flex items-center gap-2">

@@ -25,7 +25,18 @@ export const metadata: Metadata = {
   title: 'PG-SETU — PropTech & PG Rental Network',
   description: 'Verified PGs, flats and co-living rentals with digital rent passbook and zero brokerage.',
   manifest: '/manifest.json',
-  icons: { icon: '/favicon.ico', apple: '/icon-192.png' },
+  icons: {
+    icon: [
+      { url: '/favicon.ico' },
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/icon.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/apple-icon.png', sizes: '180x180', type: 'image/png' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+    ],
+    shortcut: '/favicon.ico',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',

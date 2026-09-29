@@ -1,5 +1,3 @@
-import { Building2 } from 'lucide-react'
-
 export default function GlobalLoading() {
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950 text-slate-100 selection:bg-emerald-600 selection:text-white">
@@ -15,9 +13,9 @@ export default function GlobalLoading() {
           {/* Subtle Spinning Ring Halo */}
           <div className="absolute -inset-2 rounded-2xl border border-emerald-500/20 border-t-emerald-400/80 animate-spin [animation-duration:3s]" />
           
-          {/* Official PG-SETU Emerald Brand Shield */}
-          <div className="relative w-16 h-16 bg-gradient-to-br from-[#14532D] via-[#15803D] to-[#16A34A] rounded-2xl flex items-center justify-center shadow-xl shadow-emerald-950/80 ring-2 ring-emerald-400/20 border border-emerald-500/30">
-            <Building2 className="w-8 h-8 text-white stroke-[2.2]" />
+          {/* Official PG-SETU Brand Logo */}
+          <div className="relative w-16 h-16 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center shadow-xl shadow-emerald-950/80 ring-2 ring-emerald-400/20 border border-emerald-500/30 p-2">
+            <img src="/logo.png" alt="PG-SETU Logo" className="w-full h-full object-contain drop-shadow" />
           </div>
         </div>
 

@@ -214,8 +214,8 @@ export default function ResidentPortalPage() {
     return (
       <div className="min-h-screen bg-[#F7FAF7] flex items-center justify-center p-4">
         <div className="flex flex-col items-center gap-3 text-center">
-          <div className="w-12 h-12 bg-gradient-to-tr from-[#16A34A] to-[#14532D] rounded-2xl flex items-center justify-center shadow-lg shadow-[#16A34A]/20 animate-pulse">
-            <Building2 className="w-6 h-6 text-white" />
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-[#16A34A]/20 animate-pulse overflow-hidden">
+            <img src="/logo.png" alt="PG-SETU Logo" className="w-full h-full object-contain" />
           </div>
           <p className="text-xs font-bold text-[#647067]">Loading your stay passbook...</p>
         </div>
@@ -237,8 +237,8 @@ export default function ResidentPortalPage() {
         {/* Top Header */}
         <header className="w-full max-w-5xl mx-auto flex items-center justify-between z-20 pt-2 pb-4">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#16A34A] to-[#DCFCE7] flex items-center justify-center text-[#14532D] shadow-sm font-black">
-              <Building2 className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center overflow-hidden shadow-xs shrink-0">
+              <img src="/logo.png" alt="PG-SETU Logo" className="w-full h-full object-contain" />
             </div>
             <div>
               <span className="text-base font-black tracking-tight text-[#17211B] block leading-none">PGSetu</span>
@@ -257,8 +257,8 @@ export default function ResidentPortalPage() {
         <div className="w-full max-w-md mx-auto my-auto relative z-10 space-y-6">
           {/* Header */}
           <div className="text-center space-y-2">
-            <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-tr from-[#14532D] via-[#0F3E22] to-[#16A34A] rounded-2xl shadow-xl shadow-[#16A34A]/20 text-white mb-1 border border-[#16A34A]/30">
-              <Building2 className="w-7 h-7" />
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl shadow-xl overflow-hidden mb-1">
+              <img src="/logo.png" alt="PG-SETU Logo" className="w-full h-full object-contain" />
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-[#17211B] tracking-tight">Resident Stay Passbook</h1>
             <p className="text-xs sm:text-sm text-[#647067] font-medium max-w-sm mx-auto">
@@ -390,8 +390,8 @@ export default function ResidentPortalPage() {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-2xs">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-xs">
-              <Building2 className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center overflow-hidden shadow-xs shrink-0">
+              <img src="/logo.png" alt="PG-SETU Logo" className="w-full h-full object-contain" />
             </div>
             <div>
               <h1 className="text-sm font-black text-gray-900 leading-tight truncate max-w-[180px] sm:max-w-xs">

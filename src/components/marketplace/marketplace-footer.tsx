@@ -16,9 +16,9 @@ export function MarketplaceFooter() {
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-5 lg:gap-12">
           {/* Col 1: Brand info */}
           <div className="lg:col-span-2 space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#14532D] to-[#16A34A] text-white">
-                <Building2 className="h-5 w-5" />
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl overflow-hidden shrink-0 shadow-xs">
+                <img src="/logo.png" alt="PG-SETU Logo" className="h-full w-full object-contain" />
               </div>
               <span className="text-lg font-bold text-[#14532D]">PGSetu</span>
             </div>

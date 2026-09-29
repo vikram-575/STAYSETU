@@ -106,8 +106,8 @@ export function MarketplaceNavbar({
       <div className="mx-auto flex h-18 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Brand Logo */}
         <Link href="/" className="group flex items-center gap-2.5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#14532D] to-[#16A34A] text-white shadow-sm ring-2 ring-[#DCFCE7] transition group-hover:scale-105">
-            <Building2 className="h-5 w-5" />
+          <div className="relative flex h-10 w-10 items-center justify-center rounded-xl overflow-hidden transition group-hover:scale-105 shrink-0 shadow-xs">
+            <img src="/logo.png" alt="PG-SETU Logo" className="h-full w-full object-contain" />
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">

@@ -39,8 +39,8 @@ export default function LockedErpScreen({ owner }: LockedErpScreenProps) {
       <header className="border-b border-emerald-100 bg-white/80 backdrop-blur-md sticky top-0 z-10 px-4 sm:px-6 py-3">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#14532D] to-[#16A34A] text-white shadow-sm ring-2 ring-emerald-100">
-              <Building2 className="h-5 w-5" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white shadow-sm ring-2 ring-emerald-100 overflow-hidden p-1">
+              <img src="/logo.png" alt="PG-SETU Logo" className="w-full h-full object-contain" />
             </div>
             <div className="flex flex-col">
               <span className="text-lg font-black tracking-tight text-[#14532D] leading-none">PGSetu</span>

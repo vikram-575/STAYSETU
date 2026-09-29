@@ -456,9 +456,9 @@ function UnifiedLoginForm() {
     <div className="w-full max-w-md mx-auto">
       {/* Brand Header */}
       <div className="mb-6 text-center">
-        <Link href="/" className="inline-flex items-center gap-2 mb-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#14532D] to-[#16A34A] text-white shadow-md ring-2 ring-[#DCFCE7]">
-            <Building2 className="h-6 w-6" />
+        <Link href="/" className="inline-flex items-center gap-2.5 mb-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl overflow-hidden shadow-sm shrink-0">
+            <img src="/logo.png" alt="PG-SETU Logo" className="w-full h-full object-contain" />
           </div>
           <span className="text-2xl font-extrabold tracking-tight text-[#14532D]">PGSetu</span>
         </Link>

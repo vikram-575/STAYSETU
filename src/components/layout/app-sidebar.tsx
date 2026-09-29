@@ -63,8 +63,8 @@ export default function AppSidebar({ role, orgName }: Props) {
       {/* Logo & Org Header */}
       <div className="p-4 border-b border-gray-100 bg-[#F7FAF7]/60">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-[#14532D] to-[#16A34A] rounded-xl flex items-center justify-center shrink-0 shadow-sm ring-2 ring-[#DCFCE7]">
-            <Building2 className="w-5 h-5 text-white" />
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 overflow-hidden shadow-xs">
+            <img src="/logo.png" alt="PG-SETU Logo" className="w-full h-full object-contain" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">

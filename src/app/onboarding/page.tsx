@@ -549,8 +549,8 @@ function OnboardingContent() {
       <header className="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-xl sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/25">
-              <Building2 className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden shadow-lg shrink-0">
+              <img src="/logo.png" alt="PG-SETU Logo" className="w-full h-full object-contain" />
             </div>
             <div>
               <span className="font-black text-sm tracking-tight text-white flex items-center gap-1.5">
