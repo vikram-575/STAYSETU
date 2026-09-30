@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
   Lock,
@@ -12,7 +12,11 @@ import {
   Sparkles,
   ExternalLink,
   LogOut,
-  UserCheck
+  UserCheck,
+  RefreshCw,
+  Loader2,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react'
 
 interface LockedErpScreenProps {
@@ -28,10 +32,63 @@ interface LockedErpScreenProps {
 }
 
 export default function LockedErpScreen({ owner }: LockedErpScreenProps) {
+  const [checking, setChecking] = useState(false)
+  const [statusMessage, setStatusMessage] = useState<string | null>(null)
+  const [unlockedSuccess, setUnlockedSuccess] = useState(false)
+
   const formattedPhone = owner.phone ? owner.phone.replace(/\D/g, '').slice(-10) : ''
   const whatsappUrl = `https://wa.me/919453522757?text=${encodeURIComponent(
     `Hello Operations Team, I registered as a PG Owner on PGSetu (Name: ${owner.full_name || 'Owner'}, Mobile: +91 ${formattedPhone}). Please complete my onboarding and unlock my ERP platform.`
   )}`
+
+  const handleCheckUnlockStatus = async (silent = false) => {
+    if (!silent) {
+      setChecking(true)
+      setStatusMessage(null)
+    }
+
+    try {
+      const res = await fetch(`/api/auth/session?refresh=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const isUnlocked =
+          data.isOwnerUnlocked === true ||
+          (data.hostedProperties && data.hostedProperties.length > 0) ||
+          data.profile?.erp_unlocked === true
+
+        if (isUnlocked) {
+          setUnlockedSuccess(true)
+          setStatusMessage('🎉 Your ERP is unlocked! Opening your PG dashboard...')
+          document.cookie = 'erp_locked=; Max-Age=0; path=/;'
+          document.cookie = 'erp_unlocked=true; path=/;'
+          setTimeout(() => {
+            window.location.href = '/dashboard'
+          }, 800)
+          return
+        }
+      }
+      if (!silent) {
+        setStatusMessage('Your PG onboarding is still awaiting SuperAdmin review. We will notify you once verified.')
+      }
+    } catch {
+      if (!silent) {
+        setStatusMessage('Connection check failed. Please tap again.')
+      }
+    } finally {
+      if (!silent) setChecking(false)
+    }
+  }
+
+  // Auto-poll in background every 6 seconds so if superadmin unlocks, it opens automatically
+  useEffect(() => {
+    const interval = setInterval(() => {
+      handleCheckUnlockStatus(true)
+    }, 6000)
+    return () => clearInterval(interval)
+  }, [])
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#F0FDF4] via-[#F8FAFC] to-[#F1F5F9] flex flex-col">
@@ -94,12 +151,30 @@ export default function LockedErpScreen({ owner }: LockedErpScreenProps) {
                 ERP Platform Locked
               </h1>
               <p className="mt-2 text-xs sm:text-sm text-gray-600 max-w-md leading-relaxed px-1">
-                Welcome to PGSetu, <span className="font-bold text-gray-900">{owner.full_name || 'Owner'}</span>! Your owner profile is registered, but full ERP platform access and property listing are locked until our Verification Team completes your onboarding.
+                Welcome to PGSetu, <span className="font-bold text-gray-900">{owner.full_name || 'Owner'}</span>! Your owner profile is registered. Complete setup and unlock is completed by SuperAdmin.
               </p>
             </div>
 
+            {/* Status Alert Banner if checking */}
+            {statusMessage && (
+              <div
+                className={`mt-4 p-3 rounded-2xl text-xs flex items-center gap-2.5 transition-all ${
+                  unlockedSuccess
+                    ? 'bg-emerald-50 border border-emerald-300 text-emerald-900 font-bold'
+                    : 'bg-amber-50 border border-amber-200 text-amber-900'
+                }`}
+              >
+                {unlockedSuccess ? (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                ) : (
+                  <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                )}
+                <span>{statusMessage}</span>
+              </div>
+            )}
+
             {/* Profile Overview Card */}
-            <div className="mt-5 rounded-2xl bg-gray-50/90 border border-gray-200/80 p-3.5 sm:p-4 divide-y divide-gray-200/60 text-xs">
+            <div className="mt-4 rounded-2xl bg-gray-50/90 border border-gray-200/80 p-3.5 sm:p-4 divide-y divide-gray-200/60 text-xs">
               <div className="flex items-center justify-between pb-2">
                 <span className="text-gray-500 font-medium">Owner Name</span>
                 <span className="font-bold text-gray-900">{owner.full_name || '—'}</span>
@@ -135,28 +210,61 @@ export default function LockedErpScreen({ owner }: LockedErpScreenProps) {
                 <div className="space-y-0.5">
                   <span className="font-bold text-emerald-900 block text-xs">Why is my ERP locked?</span>
                   <p className="text-emerald-800/90 leading-relaxed text-[11px]">
-                    To protect tenants and guarantee legitimate listings, our Verification Team reviews owner credentials, verifies property records, and allocates your official PG setup before unlocking the complete operations ERP.
+                    SuperAdmin configures your building structure, rooms, electricity meters, and staff before unlocking ERP operations. Once completed, your dashboard unlocks instantly!
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Call to action buttons */}
+            {/* Actions */}
             <div className="mt-5 space-y-2.5">
+              {/* PRIMARY ACTION: Check Unlock Status */}
+              <button
+                onClick={() => handleCheckUnlockStatus(false)}
+                disabled={checking || unlockedSuccess}
+                className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#14532D] hover:bg-[#166534] active:scale-[0.98] py-3.5 px-4 text-xs sm:text-sm font-black text-white shadow-lg shadow-emerald-900/20 transition-all cursor-pointer disabled:opacity-70"
+              >
+                {checking ? (
+                  <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                ) : unlockedSuccess ? (
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-white" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 shrink-0" />
+                )}
+                <span>
+                  {unlockedSuccess
+                    ? 'Entering Dashboard...'
+                    : checking
+                    ? 'Verifying Status with Server...'
+                    : 'Check Unlock Status & Enter ERP'}
+                </span>
+              </button>
+
+              {/* WHATSAPP ACTION: Mobile-friendly & Beautiful */}
               <a
                 href={whatsappUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#25D366] hover:bg-[#20ba59] active:scale-[0.98] py-3.5 px-3 text-xs sm:text-sm font-extrabold text-white shadow-lg shadow-emerald-600/25 transition-all text-center leading-none"
+                className="w-full flex items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-[#25D366] to-[#128C7E] hover:opacity-95 active:scale-[0.98] py-3 px-4 text-white shadow-md shadow-emerald-950/10 transition-all group"
               >
-                {/* Official WhatsApp SVG Icon */}
-                <svg className="w-4 h-4 sm:w-5 sm:h-5 shrink-0 fill-current" viewBox="0 0 24 24">
-                  <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.007c.101.005.241-.038.375.286.144.347.491 1.2.534 1.288.043.088.072.19.014.305-.058.115-.087.187-.173.289l-.26.309c-.087.086-.18.18-.077.355.103.175.457.755.98 1.222.673.6 1.242.787 1.417.874.175.086.276.072.378-.044.102-.115.434-.506.549-.68.115-.173.231-.144.39-.086.159.058 1.011.477 1.184.564.173.087.289.13.332.202.043.073.043.42-.101.825zM12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2.05 22l4.98-1.306A9.957 9.957 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z" />
-                </svg>
-                <span className="truncate">Chat with Support on WhatsApp</span>
-                <ExternalLink className="h-3.5 w-3.5 shrink-0 opacity-85" />
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                    <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24">
+                      <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.007c.101.005.241-.038.375.286.144.347.491 1.2.534 1.288.043.088.072.19.014.305-.058.115-.087.187-.173.289l-.26.309c-.087.086-.18.18-.077.355.103.175.457.755.98 1.222.673.6 1.242.787 1.417.874.175.086.276.072.378-.044.102-.115.434-.506.549-.68.115-.173.231-.144.39-.086.159.058 1.011.477 1.184.564.173.087.289.13.332.202.043.073.043.42-.101.825zM12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2.05 22l4.98-1.306A9.957 9.957 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z" />
+                    </svg>
+                  </div>
+                  <div className="flex flex-col text-left min-w-0">
+                    <span className="text-xs sm:text-sm font-extrabold truncate">Chat on WhatsApp</span>
+                    <span className="text-[10px] text-emerald-100 truncate">Operations & Verification Desk</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 shrink-0 bg-white/20 px-2 py-1 rounded-lg text-[10px] font-bold">
+                  <span>Chat</span>
+                  <ExternalLink className="h-3 w-3" />
+                </div>
               </a>
 
+              {/* Secondary links */}
               <div className="grid grid-cols-2 gap-2">
                 <a
                   href="tel:+919453522757"

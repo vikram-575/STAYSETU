@@ -11,6 +11,7 @@ import {
   TrendingUp, ShieldAlert, Sparkles, Compass,
   Wrench, UserCheck, Bot
 } from 'lucide-react'
+import { clearClientAuthCache } from '@/lib/auth-client-cache'
 
 interface NavItem {
   label: string
@@ -55,6 +56,7 @@ export default function AppSidebar({ role, orgName }: Props) {
     try {
       await fetch('/api/auth/logout', { method: 'POST' })
     } catch {}
+    clearClientAuthCache()
     window.location.href = '/login?logout=true'
   }
 

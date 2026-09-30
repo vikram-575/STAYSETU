@@ -20,6 +20,7 @@ import {
   LogOut,
 } from 'lucide-react'
 import { useWebsiteContent } from '@/context/website-content-context'
+import { clearClientAuthCache } from '@/lib/auth-client-cache'
 
 interface MarketplaceNavbarProps {
   onOpenListModal?: () => void
@@ -63,7 +64,10 @@ export function MarketplaceNavbar({
     let isMounted = true
     async function checkAuth() {
       try {
-        const res = await fetch('/api/auth/session')
+        const res = await fetch('/api/auth/session?light=true', {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' },
+        })
         if (res.ok) {
           const data = await res.json()
           if (isMounted && data.user) {
@@ -84,8 +88,9 @@ export function MarketplaceNavbar({
     try {
       await fetch('/api/auth/logout', { method: 'POST' })
     } catch {}
+    clearClientAuthCache()
     setCurrentUser(null)
-    window.location.href = '/'
+    window.location.href = '/login?logout=true'
   }
 
   const handleNavClick = (sectionId: string) => {

@@ -15,6 +15,7 @@ import {
   Lock, MessageSquare
 } from 'lucide-react'
 import { ListPropertyModal } from '@/components/marketplace/list-property-modal'
+import { clearClientAuthCache } from '@/lib/auth-client-cache'
 
 type ProfileTab = 'properties' | 'overview' | 'passbook' | 'stays' | 'kyc'
 
@@ -358,7 +359,25 @@ function MyProfileContent() {
             setEditEmergencyRelation(serverProfile.emergency_relation || 'Parent')
             setEditPermanentAddress(serverProfile.permanent_address || '')
             setEditPermanentCity(serverProfile.permanent_city || '')
+          } else {
+            // Unauthenticated: clear any stale cached profiles
+            clearClientAuthCache()
+            setCurrentUser(null)
+            setProfileData(null)
+            setStays([])
+            setHostedProperties([])
+            setPassbookSummary(null)
+            setTransactions([])
           }
+        } else {
+          // Status 401: clear any stale cached profiles
+          clearClientAuthCache()
+          setCurrentUser(null)
+          setProfileData(null)
+          setStays([])
+          setHostedProperties([])
+          setPassbookSummary(null)
+          setTransactions([])
         }
       } catch (err) {
         console.error('Failed to load session:', err)
@@ -647,9 +666,12 @@ function MyProfileContent() {
     try {
       await fetch('/api/auth/logout', { method: 'POST' })
     } catch {}
-    localStorage.removeItem('pgsetu_profile_id')
-    localStorage.removeItem('pgsetu_profile_data')
-    window.location.href = '/'
+    clearClientAuthCache()
+    setCurrentUser(null)
+    setProfileData(null)
+    setStays([])
+    setHostedProperties([])
+    window.location.href = '/login?logout=true'
   }
 
   const handleSaveEdit = async (e: React.FormEvent) => {

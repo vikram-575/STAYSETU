@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import GlobalSearch from '@/components/shared/global-search'
 import QuickActions from '@/components/shared/quick-actions'
+import { clearClientAuthCache } from '@/lib/auth-client-cache'
 
 interface Props {
   user: UserType & { organizations?: { name: string } }
@@ -36,6 +37,7 @@ export default function AppHeader({ user, isImpersonating }: Props) {
       await fetch('/api/auth/logout', { method: 'POST' })
       await supabase.auth.signOut()
     } catch {}
+    clearClientAuthCache()
     window.location.href = '/login?logout=true'
   }
 

@@ -107,23 +107,32 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
       }
     }
 
-    // 2. Check Supabase JWT session
+    const allCookies = cookieStore.getAll()
+    const hasSbCookie = allCookies.some((c) => c.name.startsWith('sb-') && Boolean(c.value))
+    const authUserId = cookieStore.get('auth_user_id')?.value
+    const authEmail = cookieStore.get('auth_email')?.value
+    const authMobile = cookieStore.get('auth_mobile')?.value
+    const residentId = cookieStore.get('resident_id')?.value
+
+    // Fast-path: If completely unauthenticated, return null in 0ms without external roundtrips
+    if (!hasSbCookie && !authUserId && !authEmail && !authMobile && !residentId) {
+      return null
+    }
+
+    // 2. Check Supabase JWT session (only if sb- token cookie is present)
     let sbUser: any = null
-    try {
-      const supabase = await createClient()
-      const { data } = await supabase.auth.getUser()
-      sbUser = data?.user || null
-    } catch {}
+    if (hasSbCookie) {
+      try {
+        const supabase = await createClient()
+        const { data } = await supabase.auth.getUser()
+        sbUser = data?.user || null
+      } catch {}
+    }
 
     const serviceClient = await createServiceClient()
 
     if (!sbUser) {
       // Fallback: check session cookies set by login route
-      const authUserId = cookieStore.get('auth_user_id')?.value
-      const authEmail = cookieStore.get('auth_email')?.value
-      const authMobile = cookieStore.get('auth_mobile')?.value
-      const residentId = cookieStore.get('resident_id')?.value
-
       if (authUserId || authEmail || authMobile || residentId) {
         let fallbackProfile: any = null
 

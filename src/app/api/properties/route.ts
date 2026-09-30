@@ -2,6 +2,9 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { PropertyListing, PropertyType, SharingType } from '@/types/marketplace'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createServiceClient()
@@ -27,58 +30,40 @@ export async function GET(request: NextRequest) {
     }
 
     const propList = properties || []
-    const propIds = propList.map((p) => p.id)
+    const orgIds = propList.map((p) => p.organization_id).filter(Boolean)
 
-    // Fetch related buildings, floors, rooms, and beds
-    const { data: buildings } = propIds.length > 0
-      ? await supabase.from('buildings').select('id, property_id').in('property_id', propIds)
-      : { data: [] }
+    // Fetch related rooms and beds concurrently in parallel batch by organization_id
+    const [roomsRes, bedsRes] = await Promise.all([
+      orgIds.length > 0
+        ? supabase
+            .from('rooms')
+            .select('id, organization_id, floor_id, room_number, base_rent_paise, capacity, room_type')
+            .in('organization_id', orgIds)
+        : Promise.resolve({ data: [] }),
+      orgIds.length > 0
+        ? supabase
+            .from('beds')
+            .select('id, organization_id, room_id, status')
+            .in('organization_id', orgIds)
+        : Promise.resolve({ data: [] }),
+    ])
 
-    const bldgIds = (buildings || []).map((b) => b.id)
+    const rooms = (roomsRes as any).data || []
+    const beds = (bedsRes as any).data || []
 
-    const { data: floors } = bldgIds.length > 0
-      ? await supabase.from('floors').select('id, building_id').in('building_id', bldgIds)
-      : { data: [] }
-
-    const floorIds = (floors || []).map((f) => f.id)
-
-    const { data: rooms } = floorIds.length > 0
-      ? await supabase.from('rooms').select('id, floor_id, room_number, base_rent_paise, capacity, room_type').in('floor_id', floorIds)
-      : { data: [] }
-
-    const roomIds = (rooms || []).map((r) => r.id)
-
-    const { data: beds } = roomIds.length > 0
-      ? await supabase.from('beds').select('id, room_id, status').in('room_id', roomIds)
-      : { data: [] }
-
-    // Index by foreign keys
-    const bldgByProp = new Map<string, string[]>()
-    ;(buildings || []).forEach((b) => {
-      const arr = bldgByProp.get(b.property_id) || []
-      arr.push(b.id)
-      bldgByProp.set(b.property_id, arr)
-    })
-
-    const floorByBldg = new Map<string, string[]>()
-    ;(floors || []).forEach((f) => {
-      const arr = floorByBldg.get(f.building_id) || []
-      arr.push(f.id)
-      floorByBldg.set(f.building_id, arr)
-    })
-
-    const roomsByFloor = new Map<string, any[]>()
-    ;(rooms || []).forEach((r) => {
-      const arr = roomsByFloor.get(r.floor_id) || []
+    // Index by organization_id for fast O(1) property lookup
+    const roomsByOrg = new Map<string, any[]>()
+    rooms.forEach((r: any) => {
+      const arr = roomsByOrg.get(r.organization_id) || []
       arr.push(r)
-      roomsByFloor.set(r.floor_id, arr)
+      roomsByOrg.set(r.organization_id, arr)
     })
 
-    const bedsByRoom = new Map<string, any[]>()
-    ;(beds || []).forEach((b) => {
-      const arr = bedsByRoom.get(b.room_id) || []
+    const bedsByOrg = new Map<string, any[]>()
+    beds.forEach((b: any) => {
+      const arr = bedsByOrg.get(b.organization_id) || []
       arr.push(b)
-      bedsByRoom.set(b.room_id, arr)
+      bedsByOrg.set(b.organization_id, arr)
     })
 
     const PROPERTY_IMAGE_SETS = [
@@ -115,17 +100,15 @@ export async function GET(request: NextRequest) {
     ]
 
     const listings: PropertyListing[] = propList.map((prop: any, index: number) => {
-      const propBldgs = bldgByProp.get(prop.id) || []
-      const propFloors = propBldgs.flatMap((bId) => floorByBldg.get(bId) || [])
-      const propRooms = propFloors.flatMap((fId) => roomsByFloor.get(fId) || [])
-      const propBeds = propRooms.flatMap((r) => bedsByRoom.get(r.id) || [])
+      const propRooms = prop.organization_id ? (roomsByOrg.get(prop.organization_id) || []) : []
+      const propBeds = prop.organization_id ? (bedsByOrg.get(prop.organization_id) || []) : []
 
       const totalBeds = propBeds.length || propRooms.reduce((sum: number, r: any) => sum + (r.capacity || 1), 0) || 10
       const availableBeds = propBeds.filter((b: any) => b.status === 'available').length || totalBeds
 
       const minRentPaise = propRooms.length > 0
         ? Math.min(...propRooms.map((r: any) => r.base_rent_paise || 600000))
-        : 600000
+        : (prop.settings?.starting_rent ? Number(prop.settings.starting_rent) * 100 : 600000)
 
       const price = Math.round(minRentPaise / 100)
       const settings = prop.settings || {}
@@ -238,12 +221,21 @@ export async function GET(request: NextRequest) {
       const otherCities = match ? listings.filter((l) => l.id !== match.id && l.city.toLowerCase() !== match.city.toLowerCase()) : []
       const recommended = [...sameCity, ...otherCities].slice(0, 6)
 
-      return NextResponse.json({
-        success: true,
-        property: match || null,
-        recommended,
-        properties: listings,
-      })
+      return NextResponse.json(
+        {
+          success: true,
+          property: match || null,
+          recommended,
+          properties: listings,
+        },
+        {
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            Pragma: 'no-cache',
+            Expires: '0',
+          },
+        }
+      )
     }
 
     let filtered = listings
@@ -266,13 +258,30 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    return NextResponse.json({
-      success: true,
-      total: filtered.length,
-      properties: filtered,
-    })
+    return NextResponse.json(
+      {
+        success: true,
+        total: filtered.length,
+        properties: filtered,
+      },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
+        },
+      }
+    )
   } catch (err: any) {
     console.error('Error in /api/properties:', err)
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 })
+    return NextResponse.json(
+      { success: false, error: err.message },
+      {
+        status: 500,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        },
+      }
+    )
   }
 }

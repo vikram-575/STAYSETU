@@ -5,6 +5,9 @@ import { rupeesToPaise } from '@/lib/money'
 
 import { isSuperAdminFromRequest } from '@/lib/admin-auth'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 /**
  * Shared helper: verify request is from a superadmin
  */
@@ -42,41 +45,24 @@ export async function GET(request: NextRequest) {
 
     const supabase = await createServiceClient()
 
-    // Fetch all organizations
-    const { data: orgs, error: orgError } = await supabase
-      .from('organizations')
-      .select('*')
-      .order('created_at', { ascending: false })
+    // Fetch all datasets concurrently in parallel
+    const [orgsRes, ownersRes, bedsRes, residentsRes, invoicesRes, propsRes] = await Promise.all([
+      supabase.from('organizations').select('*').order('created_at', { ascending: false }),
+      supabase.from('users').select('id, organization_id, full_name, email, phone, role, last_login_at').eq('role', 'owner'),
+      supabase.from('beds').select('id, organization_id, status'),
+      supabase.from('residents').select('id, organization_id, status').eq('status', 'active'),
+      supabase.from('invoices').select('organization_id, total_paise, paid_paise, balance_paise, status').not('status', 'in', '(cancelled,draft)'),
+      supabase.from('properties').select('id, organization_id, name, city, address, is_active, created_at'),
+    ])
 
-    if (orgError) throw orgError
+    if (orgsRes.error) throw orgsRes.error
 
-    // Fetch all users with role 'owner'
-    const { data: owners } = await supabase
-      .from('users')
-      .select('id, organization_id, full_name, email, phone, role, last_login_at')
-      .eq('role', 'owner')
-
-    // Fetch all beds
-    const { data: allBeds } = await supabase
-      .from('beds')
-      .select('id, organization_id, status')
-
-    // Fetch all active residents
-    const { data: allResidents } = await supabase
-      .from('residents')
-      .select('id, organization_id, status')
-      .eq('status', 'active')
-
-    // Fetch all invoices
-    const { data: allInvoices } = await supabase
-      .from('invoices')
-      .select('organization_id, total_paise, paid_paise, balance_paise, status')
-      .not('status', 'in', '(cancelled,draft)')
-
-    // Fetch property counts & website listings
-    const { data: allProps } = await supabase
-      .from('properties')
-      .select('id, organization_id, name, city, address, is_active, created_at')
+    const orgs = orgsRes.data || []
+    const owners = ownersRes.data || []
+    const allBeds = bedsRes.data || []
+    const allResidents = residentsRes.data || []
+    const allInvoices = invoicesRes.data || []
+    const allProps = propsRes.data || []
 
     const totalWebsiteProperties = (allProps || []).filter((p) => p.is_active !== false).length
 
@@ -129,13 +115,30 @@ export async function GET(request: NextRequest) {
         }
       })
 
-    return NextResponse.json({
-      success: true,
-      organizations: result,
-      totalWebsiteProperties,
-    })
+    return NextResponse.json(
+      {
+        success: true,
+        organizations: result,
+        totalWebsiteProperties,
+      },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
+        },
+      }
+    )
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Failed to fetch organizations' }, { status: 500 })
+    return NextResponse.json(
+      { error: err.message || 'Failed to fetch organizations' },
+      {
+        status: 500,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        },
+      }
+    )
   }
 }
 

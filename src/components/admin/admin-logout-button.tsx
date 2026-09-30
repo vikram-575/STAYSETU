@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { LogOut, Loader2 } from 'lucide-react'
+import { clearClientAuthCache } from '@/lib/auth-client-cache'
 
 export default function AdminLogoutButton({ className }: { className?: string }) {
   const [loading, setLoading] = useState(false)
@@ -11,7 +12,8 @@ export default function AdminLogoutButton({ className }: { className?: string })
     try {
       await fetch('/api/auth/logout', { method: 'POST' })
     } catch {}
-    window.location.href = '/login'
+    clearClientAuthCache()
+    window.location.href = '/login?logout=true'
   }
 
   return (

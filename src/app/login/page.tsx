@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { setupRecaptcha, sendPhoneOtp } from '@/lib/firebase/auth'
 import type { ConfirmationResult, RecaptchaVerifier } from 'firebase/auth'
+import { clearClientAuthCache } from '@/lib/auth-client-cache'
 
 type FlowStep = 'role_select' | 'mobile_entry' | 'otp_verification' | 'new_owner_details' | 'owner_not_found' | 'new_details' | 'optional_aadhaar'
 type AccountType = 'tenant' | 'owner'
@@ -82,6 +83,13 @@ function UnifiedLoginForm() {
     }, 1000)
     return () => clearInterval(timer)
   }, [countdown])
+
+  // Wipe stale client profile caches whenever arriving via logout
+  useEffect(() => {
+    if (searchParams.get('logout') === 'true') {
+      clearClientAuthCache()
+    }
+  }, [searchParams])
 
   // Recaptcha verifier helper
   const getOrCreateVerifier = () => {
@@ -254,6 +262,7 @@ function UnifiedLoginForm() {
 
       // If user exists for this role -> immediately redirect!
       if (data.redirect && data.exists !== false) {
+        clearClientAuthCache()
         window.location.href = data.redirect
         return
       }
@@ -293,12 +302,14 @@ function UnifiedLoginForm() {
         }),
       })
       const data = await res.json()
+      clearClientAuthCache()
       if (data.redirect) {
         window.location.href = data.redirect
       } else {
         window.location.href = '/my-profile'
       }
     } catch {
+      clearClientAuthCache()
       window.location.href = '/my-profile'
     } finally {
       setLoading(false)
@@ -370,6 +381,7 @@ function UnifiedLoginForm() {
         throw new Error(data.error || 'Failed to register owner account.')
       }
 
+      clearClientAuthCache()
       window.location.href = data.redirect || '/my-profile'
     } catch (err: any) {
       setError(err.message || 'Failed to register owner account. Please try again.')
@@ -445,6 +457,7 @@ function UnifiedLoginForm() {
         throw new Error(data.error || 'Registration failed.')
       }
 
+      clearClientAuthCache()
       window.location.href = '/my-profile'
     } catch (err: any) {
       setError(err.message || 'Registration failed. Please try again.')

@@ -38,52 +38,107 @@ export default async function DashboardLayout({
   }
 
   // Ensure robust effective organization context is provided once
-  const effectiveOrg = await resolveEffectiveOrg(user)
+  let effectiveOrg = await resolveEffectiveOrg(user)
+  const serviceClient = await createServiceClient()
 
   // Check lock state for un-onboarded owners: ERP platform remains locked until SuperAdmin unlocks and sets up PG
   if (!isSuperAdmin && user.role === 'owner') {
     const cookieStore = await cookies()
-    const isCookieLocked = cookieStore.get('erp_locked')?.value === 'true'
 
-    if (isCookieLocked || !effectiveOrg || !effectiveOrg.id) {
-      return <LockedErpScreen owner={user} />
-    }
-
-    const serviceClient = await createServiceClient()
-
-    // 1. Verify that SuperAdmin has setup at least 1 property for this organization
-    const { count: propertyCount } = await serviceClient
-      .from('properties')
-      .select('id', { count: 'exact', head: true })
-      .eq('organization_id', effectiveOrg.id)
-
-    if (!propertyCount || propertyCount === 0) {
-      return <LockedErpScreen owner={user} />
-    }
-
-    // 2. Query Firestore owner_profiles to verify SuperAdmin unlock status
-    try {
-      const { queryDocuments } = await import('@/lib/firebase/firestore')
-      const cleanedMobile = user.phone ? user.phone.replace(/\D/g, '').slice(-10) : ''
-      if (cleanedMobile) {
-        const ownerDocs = await queryDocuments('owner_profiles', [
-          { field: 'mobile', operator: '==', value: cleanedMobile },
-        ])
-        if (ownerDocs && ownerDocs.length > 0) {
-          const ownerDoc = ownerDocs[0]
-          // If ERP is not explicitly unlocked or onboarding is pending superadmin, keep locked!
-          if (
-            ownerDoc.erp_unlocked !== true ||
-            ownerDoc.onboarding_status === 'pending_superadmin'
-          ) {
-            return <LockedErpScreen owner={user} />
-          }
-        } else {
-          return <LockedErpScreen owner={user} />
-        }
+    // 1. Resolve fresh organization if user was recently linked or created
+    let orgId = effectiveOrg?.id
+    if (!orgId || orgId === 'edd624d8-f3a0-4f92-b8b9-515c50ed8e98') {
+      const { data: freshUser } = await serviceClient
+        .from('users')
+        .select('organization_id')
+        .eq('id', user.id)
+        .maybeSingle()
+      if (
+        freshUser?.organization_id &&
+        freshUser.organization_id !== 'edd624d8-f3a0-4f92-b8b9-515c50ed8e98'
+      ) {
+        orgId = freshUser.organization_id
+        effectiveOrg = await resolveEffectiveOrg({ ...user, organization_id: orgId || null })
       }
-    } catch (err) {
-      console.warn('[Dashboard Layout Owner Check Warning]:', err)
+    }
+
+    if (!orgId) {
+      const cleanPhone = user.phone ? user.phone.replace(/\D/g, '').slice(-10) : ''
+      const { data: matchedOrg } = await serviceClient
+        .from('organizations')
+        .select('id, name, slug, gst_enabled')
+        .or(`owner_user_id.eq.${user.id}${cleanPhone ? `,phone.ilike.%${cleanPhone}%` : ''}`)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (matchedOrg?.id) {
+        orgId = matchedOrg.id
+        effectiveOrg = matchedOrg
+      }
+    }
+
+    let isUnlocked = false
+
+    // 2. Check if SuperAdmin setup at least 1 property for this organization in Supabase
+    if (orgId && orgId !== 'edd624d8-f3a0-4f92-b8b9-515c50ed8e98') {
+      const { count: propertyCount } = await serviceClient
+        .from('properties')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', orgId)
+
+      if (propertyCount && propertyCount > 0) {
+        isUnlocked = true
+      }
+    }
+
+    // 3. Query Firestore owner_profiles to check if SuperAdmin marked them unlocked
+    if (!isUnlocked) {
+      try {
+        const { queryDocuments } = await import('@/lib/firebase/firestore')
+        const cleanedMobile = user.phone ? user.phone.replace(/\D/g, '').slice(-10) : ''
+        if (cleanedMobile) {
+          const ownerDocs = await queryDocuments('owner_profiles', [
+            { field: 'mobile', operator: '==', value: cleanedMobile },
+          ])
+          if (ownerDocs && ownerDocs.length > 0) {
+            const ownerDoc = ownerDocs[0]
+            if (
+              ownerDoc.erp_unlocked === true &&
+              ownerDoc.onboarding_status !== 'pending_superadmin'
+            ) {
+              isUnlocked = true
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[Dashboard Layout Owner Check Warning]:', err)
+      }
+    }
+
+    // 4. Update cookies & gate access
+    if (isUnlocked) {
+      try {
+        cookieStore.delete('erp_locked')
+        cookieStore.set('erp_unlocked', 'true', {
+          httpOnly: false,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 30,
+          path: '/',
+        })
+      } catch {}
+    } else {
+      try {
+        cookieStore.set('erp_locked', 'true', {
+          httpOnly: false,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 30,
+          path: '/',
+        })
+        cookieStore.delete('erp_unlocked')
+      } catch {}
+      return <LockedErpScreen owner={user} />
     }
   }
 

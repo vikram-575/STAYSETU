@@ -8,7 +8,7 @@ import { isValidUUID } from '@/lib/org-helper'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const user = await getAuthenticatedUser()
     if (!user) {
@@ -18,6 +18,20 @@ export async function GET() {
           status: 401,
           headers: {
             'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          },
+        }
+      )
+    }
+
+    const { searchParams } = new URL(request.url)
+    if (searchParams.get('light') === 'true') {
+      return NextResponse.json(
+        { user, organization: user.organizations },
+        {
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            Pragma: 'no-cache',
+            Expires: '0',
           },
         }
       )
@@ -305,7 +319,7 @@ export async function GET() {
 
     if (!isSuperAdmin && user.role === 'owner') {
       let isFirestoreUnlocked = false
-      let isPendingSuperAdmin = true
+      let isPendingSuperAdmin = false
 
       try {
         const { queryDocuments } = await import('@/lib/firebase/firestore')
@@ -323,11 +337,33 @@ export async function GET() {
         console.warn('[Session Route Firestore Owner Check Warning]:', err)
       }
 
+      // Check if user has active properties in Supabase under their organization or any org they own
+      let hasSupabaseProps = hostedProperties.length > 0
+      if (!hasSupabaseProps) {
+        try {
+          const cleanPhone = user.phone ? user.phone.replace(/\D/g, '').slice(-10) : ''
+          const { data: dbProps } = await serviceClient
+            .from('properties')
+            .select('id, organization_id, name, city, address, is_active')
+            .or(`phone.ilike.%${cleanPhone}%,email.ilike.%${user.email || ''}%`)
+            .limit(5)
+          if (dbProps && dbProps.length > 0) {
+            hasSupabaseProps = true
+            hostedProperties = dbProps
+          }
+        } catch {}
+      }
+
+      const hasCookieUnlocked = cookieStore.get('erp_unlocked')?.value === 'true'
+
+      // Owner is unlocked if:
+      // 1. Properties have been provisioned in Supabase
+      // 2. OR Firestore marks them explicitly unlocked
+      // 3. OR the erp_unlocked cookie is already true
       isOwnerUnlocked =
-        Boolean(user.organization_id) &&
-        hostedProperties.length > 0 &&
-        isFirestoreUnlocked &&
-        !isPendingSuperAdmin
+        hasSupabaseProps ||
+        (isFirestoreUnlocked && !isPendingSuperAdmin) ||
+        (hasCookieUnlocked && Boolean(user.organization_id))
 
       if (profileData) {
         profileData.erp_unlocked = isOwnerUnlocked
