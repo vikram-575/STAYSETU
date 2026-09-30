@@ -250,7 +250,7 @@ function MyProfileContent() {
 
   // Gated Owner Listing State
   const [isListingLockedModalOpen, setIsListingLockedModalOpen] = useState(false)
-  const [isOwnerUnlockedState, setIsOwnerUnlockedState] = useState(true)
+  const [isOwnerUnlockedState, setIsOwnerUnlockedState] = useState(false)
 
   // Aadhaar Verification State
   const [aadhaarInput, setAadhaarInput] = useState('')
@@ -334,7 +334,7 @@ function MyProfileContent() {
             }
 
             // Superadmin is always unlocked; owner is unlocked only if verified
-            const isUnlocked = data.isOwnerUnlocked ?? Boolean(data.user.organization_id)
+            const isUnlocked = Boolean(data.isOwnerUnlocked)
             setIsOwnerUnlockedState(isUnlocked)
 
             // Server profile is the authoritative source of truth
@@ -1066,13 +1066,13 @@ function MyProfileContent() {
                     <MessageSquare className="h-3.5 w-3.5" />
                     <span>Chat with Support to Unlock</span>
                   </a>
-                  <a
+                  <Link
                     href="/dashboard"
                     className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-50 transition"
                   >
                     <Lock className="h-3.5 w-3.5 text-amber-700" />
                     <span>View Locked ERP Screen</span>
-                  </a>
+                  </Link>
                 </div>
               </div>
             </div>

@@ -301,12 +301,61 @@ export async function GET() {
     }
 
     const isSuperAdmin = user.role === 'superadmin' || user.email === 'vikramtomar0505@gmail.com'
-    const isOwnerUnlocked =
-      isSuperAdmin ||
-      (user.role === 'owner' &&
+    let isOwnerUnlocked = isSuperAdmin
+
+    if (!isSuperAdmin && user.role === 'owner') {
+      let isFirestoreUnlocked = false
+      let isPendingSuperAdmin = true
+
+      try {
+        const { queryDocuments } = await import('@/lib/firebase/firestore')
+        if (cleanMobile) {
+          const ownerDocs = await queryDocuments('owner_profiles', [
+            { field: 'mobile', operator: '==', value: cleanMobile },
+          ])
+          if (ownerDocs && ownerDocs.length > 0) {
+            const oDoc = ownerDocs[0]
+            isFirestoreUnlocked = oDoc.erp_unlocked === true
+            isPendingSuperAdmin = oDoc.onboarding_status === 'pending_superadmin'
+          }
+        }
+      } catch (err) {
+        console.warn('[Session Route Firestore Owner Check Warning]:', err)
+      }
+
+      isOwnerUnlocked =
         Boolean(user.organization_id) &&
-        profileData?.erp_unlocked !== false &&
-        profileData?.onboarding_status !== 'pending_superadmin')
+        hostedProperties.length > 0 &&
+        isFirestoreUnlocked &&
+        !isPendingSuperAdmin
+
+      if (profileData) {
+        profileData.erp_unlocked = isOwnerUnlocked
+        profileData.can_list_properties = isOwnerUnlocked
+        profileData.onboarding_status = isOwnerUnlocked ? 'completed' : 'pending_superadmin'
+      }
+
+      // Sync cookie state
+      if (!isOwnerUnlocked) {
+        cookieStore.set('erp_locked', 'true', {
+          httpOnly: false,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 30,
+          path: '/',
+        })
+        cookieStore.delete('erp_unlocked')
+      } else {
+        cookieStore.set('erp_unlocked', 'true', {
+          httpOnly: false,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 30,
+          path: '/',
+        })
+        cookieStore.delete('erp_locked')
+      }
+    }
 
     return NextResponse.json(
       {

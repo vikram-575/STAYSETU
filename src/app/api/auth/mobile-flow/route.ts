@@ -668,11 +668,37 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      const isErpUnlocked = requestedRole === 'owner'
-        ? Boolean(orgId || user?.organization_id)
-        : true
+      let isErpUnlocked = false
+      if (isSuper) {
+        isErpUnlocked = true
+      } else if (requestedRole === 'owner') {
+        let firestoreUnlocked = false
+        try {
+          const { queryDocuments } = await import('@/lib/firebase/firestore')
+          const docs = await queryDocuments('owner_profiles', [
+            { field: 'mobile', operator: '==', value: cleaned },
+          ])
+          if (docs && docs.length > 0) {
+            firestoreUnlocked = docs[0].erp_unlocked === true && docs[0].onboarding_status !== 'pending_superadmin'
+          }
+        } catch {}
 
-      if (!isErpUnlocked) {
+        let hasProps = false
+        const effectiveOrgId = orgId || user?.organization_id
+        if (effectiveOrgId && effectiveOrgId !== 'edd624d8-f3a0-4f92-b8b9-515c50ed8e98') {
+          const { count } = await serviceClient
+            .from('properties')
+            .select('id', { count: 'exact', head: true })
+            .eq('organization_id', effectiveOrgId)
+          hasProps = Boolean(count && count > 0)
+        }
+
+        isErpUnlocked = firestoreUnlocked && hasProps
+      } else {
+        isErpUnlocked = true
+      }
+
+      if (!isErpUnlocked && requestedRole === 'owner' && !isSuper) {
         cookieStore.set('erp_locked', 'true', {
           httpOnly: false,
           secure: process.env.NODE_ENV === 'production',
@@ -680,6 +706,7 @@ export async function POST(request: NextRequest) {
           maxAge: 60 * 60 * 24 * 30,
           path: '/',
         })
+        cookieStore.delete('erp_unlocked')
       } else {
         cookieStore.delete('erp_locked')
       }

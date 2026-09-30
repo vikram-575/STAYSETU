@@ -220,7 +220,13 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
               matchedOrg = data
             }
 
-            const { data: defaultOrg } = !matchedOrg
+            const isMaster =
+              fallbackProfile.email?.toLowerCase().trim() === SUPER_ADMIN_EMAIL ||
+              cleanMob === '9453522757' ||
+              fallbackProfile.phone?.includes('9453522757') ||
+              fallbackProfile.role === 'superadmin'
+
+            const { data: defaultOrg } = (!matchedOrg && isMaster)
               ? await serviceClient
                   .from('organizations')
                   .select('id, name, slug, gst_enabled')
@@ -233,7 +239,7 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
             if (resolvedOrg && isValidUUID(resolvedOrg.id)) {
               orgId = resolvedOrg.id
               orgObj = resolvedOrg
-              if (isValidUUID(fallbackProfile.id)) {
+              if (isValidUUID(fallbackProfile.id) && matchedOrg) {
                 try {
                   await serviceClient.from('users').update({ organization_id: resolvedOrg.id }).eq('id', fallbackProfile.id)
                 } catch {}
@@ -370,7 +376,11 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
           matchedOrg = data
         }
 
-        const { data: defaultOrg } = !matchedOrg
+        const isMaster =
+          profile.email?.toLowerCase().trim() === SUPER_ADMIN_EMAIL ||
+          profile.role === 'superadmin'
+
+        const { data: defaultOrg } = (!matchedOrg && isMaster)
           ? await serviceClient
               .from('organizations')
               .select('id, name, slug, gst_enabled')
@@ -383,7 +393,7 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
         if (resolvedOrg && isValidUUID(resolvedOrg.id)) {
           orgId = resolvedOrg.id
           orgObj = resolvedOrg
-          if (isValidUUID(profile.id)) {
+          if (isValidUUID(profile.id) && matchedOrg) {
             try {
               await serviceClient.from('users').update({ organization_id: resolvedOrg.id }).eq('id', profile.id)
             } catch {}

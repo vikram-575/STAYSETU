@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { getAuthenticatedUser } from '@/lib/auth-session'
 import { resolveEffectiveOrg } from '@/lib/org-helper'
+import { createServiceClient } from '@/lib/supabase/server'
 import AppSidebar from '@/components/layout/app-sidebar'
 import AppHeader from '@/components/layout/app-header'
 import MobileBottomNav from '@/components/layout/mobile-bottom-nav'
@@ -39,35 +40,50 @@ export default async function DashboardLayout({
   // Ensure robust effective organization context is provided once
   const effectiveOrg = await resolveEffectiveOrg(user)
 
-  // Check lock state for un-onboarded owners: ERP platform remains locked until SuperAdmin unlocks
+  // Check lock state for un-onboarded owners: ERP platform remains locked until SuperAdmin unlocks and sets up PG
   if (!isSuperAdmin && user.role === 'owner') {
     const cookieStore = await cookies()
     const isCookieLocked = cookieStore.get('erp_locked')?.value === 'true'
-    const isCookieUnlocked = cookieStore.get('erp_unlocked')?.value === 'true'
 
     if (isCookieLocked || !effectiveOrg || !effectiveOrg.id) {
       return <LockedErpScreen owner={user} />
     }
 
-    // Only query Firestore if not already confirmed unlocked via session cookie
-    if (!isCookieUnlocked) {
-      try {
-        const { queryDocuments } = await import('@/lib/firebase/firestore')
-        const cleanedMobile = user.phone ? user.phone.replace(/\D/g, '').slice(-10) : ''
-        if (cleanedMobile) {
-          const ownerDocs = await queryDocuments('owner_profiles', [
-            { field: 'mobile', operator: '==', value: cleanedMobile },
-          ])
-          if (ownerDocs && ownerDocs.length > 0) {
-            const ownerDoc = ownerDocs[0]
-            if (ownerDoc.erp_unlocked === false) {
-              return <LockedErpScreen owner={user} />
-            }
+    const serviceClient = await createServiceClient()
+
+    // 1. Verify that SuperAdmin has setup at least 1 property for this organization
+    const { count: propertyCount } = await serviceClient
+      .from('properties')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', effectiveOrg.id)
+
+    if (!propertyCount || propertyCount === 0) {
+      return <LockedErpScreen owner={user} />
+    }
+
+    // 2. Query Firestore owner_profiles to verify SuperAdmin unlock status
+    try {
+      const { queryDocuments } = await import('@/lib/firebase/firestore')
+      const cleanedMobile = user.phone ? user.phone.replace(/\D/g, '').slice(-10) : ''
+      if (cleanedMobile) {
+        const ownerDocs = await queryDocuments('owner_profiles', [
+          { field: 'mobile', operator: '==', value: cleanedMobile },
+        ])
+        if (ownerDocs && ownerDocs.length > 0) {
+          const ownerDoc = ownerDocs[0]
+          // If ERP is not explicitly unlocked or onboarding is pending superadmin, keep locked!
+          if (
+            ownerDoc.erp_unlocked !== true ||
+            ownerDoc.onboarding_status === 'pending_superadmin'
+          ) {
+            return <LockedErpScreen owner={user} />
           }
+        } else {
+          return <LockedErpScreen owner={user} />
         }
-      } catch (err) {
-        console.warn('[Dashboard Layout Owner Check Warning]:', err)
       }
+    } catch (err) {
+      console.warn('[Dashboard Layout Owner Check Warning]:', err)
     }
   }
 

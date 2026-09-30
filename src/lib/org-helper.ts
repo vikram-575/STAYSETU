@@ -27,29 +27,40 @@ export async function resolveEffectiveOrg(
 ): Promise<EffectiveOrganization | null> {
   const serviceClient = await createServiceClient()
 
-  // 1. User already has a valid UUID orgId
-  if (user?.organization_id && isValidUUID(user.organization_id)) {
-    if (user.organizations && user.organizations.id === user.organization_id) {
-      return {
-        id: user.organizations.id,
-        name: user.organizations.name || 'PG-SETU Management',
-        slug: user.organizations.slug,
-        gst_enabled: Boolean(user.organizations.gst_enabled),
-      }
-    }
+  // 1. User already has a valid UUID orgId (ignoring placeholder seed org)
+  if (
+    user?.organization_id &&
+    isValidUUID(user.organization_id) &&
+    user.organization_id !== 'edd624d8-f3a0-4f92-b8b9-515c50ed8e98'
+  ) {
+    const isSuperAdmin = user?.role === 'superadmin' || user?.email === 'vikramtomar0505@gmail.com'
 
     const { data: foundOrg } = await serviceClient
       .from('organizations')
-      .select('id, name, slug, gst_enabled')
+      .select('id, name, slug, gst_enabled, owner_user_id, phone, email')
       .eq('id', user.organization_id)
       .maybeSingle()
 
     if (foundOrg) {
-      return {
-        id: foundOrg.id,
-        name: foundOrg.name,
-        slug: foundOrg.slug,
-        gst_enabled: Boolean(foundOrg.gst_enabled),
+      const cleanPhone = user.phone ? user.phone.replace(/\D/g, '').slice(-10) : ''
+      const orgPhone = foundOrg.phone ? foundOrg.phone.replace(/\D/g, '').slice(-10) : ''
+      const orgEmail = foundOrg.email?.toLowerCase().trim()
+      const uEmail = user.email?.toLowerCase().trim()
+
+      const isLegitOwnerOrg =
+        isSuperAdmin ||
+        user.role !== 'owner' ||
+        foundOrg.owner_user_id === user.id ||
+        (cleanPhone && orgPhone && cleanPhone === orgPhone) ||
+        (uEmail && orgEmail && uEmail === orgEmail && !uEmail.includes('@pgsetu.'))
+
+      if (isLegitOwnerOrg) {
+        return {
+          id: foundOrg.id,
+          name: foundOrg.name,
+          slug: foundOrg.slug,
+          gst_enabled: Boolean(foundOrg.gst_enabled),
+        }
       }
     }
   }
