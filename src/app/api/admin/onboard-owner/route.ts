@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
     // 3. Fetch organizations for lookup
     const { data: dbOrgs } = await serviceClient
       .from('organizations')
-      .select('id, name, city, address, created_at')
+      .select('id, name, city, address, settings, created_at')
 
     const orgMap = new Map((dbOrgs || []).map((o) => [o.id, o]))
 
@@ -118,6 +118,13 @@ export async function GET(request: NextRequest) {
         dob: fOwner.dob || '',
         gender: fOwner.gender || 'male',
         city: fOwner.city || linkedOrg?.city || '',
+        address: fOwner.address || linkedOrg?.address || '',
+        pg_type: fOwner.pg_type || linkedOrg?.settings?.pg_type || 'coliving',
+        approx_rooms: fOwner.approx_rooms || linkedOrg?.settings?.approx_rooms || 6,
+        starting_rent: fOwner.starting_rent || linkedOrg?.settings?.starting_rent || 7500,
+        electricity_rate: fOwner.electricity_rate || linkedOrg?.settings?.electricity_rate_per_unit || 10,
+        building_name: fOwner.building_name || linkedOrg?.settings?.building_name || 'Main Block',
+        floor_count: fOwner.floor_count || linkedOrg?.settings?.floor_count || 3,
         onboarding_status: ownerStatus,
         erp_unlocked: !isLocked,
         can_list_properties: !isPending,
@@ -152,6 +159,13 @@ export async function GET(request: NextRequest) {
         dob: '',
         gender: 'male',
         city: linkedOrg?.city || '',
+        address: linkedOrg?.address || '',
+        pg_type: linkedOrg?.settings?.pg_type || 'coliving',
+        approx_rooms: linkedOrg?.settings?.approx_rooms || 6,
+        starting_rent: linkedOrg?.settings?.starting_rent || 7500,
+        electricity_rate: linkedOrg?.settings?.electricity_rate_per_unit || 10,
+        building_name: linkedOrg?.settings?.building_name || 'Main Block',
+        floor_count: linkedOrg?.settings?.floor_count || 3,
         onboarding_status: ownerStatus,
         erp_unlocked: !isPending,
         can_list_properties: !isPending,
@@ -186,7 +200,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/admin/onboard-owner
- * SuperAdmin completes onboarding and unlocks ERP + property listing for a PG Owner
+ * SuperAdmin completes full multi-step setup and unlocks ERP + property listing for a PG Owner
  */
 export async function POST(request: NextRequest) {
   try {
@@ -201,12 +215,28 @@ export async function POST(request: NextRequest) {
       userId,
       mobile,
       full_name,
+      email,
       property_name,
       city,
       address,
       pg_type,
+      // Building & structure
+      building_count,
+      building_name,
+      floor_count,
       approx_rooms,
+      room_count,
+      room_type,
       starting_rent,
+      // Electricity
+      electricity_rate_per_unit,
+      electricity_meter_type,
+      electricity_allocation_method,
+      // Staff
+      staff_name,
+      staff_phone,
+      staff_role,
+      staff_salary,
       rejection_reason,
     } = body
 
@@ -240,13 +270,14 @@ export async function POST(request: NextRequest) {
 
     // If user does not exist in Supabase users table yet, create user row
     if (!targetUser) {
-      const defaultName = full_name || (property_name ? `${property_name} Owner` : 'PG Owner')
+      const defaultName = full_name?.trim() || (property_name ? `${property_name.trim()} Owner` : 'PG Owner')
+      const userEmail = (email && email.trim()) ? email.trim().toLowerCase() : ''
       const { data: newUser, error: userErr } = await serviceClient
         .from('users')
         .insert({
           full_name: defaultName,
           phone: cleanedMobile,
-          email: (body.email && body.email.trim()) ? body.email.trim().toLowerCase() : '',
+          email: userEmail,
           role: 'owner',
           is_active: true,
         })
@@ -258,8 +289,11 @@ export async function POST(request: NextRequest) {
       }
       targetUser = newUser
     } else {
-      // Ensure user is active and role is owner
-      await serviceClient.from('users').update({ is_active: true, role: 'owner' }).eq('id', targetUser.id)
+      // Ensure user profile details are synced and role is owner
+      const userUpdate: any = { is_active: true, role: 'owner' }
+      if (full_name && full_name.trim()) userUpdate.full_name = full_name.trim()
+      if (email && email.trim()) userUpdate.email = email.trim().toLowerCase()
+      await serviceClient.from('users').update(userUpdate).eq('id', targetUser.id)
     }
 
     // Handle rejection
@@ -286,12 +320,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Determine details for Onboarding / Unlock
-    const propName = property_name?.trim() || (targetUser.full_name ? `${targetUser.full_name}'s PG` : 'New PG Residence')
+    const ownerDisplayName = full_name?.trim() || targetUser.full_name || 'PG Owner'
+    const propName = property_name?.trim() || `${ownerDisplayName}'s PG`
     const propCity = city?.trim() || targetUser.city || 'Bengaluru'
     const propAddress = address?.trim() || `${propCity}, India`
     const effectivePgType = pg_type || 'coliving'
-    const roomCount = Math.max(1, Math.min(100, Number(approx_rooms) || 6))
-    const rentPaise = starting_rent ? Number(starting_rent) * 100 : 750000
+    const bldgName = building_name?.trim() || 'Main Block'
+    const bldgCount = Math.max(1, Math.min(10, Number(building_count) || 1))
+    const floorsCount = Math.max(1, Math.min(20, Number(floor_count) || 3))
+    const totalRooms = Math.max(1, Math.min(100, Number(room_count || approx_rooms) || 6))
+    const rentRupees = Number(starting_rent) || 7500
+    const rentPaise = rentRupees * 100
+    const roomSharing = room_type || 'Double Sharing'
+
+    let roomCapacity = 2
+    if (roomSharing.toLowerCase().includes('single')) roomCapacity = 1
+    else if (roomSharing.toLowerCase().includes('triple')) roomCapacity = 3
+    else if (roomSharing.toLowerCase().includes('four')) roomCapacity = 4
+
+    const electricityRate = Number(electricity_rate_per_unit) || 10
+    const meterType = electricity_meter_type || 'sub'
+    const allocationMethod = electricity_allocation_method || 'equal_split'
 
     // 2. Check if user already has an organization (ignoring placeholder org)
     let orgId = targetUser.organization_id
@@ -306,6 +355,23 @@ export async function POST(request: NextRequest) {
       organization = existingOrg
     }
 
+    const orgSettings = {
+      ...(organization?.settings || {}),
+      plan: 'enterprise',
+      subscription_status: 'active',
+      is_verified: true,
+      verification_status: 'verified',
+      pg_type: effectivePgType,
+      approx_rooms: totalRooms,
+      starting_rent: rentRupees,
+      building_name: bldgName,
+      building_count: bldgCount,
+      floor_count: floorsCount,
+      electricity_rate_per_unit: electricityRate,
+      electricity_meter_type: meterType,
+      electricity_allocation_method: allocationMethod,
+    }
+
     if (organization) {
       // Update existing organization with latest details
       await serviceClient
@@ -315,16 +381,8 @@ export async function POST(request: NextRequest) {
           city: propCity,
           address: propAddress,
           phone: targetUser.phone,
-          settings: {
-            ...(organization.settings || {}),
-            plan: 'enterprise',
-            subscription_status: 'active',
-            is_verified: true,
-            verification_status: 'verified',
-            pg_type: effectivePgType,
-            approx_rooms: roomCount,
-            starting_rent: Number(starting_rent) || 7500,
-          },
+          email: targetUser.email || (email?.trim() ? email.trim().toLowerCase() : ''),
+          settings: orgSettings,
         })
         .eq('id', orgId)
     } else {
@@ -337,20 +395,12 @@ export async function POST(request: NextRequest) {
           slug,
           owner_user_id: targetUser.id,
           phone: targetUser.phone,
-          email: targetUser.email,
+          email: targetUser.email || (email?.trim() ? email.trim().toLowerCase() : ''),
           city: propCity,
           address: propAddress,
           currency_code: 'INR',
           timezone: 'Asia/Kolkata',
-          settings: {
-            plan: 'enterprise',
-            subscription_status: 'active',
-            is_verified: true,
-            verification_status: 'verified',
-            pg_type: effectivePgType,
-            approx_rooms: roomCount,
-            starting_rent: Number(starting_rent) || 7500,
-          },
+          settings: orgSettings,
         })
         .select('*')
         .single()
@@ -377,6 +427,19 @@ export async function POST(request: NextRequest) {
 
     let propertyId: string | null = null
 
+    const propSettings = {
+      pg_type: effectivePgType,
+      approx_rooms: totalRooms,
+      starting_rent: rentRupees,
+      building_name: bldgName,
+      floor_count: floorsCount,
+      electricity_rate_per_unit: electricityRate,
+      electricity_meter_type: meterType,
+      electricity_allocation_method: allocationMethod,
+      amenities: ['High-Speed WiFi', 'Power Backup', 'RO Water', '3 Daily Meals', 'Air Conditioning', 'CCTV Security'],
+      rules: ['Gate closes at 11:00 PM', 'Visitors in lounge only', 'No smoking inside rooms'],
+    }
+
     if (existingProps && existingProps.length > 0) {
       propertyId = existingProps[0].id
       await serviceClient
@@ -386,13 +449,9 @@ export async function POST(request: NextRequest) {
           city: propCity,
           address: propAddress,
           phone: targetUser.phone,
-          starting_rent_paise: rentPaise,
+          email: targetUser.email || (email?.trim() ? email.trim().toLowerCase() : ''),
           is_active: true,
-          settings: {
-            pg_type: effectivePgType,
-            amenities: ['High-Speed WiFi', 'Power Backup', 'RO Water', '3 Daily Meals', 'Air Conditioning', 'CCTV Security'],
-            rules: ['Gate closes at 11:00 PM', 'Visitors in lounge only', 'No smoking inside rooms'],
-          },
+          settings: propSettings,
         })
         .eq('id', propertyId)
     } else {
@@ -404,14 +463,9 @@ export async function POST(request: NextRequest) {
           city: propCity,
           address: propAddress,
           phone: targetUser.phone,
-          email: targetUser.email,
-          starting_rent_paise: rentPaise,
+          email: targetUser.email || (email?.trim() ? email.trim().toLowerCase() : ''),
           is_active: true,
-          settings: {
-            pg_type: effectivePgType,
-            amenities: ['High-Speed WiFi', 'Power Backup', 'RO Water', '3 Daily Meals', 'Air Conditioning', 'CCTV Security'],
-            rules: ['Gate closes at 11:00 PM', 'Visitors in lounge only', 'No smoking inside rooms'],
-          },
+          settings: propSettings,
         })
         .select('id')
         .single()
@@ -419,101 +473,236 @@ export async function POST(request: NextRequest) {
       propertyId = newProp?.id || null
     }
 
-    // 4. Provision Building, Floor, Rooms, Beds if none exist
+    // 4. Provision Building, Floors, Rooms, and Beds
     if (propertyId) {
       try {
-        const { count: existingRoomCount } = await serviceClient
-          .from('rooms')
-          .select('id', { count: 'exact', head: true })
+        // Check building
+        let buildingId: string | null = null
+        const { data: existingBldgs } = await serviceClient
+          .from('buildings')
+          .select('id, name')
           .eq('property_id', propertyId)
+          .limit(1)
 
-        if (!existingRoomCount || existingRoomCount === 0) {
-          // Check if building exists or create one
-          let buildingId: string | null = null
-          const { data: existingBldgs } = await serviceClient
-            .from('buildings')
-            .select('id')
-            .eq('property_id', propertyId)
-            .limit(1)
-
-          if (existingBldgs && existingBldgs.length > 0) {
-            buildingId = existingBldgs[0].id
-          } else {
-            const { data: bld } = await serviceClient
-              .from('buildings')
-              .insert({ property_id: propertyId, name: 'Main Block' })
-              .select('id')
-              .single()
-            buildingId = bld?.id || null
-          }
-
-          if (buildingId) {
-            // Check if floor exists or create one
-            let floorId: string | null = null
-            const { data: existingFlrs } = await serviceClient
-              .from('floors')
-              .select('id')
-              .eq('building_id', buildingId)
-              .limit(1)
-
-            if (existingFlrs && existingFlrs.length > 0) {
-              floorId = existingFlrs[0].id
-            } else {
-              const { data: flr } = await serviceClient
-                .from('floors')
-                .insert({ building_id: buildingId, floor_number: 1, name: 'First Floor' })
-                .select('id')
-                .single()
-              floorId = flr?.id || null
-            }
-
-            if (floorId) {
-              // Batch insert rooms
-              const roomsToInsert: any[] = []
-              for (let i = 1; i <= roomCount; i++) {
-                const roomNum = `10${i}`
-                roomsToInsert.push({
-                  organization_id: orgId,
-                  property_id: propertyId,
-                  floor_id: floorId,
-                  room_number: roomNum,
-                  room_type: 'Double Sharing',
-                  capacity: 2,
-                  base_rent_paise: rentPaise,
-                })
-              }
-
-              const { data: createdRooms } = await serviceClient
-                .from('rooms')
-                .insert(roomsToInsert)
-                .select('id, room_number')
-
-              if (createdRooms && createdRooms.length > 0) {
-                const bedsToInsert: any[] = []
-                for (const rm of createdRooms) {
-                  bedsToInsert.push(
-                    { organization_id: orgId, room_id: rm.id, bed_label: `${rm.room_number}-A`, status: 'available' },
-                    { organization_id: orgId, room_id: rm.id, bed_label: `${rm.room_number}-B`, status: 'available' }
-                  )
-                }
-                await serviceClient.from('beds').insert(bedsToInsert)
-              }
-            }
-          }
-        } else {
-          // If rooms already exist, update base rent according to filled details
+        if (existingBldgs && existingBldgs.length > 0) {
+          buildingId = existingBldgs[0].id
           await serviceClient
+            .from('buildings')
+            .update({ name: bldgName, total_floors: floorsCount })
+            .eq('id', buildingId)
+        } else {
+          const { data: bld } = await serviceClient
+            .from('buildings')
+            .insert({
+              organization_id: orgId,
+              property_id: propertyId,
+              name: bldgName,
+              total_floors: floorsCount,
+            })
+            .select('id')
+            .single()
+          buildingId = bld?.id || null
+        }
+
+        if (buildingId) {
+          // Check & create floors
+          const { data: existingFlrs } = await serviceClient
+            .from('floors')
+            .select('id, floor_number')
+            .eq('building_id', buildingId)
+
+          const existingFloorMap = new Map((existingFlrs || []).map((f) => [f.floor_number, f.id]))
+          const activeFloors: { id: string; floor_number: number }[] = []
+
+          for (let f = 1; f <= floorsCount; f++) {
+            if (existingFloorMap.has(f)) {
+              activeFloors.push({ id: existingFloorMap.get(f)!, floor_number: f })
+            } else {
+              const suffix = f === 1 ? 'st' : f === 2 ? 'nd' : f === 3 ? 'rd' : 'th'
+              const floorName = `${f}${suffix} Floor`
+              const { data: newFlr } = await serviceClient
+                .from('floors')
+                .insert({
+                  organization_id: orgId,
+                  building_id: buildingId,
+                  floor_number: f,
+                  name: floorName,
+                })
+                .select('id, floor_number')
+                .single()
+              if (newFlr) {
+                activeFloors.push(newFlr)
+              }
+            }
+          }
+
+          // Check if rooms already exist
+          const { count: existingRoomCount } = await serviceClient
             .from('rooms')
-            .update({ base_rent_paise: rentPaise })
-            .eq('property_id', propertyId)
+            .select('id', { count: 'exact', head: true })
+            .eq('organization_id', orgId)
+
+          if (!existingRoomCount || existingRoomCount === 0) {
+            const floorCountSafe = Math.max(1, activeFloors.length)
+            const roomsPerFloor = Math.ceil(totalRooms / floorCountSafe)
+            let roomsCreatedCount = 0
+
+            for (const flr of activeFloors) {
+              if (roomsCreatedCount >= totalRooms) break
+              const countForThisFloor = Math.min(roomsPerFloor, totalRooms - roomsCreatedCount)
+
+              for (let r = 1; r <= countForThisFloor; r++) {
+                roomsCreatedCount++
+                const roomNum = `${flr.floor_number}${String(r).padStart(2, '0')}` // e.g. 101, 102, 201, 202
+
+                const { data: createdRoom } = await serviceClient
+                  .from('rooms')
+                  .insert({
+                    organization_id: orgId,
+                    floor_id: flr.id,
+                    room_number: roomNum,
+                    name: `Room ${roomNum}`,
+                    room_type: roomSharing,
+                    capacity: roomCapacity,
+                    base_rent_paise: rentPaise,
+                  })
+                  .select('id, room_number')
+                  .single()
+
+                if (createdRoom) {
+                  const bedsToInsert: any[] = []
+                  for (let b = 0; b < roomCapacity; b++) {
+                    const bedLetter = String.fromCharCode(65 + b) // A, B, C, D
+                    bedsToInsert.push({
+                      organization_id: orgId,
+                      room_id: createdRoom.id,
+                      bed_label: `${createdRoom.room_number}-${bedLetter}`,
+                      status: 'available',
+                      base_rent_paise: rentPaise,
+                    })
+                  }
+                  await serviceClient.from('beds').insert(bedsToInsert)
+
+                  // If sub-meter per room, create sub-meter for this room
+                  if (meterType === 'sub') {
+                    try {
+                      await serviceClient.from('electricity_meters').insert({
+                        organization_id: orgId,
+                        property_id: propertyId,
+                        room_id: createdRoom.id,
+                        meter_number: `MTR-${createdRoom.room_number}`,
+                        meter_type: 'sub',
+                        allocation_method: allocationMethod === 'room_actual' ? 'equal_split' : allocationMethod,
+                        is_active: true,
+                        notes: `Room ${createdRoom.room_number} sub-meter (Tariff: ₹${electricityRate}/unit)`,
+                      })
+                    } catch {}
+                  }
+                }
+              }
+            }
+          } else {
+            // Update existing rooms with base rent and sharing
+            await serviceClient
+              .from('rooms')
+              .update({ base_rent_paise: rentPaise, room_type: roomSharing, capacity: roomCapacity })
+              .eq('organization_id', orgId)
+          }
         }
       } catch (setupErr: any) {
         console.warn('[Onboarding auto room setup warning]:', setupErr?.message)
       }
+
+      // 5. Electricity Meter setup (Main Property Meter)
+      try {
+        const mainMeterNumber = `MTR-MAIN-${slugify(propName).slice(0, 8).toUpperCase() || '01'}`
+        const { data: existingMainMeter } = await serviceClient
+          .from('electricity_meters')
+          .select('id')
+          .eq('organization_id', orgId)
+          .eq('meter_number', mainMeterNumber)
+          .maybeSingle()
+
+        if (!existingMainMeter) {
+          await serviceClient.from('electricity_meters').insert({
+            organization_id: orgId,
+            property_id: propertyId,
+            meter_number: mainMeterNumber,
+            meter_type: meterType === 'sub' ? 'main' : meterType,
+            allocation_method: allocationMethod === 'room_actual' ? 'equal_split' : allocationMethod,
+            is_active: true,
+            notes: `Main property electric connection (Tariff: ₹${electricityRate}/unit)`,
+          })
+        }
+      } catch (mErr: any) {
+        console.warn('[Electricity meter insert warning]:', mErr?.message)
+      }
     }
 
-    // 5. Update Firestore owner profile to unlocked & verified
     const nowIso = new Date().toISOString()
+
+    // 6. On-site Staff Setup (if staff_name provided)
+    if (staff_name && staff_name.trim()) {
+      const cleanStaffName = staff_name.trim()
+      const staffPhoneClean = staff_phone ? cleanMobile(staff_phone) : ''
+      const staffSalaryPaise = (Number(staff_salary) || 15000) * 100
+      const staffRoleEffective = staff_role || 'Manager / Supervisor'
+
+      // 6a. In Firestore staff_members collection
+      try {
+        const { queryCollection, createDocument } = await import('@/lib/firebase/firestore')
+        const existingStaff = await queryCollection('staff_members', [
+          { field: 'organization_id', operator: '==', value: orgId },
+        ])
+        const alreadyExists = (existingStaff || []).some(
+          (s: any) => s.name?.toLowerCase() === cleanStaffName.toLowerCase()
+        )
+        if (!alreadyExists) {
+          await createDocument('staff_members', {
+            organization_id: orgId,
+            name: cleanStaffName,
+            role: staffRoleEffective,
+            phone: staffPhoneClean || targetUser.phone || '',
+            shift: 'General (9 AM - 6 PM)',
+            monthlySalaryPaise: staffSalaryPaise,
+            advanceTakenPaise: 0,
+            overtimeHours: 0,
+            status: 'active',
+            notes: 'Initial on-site staff enrolled during superadmin onboarding',
+            created_at: nowIso,
+            updated_at: nowIso,
+          })
+        }
+      } catch (stErr: any) {
+        console.warn('[Staff Firestore create warning]:', stErr?.message)
+      }
+
+      // 6b. In Supabase users table
+      if (staffPhoneClean) {
+        try {
+          const { data: existingStaffUser } = await serviceClient
+            .from('users')
+            .select('id')
+            .eq('phone', staffPhoneClean)
+            .maybeSingle()
+
+          if (!existingStaffUser) {
+            await serviceClient.from('users').insert({
+              organization_id: orgId,
+              full_name: cleanStaffName,
+              phone: staffPhoneClean,
+              email: '',
+              role: 'staff',
+              is_active: true,
+            })
+          }
+        } catch (sDbErr: any) {
+          console.warn('[Staff Supabase user warning]:', sDbErr?.message)
+        }
+      }
+    }
+
+    // 7. Update Firestore owner profile to unlocked & verified
     try {
       const { queryDocuments, updateDocument } = await import('@/lib/firebase/firestore')
       if (cleanedMobile) {
@@ -527,8 +716,15 @@ export async function POST(request: NextRequest) {
             organization_id: orgId,
             property_name: propName,
             city: propCity,
-            approx_rooms: roomCount,
-            starting_rent: Number(starting_rent) || 7500,
+            address: propAddress,
+            approx_rooms: totalRooms,
+            starting_rent: rentRupees,
+            electricity_rate: electricityRate,
+            electricity_meter_type: meterType,
+            building_name: bldgName,
+            floor_count: floorsCount,
+            staff_name: staff_name?.trim() || null,
+            staff_role: staff_role || null,
             unlocked_at: nowIso,
             unlocked_by: admin.email || 'superadmin',
             updated_at: nowIso,
@@ -539,26 +735,28 @@ export async function POST(request: NextRequest) {
       console.warn('[Firestore Owner Profile Unlock Warning]:', fErr?.message)
     }
 
-    // 6. Audit Log
+    // 8. Audit Log
     try {
       await serviceClient.from('audit_logs').insert({
         organization_id: orgId,
         actor_id: targetUser.id,
-        action: action === 'unlock_only' ? 'owner_quick_unlocked' : 'owner_onboarded_unlocked',
+        action: 'owner_onboarded_unlocked',
         entity_type: 'owner_profiles',
         entity_id: targetUser.id,
         metadata: {
           property_name: propName,
           city: propCity,
           unlocked_by: admin.email,
-          approx_rooms: roomCount,
+          approx_rooms: totalRooms,
+          building_name: bldgName,
+          floor_count: floorsCount,
+          electricity_rate: electricityRate,
+          staff_name: staff_name?.trim() || null,
         },
       })
     } catch {}
 
-    const successMessage = action === 'unlock_only'
-      ? `Owner ERP unlocked successfully! "${propName}" is now active.`
-      : `Owner onboarding completed! "${propName}" has been created with ${roomCount} rooms and ERP is unlocked.`
+    const successMessage = `PG "${propName}" setup complete with ${totalRooms} rooms across ${floorsCount} floors. Electricity tariff (₹${electricityRate}/unit) and staff configured. ERP unlocked!`
 
     return NextResponse.json({
       success: true,

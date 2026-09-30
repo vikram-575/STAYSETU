@@ -7,7 +7,7 @@ import {
   Building2, Search, ShieldCheck, ShieldAlert, KeyRound,
   ExternalLink, Phone, Mail, MapPin, CheckCircle2,
   Clock, AlertTriangle, ChevronRight, X, Loader2, Edit3, Sparkles, Plus,
-  Lock, User, Check, RefreshCw, Download
+  Lock, User, Check, RefreshCw, Download, Zap, Users, ArrowLeft, ArrowRight
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/money'
 import { formatDate } from '@/lib/utils'
@@ -32,14 +32,38 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
   const [pendingLoading, setPendingLoading] = useState(false)
   const [unlockingOwnerId, setUnlockingOwnerId] = useState<string | null>(null)
 
-  // Onboard / Unlock Modal state
+  // 4-Step Guided Onboard & Unlock Wizard State
   const [onboardModalOwner, setOnboardModalOwner] = useState<any>(null)
+  const [wizardStep, setWizardStep] = useState<1 | 2 | 3 | 4>(1)
+
+  // Step 1: Basic Details
+  const [onboardOwnerName, setOnboardOwnerName] = useState('')
+  const [onboardMobile, setOnboardMobile] = useState('')
+  const [onboardEmail, setOnboardEmail] = useState('')
   const [onboardPropName, setOnboardPropName] = useState('')
   const [onboardCity, setOnboardCity] = useState('')
   const [onboardAddress, setOnboardAddress] = useState('')
   const [onboardPgType, setOnboardPgType] = useState('coliving')
+
+  // Step 2: Building & Structure
+  const [onboardBuildingCount, setOnboardBuildingCount] = useState('1')
+  const [onboardBuildingName, setOnboardBuildingName] = useState('Main Block')
+  const [onboardFloorCount, setOnboardFloorCount] = useState('3')
   const [onboardRooms, setOnboardRooms] = useState('6')
+  const [onboardRoomType, setOnboardRoomType] = useState('Double Sharing')
   const [onboardRent, setOnboardRent] = useState('7500')
+
+  // Step 3: Electricity Charges
+  const [onboardElectricityRate, setOnboardElectricityRate] = useState('10')
+  const [onboardMeterType, setOnboardMeterType] = useState('sub')
+  const [onboardAllocationMethod, setOnboardAllocationMethod] = useState('room_actual')
+
+  // Step 4: Staff Details
+  const [onboardStaffName, setOnboardStaffName] = useState('')
+  const [onboardStaffPhone, setOnboardStaffPhone] = useState('')
+  const [onboardStaffRole, setOnboardStaffRole] = useState('Manager / Supervisor')
+  const [onboardStaffSalary, setOnboardStaffSalary] = useState('15000')
+
   const [onboardSubmitting, setOnboardSubmitting] = useState(false)
   const [onboardSuccess, setOnboardSuccess] = useState('')
   const [onboardError, setOnboardError] = useState('')
@@ -97,30 +121,8 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
     loadPendingOwners()
   }, [])
 
-  const handleQuickUnlockOwner = async (owner: any) => {
-    const targetId = owner.user_id || owner.id
-    setUnlockingOwnerId(targetId)
-    try {
-      const res = await fetch('/api/admin/onboard-owner', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'unlock_only',
-          userId: owner.user_id,
-          mobile: owner.mobile,
-          full_name: owner.full_name,
-          city: owner.city && owner.city !== 'Not provided' ? owner.city : 'Bengaluru',
-          property_name: owner.full_name ? `${owner.full_name}'s PG` : undefined,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to unlock owner')
-      await Promise.all([loadPendingOwners(), loadOrganizations()])
-    } catch (err: any) {
-      alert(err.message || 'Failed to unlock owner')
-    } finally {
-      setUnlockingOwnerId(null)
-    }
+  const handleQuickUnlockOwner = (owner: any) => {
+    handleOpenOnboardModal(owner)
   }
 
   const handleNavigateToOnboarding = (owner: any) => {
@@ -136,15 +138,79 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
     router.push(`/onboarding?${params.toString()}`)
   }
 
+  const validateStep1 = () => {
+    setOnboardError('')
+    if (!onboardOwnerName.trim()) {
+      setOnboardError('Please enter the owner full name.')
+      return false
+    }
+    if (!onboardMobile.trim()) {
+      setOnboardError('Please enter the owner contact phone number.')
+      return false
+    }
+    if (!onboardPropName.trim()) {
+      setOnboardError('Please enter the PG / Property Name.')
+      return false
+    }
+    if (!onboardCity.trim()) {
+      setOnboardError('Please enter the city for the PG.')
+      return false
+    }
+    return true
+  }
+
+  const validateStep2 = () => {
+    setOnboardError('')
+    if (!onboardBuildingName.trim()) {
+      setOnboardError('Please enter the building name (e.g. Main Block).')
+      return false
+    }
+    const floors = Number(onboardFloorCount)
+    if (!floors || floors < 1) {
+      setOnboardError('Please enter at least 1 floor.')
+      return false
+    }
+    const rooms = Number(onboardRooms)
+    if (!rooms || rooms < 1) {
+      setOnboardError('Please enter at least 1 room.')
+      return false
+    }
+    return true
+  }
+
   const handleOpenOnboardModal = (owner: any) => {
     setOnboardModalOwner(owner)
+    setWizardStep(1)
+
+    // Step 1 defaults
+    setOnboardOwnerName(owner.full_name || 'PG Owner')
+    setOnboardMobile(owner.mobile || '')
+    setOnboardEmail(owner.email || '')
     const validCity = owner.city && owner.city !== 'Not provided' ? owner.city : 'Bengaluru'
     setOnboardPropName(owner.organization_name || (owner.full_name ? `${owner.full_name}'s PG` : 'New Luxury PG'))
     setOnboardCity(validCity)
     setOnboardAddress(owner.address || `${validCity}, India`)
     setOnboardPgType(owner.pg_type || 'coliving')
+
+    // Step 2 defaults
+    setOnboardBuildingCount(owner.building_count ? String(owner.building_count) : '1')
+    setOnboardBuildingName(owner.building_name || 'Main Block')
+    setOnboardFloorCount(owner.floor_count ? String(owner.floor_count) : '3')
     setOnboardRooms(owner.approx_rooms ? String(owner.approx_rooms) : '6')
+    setOnboardRoomType(owner.room_type || 'Double Sharing')
     setOnboardRent(owner.starting_rent ? String(owner.starting_rent) : '7500')
+
+    // Step 3 defaults
+    setOnboardElectricityRate(owner.electricity_rate ? String(owner.electricity_rate) : '10')
+    setOnboardMeterType('sub')
+    setOnboardAllocationMethod('room_actual')
+
+    // Step 4 defaults
+    setOnboardStaffName(owner.staff_name || '')
+    setOnboardStaffPhone('')
+    setOnboardStaffRole(owner.staff_role || 'Manager / Supervisor')
+    setOnboardStaffSalary('15000')
+
     setOnboardError('')
     setOnboardSuccess('')
   }
@@ -160,16 +226,29 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: action === 'unlock' ? 'onboard_pg' : action,
+          action: action === 'reject' ? 'reject' : 'onboard_pg',
           userId: onboardModalOwner.user_id,
-          mobile: onboardModalOwner.mobile,
-          full_name: onboardModalOwner.full_name,
+          mobile: onboardMobile.trim() || onboardModalOwner.mobile,
+          full_name: onboardOwnerName.trim() || onboardModalOwner.full_name,
+          email: onboardEmail.trim() || onboardModalOwner.email,
           property_name: onboardPropName.trim(),
           city: onboardCity.trim(),
           address: onboardAddress.trim(),
           pg_type: onboardPgType,
+          building_count: Number(onboardBuildingCount) || 1,
+          building_name: onboardBuildingName.trim() || 'Main Block',
+          floor_count: Number(onboardFloorCount) || 3,
           approx_rooms: Number(onboardRooms) || 6,
+          room_count: Number(onboardRooms) || 6,
+          room_type: onboardRoomType,
           starting_rent: Number(onboardRent) || 7500,
+          electricity_rate_per_unit: Number(onboardElectricityRate) || 10,
+          electricity_meter_type: onboardMeterType,
+          electricity_allocation_method: onboardAllocationMethod,
+          staff_name: onboardStaffName.trim(),
+          staff_phone: onboardStaffPhone.trim(),
+          staff_role: onboardStaffRole,
+          staff_salary: Number(onboardStaffSalary) || 15000,
         }),
       })
       const data = await res.json()
@@ -177,11 +256,11 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
         throw new Error(data.error || 'Failed to finish onboarding')
       }
 
-      setOnboardSuccess(data.message || 'Owner successfully onboarded and ERP adjusted!')
+      setOnboardSuccess(data.message || 'Owner successfully onboarded and ERP unlocked!')
       await Promise.all([loadPendingOwners(), loadOrganizations()])
       setTimeout(() => {
         setOnboardModalOwner(null)
-      }, 900)
+      }, 1000)
     } catch (err: any) {
       setOnboardError(err.message || 'Failed to complete owner onboarding')
     } finally {
@@ -617,16 +696,11 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
                               <>
                                 <button
                                   type="button"
-                                  onClick={() => handleQuickUnlockOwner(owner)}
-                                  disabled={unlockingOwnerId === targetId}
-                                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black transition inline-flex items-center gap-1.5 shadow-md shadow-amber-500/20 active:scale-95 disabled:opacity-50 cursor-pointer"
-                                  title="Quick Unlock & Initialize ERP"
+                                  onClick={() => handleOpenOnboardModal(owner)}
+                                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black transition inline-flex items-center gap-1.5 shadow-md shadow-amber-500/20 active:scale-95 cursor-pointer"
+                                  title="Setup PG & Unlock ERP (Basic Details, Buildings, Electricity & Staff)"
                                 >
-                                  {unlockingOwnerId === targetId ? (
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                  ) : (
-                                    <KeyRound className="w-3.5 h-3.5" />
-                                  )}
+                                  <KeyRound className="w-3.5 h-3.5" />
                                   <span>Unlock ERP</span>
                                 </button>
 
@@ -1030,162 +1104,493 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
         </div>
       )}
 
-      {/* SuperAdmin Onboard & Unlock Owner Modal */}
+      {/* SuperAdmin Onboard & Unlock Owner Guided 4-Step Wizard Modal */}
       {onboardModalOwner && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
-          <div className="w-full max-w-lg bg-slate-900 border border-amber-500/30 rounded-2xl p-6 space-y-4 shadow-2xl my-8">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
-                  <Sparkles className="w-4 h-4" />
+          <div className="w-full max-w-xl bg-slate-900 border border-amber-500/30 rounded-2xl p-6 space-y-4 shadow-2xl my-8 max-h-[90vh] flex flex-col justify-between">
+            {/* Modal Header */}
+            <div>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-white flex items-center gap-2">
+                      <span>ERP Onboarding & Unlock Wizard</span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                        Step {wizardStep} of 4
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      Guided setup for {onboardModalOwner.full_name || 'PG Owner'} before unlocking ERP
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-black text-white">
-                    Onboard PG Property & Adjust ERP
-                  </h3>
-                  <p className="text-[11px] text-slate-400">
-                    Provision PG Property, auto-generate rooms & beds, or{' '}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const owner = onboardModalOwner
-                        setOnboardModalOwner(null)
-                        handleNavigateToOnboarding(owner)
-                      }}
-                      className="text-blue-400 hover:underline font-bold inline-flex items-center gap-0.5"
+                <button
+                  onClick={() => setOnboardModalOwner(null)}
+                  className="p-1.5 text-slate-400 hover:text-white rounded-xl bg-slate-800 border border-slate-700 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* 4-Step Tabs Indicator */}
+              <div className="grid grid-cols-4 gap-1.5 bg-slate-950/60 p-1.5 rounded-xl border border-slate-800 text-center mt-3">
+                <button
+                  type="button"
+                  onClick={() => setWizardStep(1)}
+                  className={`py-1.5 px-1 sm:px-2 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                    wizardStep === 1
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <User className="w-3 h-3" />
+                  <span className="truncate">1. Basic</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (validateStep1()) setWizardStep(2)
+                  }}
+                  className={`py-1.5 px-1 sm:px-2 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                    wizardStep === 2
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Building2 className="w-3 h-3" />
+                  <span className="truncate">2. Building</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (validateStep1() && validateStep2()) setWizardStep(3)
+                  }}
+                  className={`py-1.5 px-1 sm:px-2 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                    wizardStep === 3
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Zap className="w-3 h-3" />
+                  <span className="truncate">3. Electricity</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (validateStep1() && validateStep2()) setWizardStep(4)
+                  }}
+                  className={`py-1.5 px-1 sm:px-2 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                    wizardStep === 4
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Users className="w-3 h-3" />
+                  <span className="truncate">4. Staff</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body - Scrollable */}
+            <div className="overflow-y-auto pr-1 space-y-4 max-h-[55vh]">
+              {/* STEP 1: BASIC DETAILS */}
+              {wizardStep === 1 && (
+                <div className="space-y-3.5">
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-300 flex items-center gap-2">
+                    <User className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>
+                      <strong>Step 1: Basic Details</strong> — Verify and update owner identity and property details.
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                        Owner Full Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={onboardOwnerName}
+                        onChange={(e) => setOnboardOwnerName(e.target.value)}
+                        placeholder="Owner name"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                        Mobile Phone Number *
+                      </label>
+                      <input
+                        type="text"
+                        value={onboardMobile}
+                        onChange={(e) => setOnboardMobile(e.target.value)}
+                        placeholder="10-digit mobile"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500 font-mono"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                        Email Address
+                      </label>
+                      <input
+                        type="email"
+                        value={onboardEmail}
+                        onChange={(e) => setOnboardEmail(e.target.value)}
+                        placeholder="owner@example.com"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                        PG Type *
+                      </label>
+                      <select
+                        value={onboardPgType}
+                        onChange={(e) => setOnboardPgType(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                      >
+                        <option value="coliving">Co-Living (Unisex)</option>
+                        <option value="boys">Boys PG</option>
+                        <option value="girls">Girls PG</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                      Property / PG Brand Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={onboardPropName}
+                      onChange={(e) => setOnboardPropName(e.target.value)}
+                      placeholder="e.g. Sri Lakshmi Luxury PG"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-bold text-slate-300">City *</label>
+                      <div className="flex items-center gap-1">
+                        {['Bengaluru', 'Pune', 'Hyderabad', 'Delhi NCR'].map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => setOnboardCity(c)}
+                            className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+                          >
+                            {c}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <input
+                      type="text"
+                      value={onboardCity}
+                      onChange={(e) => setOnboardCity(e.target.value)}
+                      placeholder="e.g. Bengaluru"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                      Physical Address & Landmark
+                    </label>
+                    <input
+                      type="text"
+                      value={onboardAddress}
+                      onChange={(e) => setOnboardAddress(e.target.value)}
+                      placeholder="e.g. #42, 5th Cross, 6th Block, Koramangala"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 2: BUILDING & STRUCTURE */}
+              {wizardStep === 2 && (
+                <div className="space-y-3.5">
+                  <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-xs text-blue-300 flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-blue-400 shrink-0" />
+                    <span>
+                      <strong>Step 2: Building & Structure</strong> — Define buildings, floors, and rooms. The system will auto-generate rooms and beds.
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                        Number of Buildings
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="10"
+                        value={onboardBuildingCount}
+                        onChange={(e) => setOnboardBuildingCount(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                        Building / Block Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={onboardBuildingName}
+                        onChange={(e) => setOnboardBuildingName(e.target.value)}
+                        placeholder="e.g. Main Block or Block A"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                        Number of Floors *
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="20"
+                        value={onboardFloorCount}
+                        onChange={(e) => setOnboardFloorCount(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                        Total Number of Rooms *
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={onboardRooms}
+                        onChange={(e) => setOnboardRooms(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                        Default Room Sharing Type
+                      </label>
+                      <select
+                        value={onboardRoomType}
+                        onChange={(e) => setOnboardRoomType(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                      >
+                        <option value="Single Room">Single Room (1 Bed)</option>
+                        <option value="Double Sharing">Double Sharing (2 Beds)</option>
+                        <option value="Triple Sharing">Triple Sharing (3 Beds)</option>
+                        <option value="Four Sharing">Four Sharing (4 Beds)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                        Default Monthly Rent (₹/bed)
+                      </label>
+                      <input
+                        type="number"
+                        min="1000"
+                        step="500"
+                        value={onboardRent}
+                        onChange={(e) => setOnboardRent(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Auto-Calculation Preview Card */}
+                  <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl space-y-1 text-xs">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Structure Preview</span>
+                    <div className="text-slate-300">
+                      🏢 <strong>{onboardBuildingName || 'Main Block'}</strong> • {onboardFloorCount || 3} Floors •{' '}
+                      {onboardRooms || 6} Rooms (~{Math.ceil(Number(onboardRooms || 6) / Math.max(1, Number(onboardFloorCount || 3)))} rooms/floor)
+                    </div>
+                    <div className="text-[11px] text-emerald-400 font-semibold">
+                      ✨ Auto-generates ~{Number(onboardRooms || 6) * (onboardRoomType.includes('Single') ? 1 : onboardRoomType.includes('Triple') ? 3 : onboardRoomType.includes('Four') ? 4 : 2)} total beds at ₹{Number(onboardRent || 7500).toLocaleString('en-IN')}/mo per bed.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 3: ELECTRICITY CHARGES */}
+              {wizardStep === 3 && (
+                <div className="space-y-3.5">
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-300 flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>
+                      <strong>Step 3: Electric Bill Charges</strong> — Configure per-unit electricity tariff and meter billing model.
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                      Electric Bill Charges Per Unit (₹ / kWh) *
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-bold">₹</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="50"
+                        step="0.5"
+                        value={onboardElectricityRate}
+                        onChange={(e) => setOnboardElectricityRate(e.target.value)}
+                        placeholder="10"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-8 pr-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-amber-500"
+                        required
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Standard unit rate charged to residents. Recommended: ₹9 to ₹12 / unit for commercial/residential PG.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                      Meter Installation Model
+                    </label>
+                    <select
+                      value={onboardMeterType}
+                      onChange={(e) => setOnboardMeterType(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
                     >
-                      switch to Full Onboarding Wizard (/onboarding) <ExternalLink className="w-3 h-3" />
-                    </button>
-                  </p>
+                      <option value="sub">Sub-meter per Room (Individual room meters)</option>
+                      <option value="common_floor">Common Floor Meter (One meter per floor)</option>
+                      <option value="main">Commercial Main Connection (Single whole building meter)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                      Bill Allocation Method
+                    </label>
+                    <select
+                      value={onboardAllocationMethod}
+                      onChange={(e) => setOnboardAllocationMethod(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                    >
+                      <option value="room_actual">Actual Room Meter Reading (Units × ₹{onboardElectricityRate})</option>
+                      <option value="equal_split">Equal Split (Total units split equally among active occupants)</option>
+                    </select>
+                  </div>
+
+                  <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl space-y-1 text-xs">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Electricity Summary</span>
+                    <div className="text-slate-300">
+                      ⚡ Tariff set to <strong>₹{onboardElectricityRate || 10}/kWh</strong>. Monthly readings can be entered under ERP Electricity Module.
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <button
-                onClick={() => setOnboardModalOwner(null)}
-                className="p-1.5 text-slate-400 hover:text-white rounded-xl bg-slate-800 border border-slate-700"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              )}
+
+              {/* STEP 4: STAFF INFORMATION */}
+              {wizardStep === 4 && (
+                <div className="space-y-3.5">
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
+                    <Users className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>
+                      <strong>Step 4: On-site Staff</strong> — Assign initial property manager or caretaker (optional; can be added anytime in ERP).
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                        Staff / Caretaker Name
+                      </label>
+                      <input
+                        type="text"
+                        value={onboardStaffName}
+                        onChange={(e) => setOnboardStaffName(e.target.value)}
+                        placeholder="e.g. Ramesh Kumar"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                        Staff Phone Number
+                      </label>
+                      <input
+                        type="text"
+                        value={onboardStaffPhone}
+                        onChange={(e) => setOnboardStaffPhone(e.target.value)}
+                        placeholder="e.g. 9876543210"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                        Staff Role / Designation
+                      </label>
+                      <select
+                        value={onboardStaffRole}
+                        onChange={(e) => setOnboardStaffRole(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                      >
+                        <option value="Manager / Supervisor">Manager / Supervisor</option>
+                        <option value="Warden">Warden</option>
+                        <option value="Caretaker">Caretaker</option>
+                        <option value="Security Guard">Security Guard</option>
+                        <option value="Cook">Cook</option>
+                        <option value="Housekeeping">Housekeeping</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                        Monthly Salary (₹)
+                      </label>
+                      <input
+                        type="number"
+                        min="1000"
+                        step="500"
+                        value={onboardStaffSalary}
+                        onChange={(e) => setOnboardStaffSalary(e.target.value)}
+                        placeholder="15000"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Summary of full setup before unlock */}
+                  <div className="p-3 bg-slate-950/80 border border-emerald-500/30 rounded-xl space-y-1.5 text-xs">
+                    <span className="text-[10px] uppercase font-bold text-emerald-400">Complete Onboarding Summary</span>
+                    <ul className="text-slate-300 space-y-1 text-[11px]">
+                      <li>🏠 <strong>Property:</strong> {onboardPropName} ({onboardCity})</li>
+                      <li>🏢 <strong>Structure:</strong> {onboardBuildingName} ({onboardFloorCount} Floors, {onboardRooms} Rooms, {onboardRoomType})</li>
+                      <li>⚡ <strong>Electricity:</strong> ₹{onboardElectricityRate}/unit ({onboardMeterType === 'sub' ? 'Room Sub-meter' : 'Floor/Main'})</li>
+                      <li>👥 <strong>Staff:</strong> {onboardStaffName ? `${onboardStaffName} (${onboardStaffRole})` : 'To be added later'}</li>
+                    </ul>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Owner Personal Profile Review */}
-            <div className="p-3.5 bg-slate-950/60 rounded-xl border border-slate-800 space-y-1.5 text-xs">
-              <div className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1.5">
-                <User className="w-3 h-3 text-amber-400" />
-                Owner Personal Details (Registered)
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-slate-300 mt-2">
-                <div>
-                  <span className="text-slate-500 block text-[10px]">Full Name</span>
-                  <span className="font-bold text-white">{onboardModalOwner.full_name}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block text-[10px]">Phone Number</span>
-                  <span className="font-mono text-white">{onboardModalOwner.mobile}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block text-[10px]">Email Address</span>
-                  <span className="text-white">{onboardModalOwner.email || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block text-[10px]">Date of Birth / Gender</span>
-                  <span className="text-white">
-                    {onboardModalOwner.dob || 'N/A'} {onboardModalOwner.gender ? `(${onboardModalOwner.gender})` : ''}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Provision Property Configuration */}
-            <div className="space-y-3 pt-1">
-              <div className="text-[11px] font-bold uppercase text-slate-300 tracking-wider">
-                PG Property & Organization Setup
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-slate-400 block mb-1">
-                  Property / PG Brand Name *
-                </label>
-                <input
-                  type="text"
-                  value={onboardPropName}
-                  onChange={(e) => setOnboardPropName(e.target.value)}
-                  placeholder="e.g. Sri Lakshmi Luxury PG"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[11px] font-bold text-slate-400 block mb-1">
-                    City *
-                  </label>
-                  <input
-                    type="text"
-                    value={onboardCity}
-                    onChange={(e) => setOnboardCity(e.target.value)}
-                    placeholder="e.g. Bangalore"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-bold text-slate-400 block mb-1">
-                    PG Type
-                  </label>
-                  <select
-                    value={onboardPgType}
-                    onChange={(e) => setOnboardPgType(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
-                  >
-                    <option value="coliving">Co-Living (Unisex)</option>
-                    <option value="boys">Boys PG</option>
-                    <option value="girls">Girls PG</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-slate-400 block mb-1">
-                  Physical Address / Landmark
-                </label>
-                <input
-                  type="text"
-                  value={onboardAddress}
-                  onChange={(e) => setOnboardAddress(e.target.value)}
-                  placeholder="e.g. #42, 5th Cross, Koramangala"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[11px] font-bold text-slate-400 block mb-1">
-                    Initial Rooms to Provision
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={onboardRooms}
-                    onChange={(e) => setOnboardRooms(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-bold text-slate-400 block mb-1">
-                    Default Monthly Rent (₹)
-                  </label>
-                  <input
-                    type="number"
-                    min="1000"
-                    step="500"
-                    value={onboardRent}
-                    onChange={(e) => setOnboardRent(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
-                  />
-                </div>
-              </div>
-            </div>
-
+            {/* Error & Success Messages */}
             {onboardError && (
               <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-400 font-semibold flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />
@@ -1200,39 +1605,63 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
               </div>
             )}
 
+            {/* Modal Footer Controls */}
             <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
               <button
                 type="button"
                 onClick={() => setOnboardModalOwner(null)}
                 disabled={onboardSubmitting}
-                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition"
+                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition cursor-pointer"
               >
                 Cancel
               </button>
 
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleCompleteOnboarding('reject')}
-                  disabled={onboardSubmitting}
-                  className="px-3.5 py-2 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/40 rounded-xl text-xs font-bold transition"
-                >
-                  Reject & Keep Locked
-                </button>
+                {wizardStep > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setWizardStep((s) => (s > 1 ? ((s - 1) as any) : 1))}
+                    disabled={onboardSubmitting}
+                    className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Back</span>
+                  </button>
+                )}
 
-                <button
-                  type="button"
-                  onClick={() => handleCompleteOnboarding('onboard_pg')}
-                  disabled={onboardSubmitting || !onboardPropName.trim()}
-                  className="px-4 py-2 bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-lg shadow-amber-500/20 disabled:opacity-50"
-                >
-                  {onboardSubmitting ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                  )}
-                  <span>Save & Onboard PG Property</span>
-                </button>
+                {wizardStep < 4 ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (wizardStep === 1 && validateStep1()) setWizardStep(2)
+                      else if (wizardStep === 2 && validateStep2()) setWizardStep(3)
+                      else if (wizardStep === 3) setWizardStep(4)
+                    }}
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black transition flex items-center gap-1.5 shadow-md shadow-amber-500/20 cursor-pointer"
+                  >
+                    <span>
+                      {wizardStep === 1
+                        ? 'Next: Building & Floors →'
+                        : wizardStep === 2
+                        ? 'Next: Electric Charges →'
+                        : 'Next: Staff Info →'}
+                    </span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleCompleteOnboarding('onboard_pg')}
+                    disabled={onboardSubmitting || !onboardPropName.trim()}
+                    className="px-4 py-2 bg-gradient-to-r from-amber-500 via-emerald-500 to-teal-500 hover:from-amber-400 hover:to-teal-400 text-slate-950 font-black rounded-xl text-xs transition flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 disabled:opacity-50 cursor-pointer"
+                  >
+                    {onboardSubmitting ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <KeyRound className="w-3.5 h-3.5" />
+                    )}
+                    <span>Save Setup & Unlock ERP</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
