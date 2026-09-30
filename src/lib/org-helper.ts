@@ -54,28 +54,64 @@ export async function resolveEffectiveOrg(
     }
   }
 
-  // 2. Try to match by user email or phone if user exists
-  if (user?.email) {
-    const { data: matchedOrg } = await serviceClient
+  // 2. Try to match by owner_user_id, email, or phone if user exists
+  if (user?.id && isValidUUID(user.id)) {
+    const { data: ownedOrg } = await serviceClient
       .from('organizations')
       .select('id, name, slug, gst_enabled')
-      .or(`email.ilike.${user.email},phone.eq.${user.phone || 'none'}`)
+      .eq('owner_user_id', user.id)
       .order('created_at', { ascending: true })
       .limit(1)
       .maybeSingle()
 
-    if (matchedOrg && isValidUUID(matchedOrg.id)) {
-      // Link user to this org
-      if (user.id && isValidUUID(user.id)) {
-        try {
-          await serviceClient.from('users').update({ organization_id: matchedOrg.id }).eq('id', user.id)
-        } catch {}
-      }
+    if (ownedOrg && isValidUUID(ownedOrg.id)) {
+      try {
+        await serviceClient.from('users').update({ organization_id: ownedOrg.id }).eq('id', user.id)
+      } catch {}
       return {
-        id: matchedOrg.id,
-        name: matchedOrg.name,
-        slug: matchedOrg.slug,
-        gst_enabled: Boolean(matchedOrg.gst_enabled),
+        id: ownedOrg.id,
+        name: ownedOrg.name,
+        slug: ownedOrg.slug,
+        gst_enabled: Boolean(ownedOrg.gst_enabled),
+      }
+    }
+  }
+
+  const cleanMob = user?.phone ? user.phone.replace(/\D/g, '').slice(-10) : ''
+  const userEmail = user?.email?.trim()
+
+  if (userEmail || cleanMob) {
+    const orFilters: string[] = []
+    if (userEmail && !userEmail.includes('@pgsetu.')) {
+      orFilters.push(`email.ilike.${userEmail}`)
+    }
+    if (cleanMob) {
+      orFilters.push(`phone.eq.${cleanMob}`)
+      orFilters.push(`phone.ilike.%${cleanMob}%`)
+    }
+
+    if (orFilters.length > 0) {
+      const { data: matchedOrg } = await serviceClient
+        .from('organizations')
+        .select('id, name, slug, gst_enabled')
+        .or(orFilters.join(','))
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
+      if (matchedOrg && isValidUUID(matchedOrg.id)) {
+        // Link user to this org
+        if (user?.id && isValidUUID(user.id)) {
+          try {
+            await serviceClient.from('users').update({ organization_id: matchedOrg.id }).eq('id', user.id)
+          } catch {}
+        }
+        return {
+          id: matchedOrg.id,
+          name: matchedOrg.name,
+          slug: matchedOrg.slug,
+          gst_enabled: Boolean(matchedOrg.gst_enabled),
+        }
       }
     }
   }

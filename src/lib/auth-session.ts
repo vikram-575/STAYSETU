@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { getAdminSessionFromCookies, SUPER_ADMIN_EMAIL } from '@/lib/admin-auth'
+import { isValidUUID } from '@/lib/org-helper'
 
 export interface AuthSessionUser {
   id: string
@@ -128,8 +129,8 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
 
         const cleanMob = authMobile ? authMobile.replace(/\D/g, '').slice(-10) : ''
 
-        // Look up by ID first if present
-        if (authUserId) {
+        // Look up by ID first if present and valid UUID
+        if (authUserId && isValidUUID(authUserId)) {
           const { data } = await serviceClient
             .from('users')
             .select('*, organizations(*)')
@@ -198,11 +199,26 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
           let orgObj = fallbackProfile.organizations
 
           if (!orgId) {
-            const { data: matchedOrg } = await serviceClient
-              .from('organizations')
-              .select('id, name, slug, gst_enabled')
-              .or(`email.ilike.${fallbackProfile.email},phone.eq.${fallbackProfile.phone || 'none'},phone.ilike.%${cleanMob || 'none'}%`)
-              .maybeSingle()
+            const orFilters: string[] = []
+            if (fallbackProfile.email && fallbackProfile.email.trim()) {
+              orFilters.push(`email.ilike.${fallbackProfile.email.trim()}`)
+            }
+            if (fallbackProfile.phone) {
+              orFilters.push(`phone.eq.${fallbackProfile.phone}`)
+            }
+            if (cleanMob) {
+              orFilters.push(`phone.ilike.%${cleanMob}%`)
+            }
+
+            let matchedOrg: any = null
+            if (orFilters.length > 0) {
+              const { data } = await serviceClient
+                .from('organizations')
+                .select('id, name, slug, gst_enabled')
+                .or(orFilters.join(','))
+                .maybeSingle()
+              matchedOrg = data
+            }
 
             const { data: defaultOrg } = !matchedOrg
               ? await serviceClient
@@ -214,12 +230,14 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
               : { data: null }
 
             const resolvedOrg = matchedOrg || defaultOrg
-            if (resolvedOrg) {
+            if (resolvedOrg && isValidUUID(resolvedOrg.id)) {
               orgId = resolvedOrg.id
               orgObj = resolvedOrg
-              try {
-                await serviceClient.from('users').update({ organization_id: resolvedOrg.id }).eq('id', fallbackProfile.id)
-              } catch {}
+              if (isValidUUID(fallbackProfile.id)) {
+                try {
+                  await serviceClient.from('users').update({ organization_id: resolvedOrg.id }).eq('id', fallbackProfile.id)
+                } catch {}
+              }
             }
           }
 
@@ -260,13 +278,18 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
           .from('residents')
           .select('id, full_name, email, phone, registration_number, organization_id, organizations(*)')
         
-        if (targetResidentId) {
+        let shouldQueryResident = false
+        if (targetResidentId && isValidUUID(targetResidentId)) {
           residentQuery = residentQuery.eq('id', targetResidentId)
+          shouldQueryResident = true
         } else if (cleanMob) {
           residentQuery = residentQuery.or(`phone.ilike.%${cleanMob}%,alternate_phone.ilike.%${cleanMob}%`)
+          shouldQueryResident = true
         }
 
-        const { data: matchedResident } = await residentQuery.maybeSingle()
+        const { data: matchedResident } = shouldQueryResident
+          ? await residentQuery.maybeSingle()
+          : { data: null }
         if (matchedResident) {
           const resEmail = matchedResident.email && !matchedResident.email.includes('@resident.pgsetu.') && !matchedResident.email.includes('@user.pgsetu.')
             ? matchedResident.email
@@ -290,11 +313,12 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
           const safeEmail = authEmail && !authEmail.includes('@owner.pgsetu.') && !authEmail.includes('@user.pgsetu.') && !authEmail.includes('@resident.pgsetu.')
             ? authEmail
             : ''
+          const effectiveRole = isOwnerCookie ? 'owner' : (cookieRole as any) || 'resident'
           return {
-            id: authUserId || `user_${cleanMob}`,
+            id: (authUserId && isValidUUID(authUserId)) ? authUserId : `user_${cleanMob}`,
             email: safeEmail,
             full_name: cookieStore.get('auth_name')?.value || (isOwnerCookie ? 'PG Owner & Host' : 'PG-Setu Member'),
-            role: (cookieRole as any) || 'resident',
+            role: effectiveRole,
             organization_id: null,
             phone: authMobile,
             organizations: null,
@@ -328,11 +352,23 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
       let orgObj = profile.organizations
 
       if (!orgId) {
-        const { data: matchedOrg } = await serviceClient
-          .from('organizations')
-          .select('id, name, slug, gst_enabled')
-          .or(`email.ilike.${profile.email},phone.eq.${profile.phone || 'none'}`)
-          .maybeSingle()
+        const orFilters: string[] = []
+        if (profile.email && profile.email.trim()) {
+          orFilters.push(`email.ilike.${profile.email.trim()}`)
+        }
+        if (profile.phone) {
+          orFilters.push(`phone.eq.${profile.phone}`)
+        }
+
+        let matchedOrg: any = null
+        if (orFilters.length > 0) {
+          const { data } = await serviceClient
+            .from('organizations')
+            .select('id, name, slug, gst_enabled')
+            .or(orFilters.join(','))
+            .maybeSingle()
+          matchedOrg = data
+        }
 
         const { data: defaultOrg } = !matchedOrg
           ? await serviceClient
@@ -344,12 +380,14 @@ export async function getAuthenticatedUser(): Promise<AuthSessionUser | null> {
           : { data: null }
 
         const resolvedOrg = matchedOrg || defaultOrg
-        if (resolvedOrg) {
+        if (resolvedOrg && isValidUUID(resolvedOrg.id)) {
           orgId = resolvedOrg.id
           orgObj = resolvedOrg
-          try {
-            await serviceClient.from('users').update({ organization_id: resolvedOrg.id }).eq('id', profile.id)
-          } catch {}
+          if (isValidUUID(profile.id)) {
+            try {
+              await serviceClient.from('users').update({ organization_id: resolvedOrg.id }).eq('id', profile.id)
+            } catch {}
+          }
         }
       }
 

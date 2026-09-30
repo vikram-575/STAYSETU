@@ -56,6 +56,7 @@ export async function middleware(request: NextRequest) {
   const authUserId = request.cookies.get('auth_user_id')?.value
   const authEmail = request.cookies.get('auth_email')?.value?.toLowerCase().trim()
   const authRole = request.cookies.get('auth_role')?.value || sbUser?.user_metadata?.role || ''
+  const authMobile = request.cookies.get('auth_mobile')?.value
 
   const isSuperAdminUser =
     isSuperAdmin ||
@@ -63,7 +64,7 @@ export async function middleware(request: NextRequest) {
       authEmail || sbUser?.email,
       authRole,
       authUserId || sbUser?.id,
-      request.cookies.get('auth_mobile')?.value
+      authMobile
     )
 
   const isOwnerOrStaff =
@@ -75,7 +76,14 @@ export async function middleware(request: NextRequest) {
 
   const isResident = !isOwnerOrStaff && (authRole === 'resident' || authRole === 'tenant' || authRole === 'user')
 
-  const isAuthenticated = Boolean(isSuperAdminUser || sbUser || (authUserId && authEmail))
+  const isAuthenticated = Boolean(
+    isSuperAdminUser ||
+    sbUser ||
+    (authUserId && (authEmail || authMobile || authRole)) ||
+    authUserId ||
+    (authMobile && authMobile.length >= 10) ||
+    authEmail
+  )
 
   const mustChangePassword = request.cookies.get('must_change_password')?.value === 'true'
 

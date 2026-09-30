@@ -861,16 +861,13 @@ function MyProfileContent() {
                   <Plus className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline">Add Property</span>
                 </button>
-                <a
+                <Link
                   href="/dashboard"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-2.5 sm:px-3.5 py-1.5 text-[11px] sm:text-xs font-bold text-white shadow-xs hover:bg-[#166534] transition"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#14532D] px-2.5 sm:px-3.5 py-1.5 text-[11px] sm:text-xs font-bold text-white shadow-xs hover:bg-[#166534] transition active:scale-95"
                 >
                   <Building2 className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline">Owner ERP</span>
-                  <ExternalLink className="h-3 w-3 opacity-80" />
-                </a>
+                </Link>
               </div>
             ) : (
               <Link
@@ -1116,36 +1113,32 @@ function MyProfileContent() {
             </button>
 
             {/* 3. Owner ERP Dashboard */}
-            <a
+            <Link
               href="/dashboard"
-              target="_blank"
-              rel="noopener noreferrer"
               className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-gray-200/80 shadow-xs hover:border-emerald-300 active:scale-95 transition text-center group"
             >
               <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-700 group-hover:bg-amber-600 group-hover:text-white transition">
                 <Building2 className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
               <span className="mt-1.5 text-[10px] sm:text-xs font-bold text-gray-800 line-clamp-1 flex items-center justify-center gap-0.5">
-                Owner ERP <ExternalLink className="h-2.5 w-2.5 opacity-60" />
+                Owner ERP
               </span>
               <span className="text-[9px] text-gray-400 hidden sm:block">Full Dashboard</span>
-            </a>
+            </Link>
 
             {/* 4. Residents CRM */}
-            <a
+            <Link
               href="/dashboard/residents"
-              target="_blank"
-              rel="noopener noreferrer"
               className="flex flex-col items-center justify-center rounded-2xl bg-white p-2.5 sm:p-3.5 border border-gray-200/80 shadow-xs hover:border-emerald-300 active:scale-95 transition text-center group"
             >
               <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-700 group-hover:bg-purple-600 group-hover:text-white transition">
                 <Users className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
               <span className="mt-1.5 text-[10px] sm:text-xs font-bold text-gray-800 line-clamp-1 flex items-center justify-center gap-0.5">
-                Residents CRM <ExternalLink className="h-2.5 w-2.5 opacity-60" />
+                Residents CRM
               </span>
               <span className="text-[9px] text-gray-400 hidden sm:block">Check-in & KYC</span>
-            </a>
+            </Link>
           </div>
         ) : (
           <div className="grid grid-cols-4 gap-2 sm:gap-3">
@@ -1495,15 +1488,13 @@ function MyProfileContent() {
                           <Edit className="h-3.5 w-3.5" />
                           <span>Edit Details</span>
                         </button>
-                        <a
+                        <Link
                           href="/dashboard"
-                          target="_blank"
-                          rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 sm:gap-1.5 rounded-xl bg-[#14532D] px-2.5 py-1.5 sm:px-3 text-xs font-bold text-white hover:bg-[#166534] transition active:scale-95 shadow-xs"
                         >
                           <Building2 className="h-3.5 w-3.5" />
-                          <span>Open ERP ↗</span>
-                        </a>
+                          <span>Open ERP</span>
+                        </Link>
                         <button
                           type="button"
                           onClick={() => {

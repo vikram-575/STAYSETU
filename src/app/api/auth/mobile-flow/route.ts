@@ -560,12 +560,13 @@ export async function POST(request: NextRequest) {
       const now = new Date().toISOString()
 
       // ─── SAVE / UPSERT SIGNED-IN USER IN SUPABASE ───────────
+      const safeDbEmail = effectiveEmail || (effectiveRole === 'owner' ? `owner_${cleaned}@pgsetu.user` : `user_${cleaned}@pgsetu.user`)
       const { data: savedUser, error: saveErr } = await serviceClient
         .from('users')
         .upsert({
           id: targetUserId,
           organization_id: orgId,
-          email: effectiveEmail, // Empty string if not provided by user, never a fake email!
+          email: safeDbEmail,
           full_name: effectiveName,
           phone: cleaned,
           role: effectiveRole,
@@ -595,17 +596,13 @@ export async function POST(request: NextRequest) {
         path: '/',
       })
 
-      if (effectiveEmail) {
-        cookieStore.set('auth_email', effectiveEmail, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 60 * 60 * 24 * 30,
-          path: '/',
-        })
-      } else {
-        cookieStore.delete('auth_email')
-      }
+      cookieStore.set('auth_email', safeDbEmail, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 30,
+        path: '/',
+      })
 
       cookieStore.set('auth_role', effectiveRole, {
         httpOnly: false,
@@ -809,12 +806,13 @@ export async function POST(request: NextRequest) {
       const now = new Date().toISOString()
 
       // Save in Supabase users table
+      const safeDbEmail = effectiveEmail || `user_${cleanedMobile}@pgsetu.user`
       const { data: savedUser, error: saveErr } = await serviceClient
         .from('users')
         .upsert({
           id: targetUserId,
           organization_id: null,
-          email: effectiveEmail, // Empty string if not filled by user
+          email: safeDbEmail,
           full_name: full_name.trim(),
           phone: cleanedMobile,
           role: 'resident',
@@ -866,17 +864,13 @@ export async function POST(request: NextRequest) {
         maxAge: 60 * 60 * 24 * 30,
         path: '/',
       })
-      if (effectiveEmail) {
-        cookieStore.set('auth_email', effectiveEmail, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 60 * 60 * 24 * 30,
-          path: '/',
-        })
-      } else {
-        cookieStore.delete('auth_email')
-      }
+      cookieStore.set('auth_email', safeDbEmail, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 30,
+        path: '/',
+      })
       cookieStore.set('auth_role', 'resident', {
         httpOnly: false,
         secure: process.env.NODE_ENV === 'production',
@@ -1014,8 +1008,9 @@ export async function POST(request: NextRequest) {
         isVerified = true
       }
 
-      // Clean email — NEVER fabricate fake email
+      // Clean email — if not provided, assign deterministic valid fallback
       const effectiveEmail = cleanUserEmail(email)
+      const safeDbEmail = effectiveEmail || `owner_${cleanedMobile}@pgsetu.user`
       const now = new Date().toISOString()
 
       // Check if user record exists
@@ -1034,7 +1029,7 @@ export async function POST(request: NextRequest) {
           {
             id: targetUserId,
             organization_id: existingUser?.organization_id || null,
-            email: effectiveEmail, // Empty string if not filled by user
+            email: safeDbEmail,
             full_name: owner_name.trim(),
             phone: cleanedMobile,
             role: 'owner',
@@ -1093,17 +1088,13 @@ export async function POST(request: NextRequest) {
         maxAge: 60 * 60 * 24 * 30,
         path: '/',
       })
-      if (effectiveEmail) {
-        cookieStore.set('auth_email', effectiveEmail, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 60 * 60 * 24 * 30,
-          path: '/',
-        })
-      } else {
-        cookieStore.delete('auth_email')
-      }
+      cookieStore.set('auth_email', safeDbEmail, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 30,
+        path: '/',
+      })
       cookieStore.set('auth_role', 'owner', {
         httpOnly: false,
         secure: process.env.NODE_ENV === 'production',
