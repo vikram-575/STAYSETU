@@ -200,6 +200,7 @@ export async function POST(request: NextRequest) {
       action,
       userId,
       mobile,
+      full_name,
       property_name,
       city,
       address,
@@ -219,23 +220,35 @@ export async function POST(request: NextRequest) {
       targetUser = data
     }
     if (!targetUser && cleanedMobile.length >= 10) {
-      const { data } = await serviceClient
+      const { data: uByPhone } = await serviceClient
         .from('users')
         .select('*')
-        .or(`phone.ilike.%${cleanedMobile}%,phone.eq.${cleanedMobile}`)
+        .ilike('phone', `%${cleanedMobile}%`)
+        .limit(1)
+      if (uByPhone && uByPhone.length > 0) {
+        targetUser = uByPhone[0]
+      }
+    }
+    if (!targetUser && cleanedMobile.length >= 10) {
+      const { data: uExact } = await serviceClient
+        .from('users')
+        .select('*')
+        .eq('phone', cleanedMobile)
         .maybeSingle()
-      targetUser = data
+      targetUser = uExact
     }
 
     // If user does not exist in Supabase users table yet, create user row
     if (!targetUser) {
+      const defaultName = full_name || (property_name ? `${property_name} Owner` : 'PG Owner')
       const { data: newUser, error: userErr } = await serviceClient
         .from('users')
         .insert({
-          full_name: property_name ? `${property_name} Owner` : 'PG Owner',
+          full_name: defaultName,
           phone: cleanedMobile,
           email: (body.email && body.email.trim()) ? body.email.trim().toLowerCase() : '',
           role: 'owner',
+          is_active: true,
         })
         .select('*')
         .single()
@@ -244,6 +257,9 @@ export async function POST(request: NextRequest) {
         throw new Error(`Failed to initialize user: ${userErr?.message || 'Database error'}`)
       }
       targetUser = newUser
+    } else {
+      // Ensure user is active and role is owner
+      await serviceClient.from('users').update({ is_active: true, role: 'owner' }).eq('id', targetUser.id)
     }
 
     // Handle rejection
@@ -269,95 +285,12 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Action 1: UNLOCK ERP ACCESS ONLY (First step before PG onboarding)
-    if (action === 'unlock_only') {
-      try {
-        const { queryDocuments, updateDocument } = await import('@/lib/firebase/firestore')
-        if (cleanedMobile) {
-          const docs = await queryDocuments('owner_profiles', [{ field: 'mobile', operator: '==', value: cleanedMobile }])
-          if (docs && docs.length > 0) {
-            await updateDocument('owner_profiles', docs[0].id, {
-              erp_unlocked: true,
-              onboarding_status: 'unlocked_pending_pg',
-              reviewed_by: admin.email || 'superadmin',
-              updated_at: new Date().toISOString(),
-            })
-          }
-        }
-      } catch (fErr) {}
-
-      await serviceClient
-        .from('users')
-        .update({ is_active: true })
-        .eq('id', targetUser.id)
-
-      // Ensure Organization exists
-      let userOrgId = targetUser.organization_id
-      if (!userOrgId || userOrgId === 'edd624d8-f3a0-4f92-b8b9-515c50ed8e98') {
-        const orgName = `${targetUser.full_name || 'PG'} Stays`
-        const { data: newOrg } = await serviceClient
-          .from('organizations')
-          .insert({
-            name: orgName,
-            slug: `${slugify(orgName)}-${Date.now().toString(36)}`,
-            owner_user_id: targetUser.id,
-            phone: targetUser.phone,
-            email: targetUser.email,
-            city: city || 'Bengaluru',
-            currency_code: 'INR',
-            timezone: 'Asia/Kolkata',
-            settings: { plan: 'growth', subscription_status: 'active', is_verified: true },
-          })
-          .select('id')
-          .single()
-        if (newOrg) {
-          userOrgId = newOrg.id
-          await serviceClient.from('users').update({ organization_id: userOrgId }).eq('id', targetUser.id)
-        }
-      }
-
-      // Check if property exists; if not, create draft pending listing so it syncs to Marketplace tab
-      if (userOrgId) {
-        const { data: existingProps } = await serviceClient
-          .from('properties')
-          .select('id')
-          .eq('organization_id', userOrgId)
-          .limit(1)
-
-        if (!existingProps || existingProps.length === 0) {
-          const draftName = `${targetUser.full_name || 'Verified'} PG Residence`
-          await serviceClient.from('properties').insert({
-            organization_id: userOrgId,
-            name: draftName,
-            city: city || 'Bengaluru',
-            address: address || 'Main Road, City Center',
-            phone: targetUser.phone,
-            email: targetUser.email,
-            starting_rent_paise: 800000,
-            is_active: false, // draft pending approval in marketplace
-            settings: {
-              status: 'pending',
-              pg_type: 'coliving',
-              amenities: ['High-Speed WiFi', 'Power Backup', 'RO Water', 'CCTV Security'],
-              rules: ['No smoking', 'Gate closes at 11:00 PM'],
-            },
-          })
-        }
-      }
-
-      return NextResponse.json({
-        success: true,
-        status: 'unlocked_pending_pg',
-        message: `ERP access unlocked for ${targetUser.full_name || 'Owner'}. A draft listing has been submitted to the Marketplace for review.`,
-      })
-    }
-
-    // Action 2: ONBOARD PG PROPERTY & ADJUST ERP
-    const propName = property_name?.trim() || `${targetUser.full_name || 'PG'} Property`
-    const propCity = city?.trim() || 'Bangalore'
+    // Determine details for Onboarding / Unlock
+    const propName = property_name?.trim() || (targetUser.full_name ? `${targetUser.full_name}'s PG` : 'New PG Residence')
+    const propCity = city?.trim() || targetUser.city || 'Bengaluru'
     const propAddress = address?.trim() || `${propCity}, India`
     const effectivePgType = pg_type || 'coliving'
-    const roomCount = Math.max(1, Math.min(50, Number(approx_rooms) || 6))
+    const roomCount = Math.max(1, Math.min(100, Number(approx_rooms) || 6))
     const rentPaise = starting_rent ? Number(starting_rent) * 100 : 750000
 
     // 2. Check if user already has an organization (ignoring placeholder org)
@@ -373,7 +306,28 @@ export async function POST(request: NextRequest) {
       organization = existingOrg
     }
 
-    if (!organization) {
+    if (organization) {
+      // Update existing organization with latest details
+      await serviceClient
+        .from('organizations')
+        .update({
+          name: propName,
+          city: propCity,
+          address: propAddress,
+          phone: targetUser.phone,
+          settings: {
+            ...(organization.settings || {}),
+            plan: 'enterprise',
+            subscription_status: 'active',
+            is_verified: true,
+            verification_status: 'verified',
+            pg_type: effectivePgType,
+            approx_rooms: roomCount,
+            starting_rent: Number(starting_rent) || 7500,
+          },
+        })
+        .eq('id', orgId)
+    } else {
       // Provision fresh Organization
       const slug = `${slugify(propName)}-${Date.now().toString(36)}`
       const { data: newOrg, error: orgErr } = await serviceClient
@@ -395,6 +349,7 @@ export async function POST(request: NextRequest) {
             verification_status: 'verified',
             pg_type: effectivePgType,
             approx_rooms: roomCount,
+            starting_rent: Number(starting_rent) || 7500,
           },
         })
         .select('*')
@@ -410,18 +365,37 @@ export async function POST(request: NextRequest) {
       // Link user to this organization and set role to owner
       await serviceClient
         .from('users')
-        .update({ organization_id: orgId, role: 'owner' })
+        .update({ organization_id: orgId, role: 'owner', is_active: true })
         .eq('id', targetUser.id)
     }
 
-    // 3. Provision primary Property under this organization
+    // 3. Provision or Update primary Property under this organization
     const { data: existingProps } = await serviceClient
       .from('properties')
-      .select('id')
+      .select('id, name')
       .eq('organization_id', orgId)
 
     let propertyId: string | null = null
-    if (!existingProps || existingProps.length === 0) {
+
+    if (existingProps && existingProps.length > 0) {
+      propertyId = existingProps[0].id
+      await serviceClient
+        .from('properties')
+        .update({
+          name: propName,
+          city: propCity,
+          address: propAddress,
+          phone: targetUser.phone,
+          starting_rent_paise: rentPaise,
+          is_active: true,
+          settings: {
+            pg_type: effectivePgType,
+            amenities: ['High-Speed WiFi', 'Power Backup', 'RO Water', '3 Daily Meals', 'Air Conditioning', 'CCTV Security'],
+            rules: ['Gate closes at 11:00 PM', 'Visitors in lounge only', 'No smoking inside rooms'],
+          },
+        })
+        .eq('id', propertyId)
+    } else {
       const { data: newProp } = await serviceClient
         .from('properties')
         .insert({
@@ -443,56 +417,102 @@ export async function POST(request: NextRequest) {
         .single()
 
       propertyId = newProp?.id || null
+    }
 
-      // Provision Building, Floor, Rooms, Beds
-      if (propertyId) {
-        try {
-          const { data: bld } = await serviceClient
+    // 4. Provision Building, Floor, Rooms, Beds if none exist
+    if (propertyId) {
+      try {
+        const { count: existingRoomCount } = await serviceClient
+          .from('rooms')
+          .select('id', { count: 'exact', head: true })
+          .eq('property_id', propertyId)
+
+        if (!existingRoomCount || existingRoomCount === 0) {
+          // Check if building exists or create one
+          let buildingId: string | null = null
+          const { data: existingBldgs } = await serviceClient
             .from('buildings')
-            .insert({ property_id: propertyId, name: 'Main Block' })
             .select('id')
-            .single()
+            .eq('property_id', propertyId)
+            .limit(1)
 
-          if (bld) {
-            const { data: flr } = await serviceClient
-              .from('floors')
-              .insert({ building_id: bld.id, floor_number: 1, name: 'First Floor' })
+          if (existingBldgs && existingBldgs.length > 0) {
+            buildingId = existingBldgs[0].id
+          } else {
+            const { data: bld } = await serviceClient
+              .from('buildings')
+              .insert({ property_id: propertyId, name: 'Main Block' })
               .select('id')
               .single()
+            buildingId = bld?.id || null
+          }
 
-            if (flr) {
+          if (buildingId) {
+            // Check if floor exists or create one
+            let floorId: string | null = null
+            const { data: existingFlrs } = await serviceClient
+              .from('floors')
+              .select('id')
+              .eq('building_id', buildingId)
+              .limit(1)
+
+            if (existingFlrs && existingFlrs.length > 0) {
+              floorId = existingFlrs[0].id
+            } else {
+              const { data: flr } = await serviceClient
+                .from('floors')
+                .insert({ building_id: buildingId, floor_number: 1, name: 'First Floor' })
+                .select('id')
+                .single()
+              floorId = flr?.id || null
+            }
+
+            if (floorId) {
+              // Batch insert rooms
+              const roomsToInsert: any[] = []
               for (let i = 1; i <= roomCount; i++) {
                 const roomNum = `10${i}`
-                const { data: rm } = await serviceClient
-                  .from('rooms')
-                  .insert({
-                    organization_id: orgId,
-                    property_id: propertyId,
-                    floor_id: flr.id,
-                    room_number: roomNum,
-                    room_type: 'Double Sharing',
-                    capacity: 2,
-                    base_rent_paise: rentPaise,
-                  })
-                  .select('id')
-                  .single()
+                roomsToInsert.push({
+                  organization_id: orgId,
+                  property_id: propertyId,
+                  floor_id: floorId,
+                  room_number: roomNum,
+                  room_type: 'Double Sharing',
+                  capacity: 2,
+                  base_rent_paise: rentPaise,
+                })
+              }
 
-                if (rm) {
-                  await serviceClient.from('beds').insert([
-                    { organization_id: orgId, room_id: rm.id, bed_label: `${roomNum}-A`, status: 'available' },
-                    { organization_id: orgId, room_id: rm.id, bed_label: `${roomNum}-B`, status: 'available' },
-                  ])
+              const { data: createdRooms } = await serviceClient
+                .from('rooms')
+                .insert(roomsToInsert)
+                .select('id, room_number')
+
+              if (createdRooms && createdRooms.length > 0) {
+                const bedsToInsert: any[] = []
+                for (const rm of createdRooms) {
+                  bedsToInsert.push(
+                    { organization_id: orgId, room_id: rm.id, bed_label: `${rm.room_number}-A`, status: 'available' },
+                    { organization_id: orgId, room_id: rm.id, bed_label: `${rm.room_number}-B`, status: 'available' }
+                  )
                 }
+                await serviceClient.from('beds').insert(bedsToInsert)
               }
             }
           }
-        } catch (setupErr: any) {
-          console.warn('[Onboarding auto room setup warning]:', setupErr?.message)
+        } else {
+          // If rooms already exist, update base rent according to filled details
+          await serviceClient
+            .from('rooms')
+            .update({ base_rent_paise: rentPaise })
+            .eq('property_id', propertyId)
         }
+      } catch (setupErr: any) {
+        console.warn('[Onboarding auto room setup warning]:', setupErr?.message)
       }
     }
 
-    // 4. Update Firestore owner profile to unlocked & verified
+    // 5. Update Firestore owner profile to unlocked & verified
     const nowIso = new Date().toISOString()
     try {
       const { queryDocuments, updateDocument } = await import('@/lib/firebase/firestore')
@@ -507,6 +527,8 @@ export async function POST(request: NextRequest) {
             organization_id: orgId,
             property_name: propName,
             city: propCity,
+            approx_rooms: roomCount,
+            starting_rent: Number(starting_rent) || 7500,
             unlocked_at: nowIso,
             unlocked_by: admin.email || 'superadmin',
             updated_at: nowIso,
@@ -517,12 +539,12 @@ export async function POST(request: NextRequest) {
       console.warn('[Firestore Owner Profile Unlock Warning]:', fErr?.message)
     }
 
-    // 5. Audit Log
+    // 6. Audit Log
     try {
       await serviceClient.from('audit_logs').insert({
         organization_id: orgId,
         actor_id: targetUser.id,
-        action: 'owner_onboarded_unlocked',
+        action: action === 'unlock_only' ? 'owner_quick_unlocked' : 'owner_onboarded_unlocked',
         entity_type: 'owner_profiles',
         entity_id: targetUser.id,
         metadata: {
@@ -534,9 +556,13 @@ export async function POST(request: NextRequest) {
       })
     } catch {}
 
+    const successMessage = action === 'unlock_only'
+      ? `Owner ERP unlocked successfully! "${propName}" is now active.`
+      : `Owner onboarding completed! "${propName}" has been created with ${roomCount} rooms and ERP is unlocked.`
+
     return NextResponse.json({
       success: true,
-      message: `Owner onboarding completed! "${propName}" is created and ERP platform is now unlocked.`,
+      message: successMessage,
       organization,
     })
   } catch (err: any) {

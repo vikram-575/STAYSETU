@@ -108,12 +108,14 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
           action: 'unlock_only',
           userId: owner.user_id,
           mobile: owner.mobile,
+          full_name: owner.full_name,
+          city: owner.city && owner.city !== 'Not provided' ? owner.city : 'Bengaluru',
+          property_name: owner.full_name ? `${owner.full_name}'s PG` : undefined,
         }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to unlock owner')
-      await loadPendingOwners()
-      await loadOrganizations()
+      await Promise.all([loadPendingOwners(), loadOrganizations()])
     } catch (err: any) {
       alert(err.message || 'Failed to unlock owner')
     } finally {
@@ -136,12 +138,13 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
 
   const handleOpenOnboardModal = (owner: any) => {
     setOnboardModalOwner(owner)
-    setOnboardPropName(owner.full_name ? `${owner.full_name}'s PG` : 'New Luxury PG')
-    setOnboardCity(owner.city || 'Bangalore')
-    setOnboardAddress(owner.city ? `${owner.city}, India` : '')
-    setOnboardPgType('coliving')
-    setOnboardRooms('6')
-    setOnboardRent('7500')
+    const validCity = owner.city && owner.city !== 'Not provided' ? owner.city : 'Bengaluru'
+    setOnboardPropName(owner.organization_name || (owner.full_name ? `${owner.full_name}'s PG` : 'New Luxury PG'))
+    setOnboardCity(validCity)
+    setOnboardAddress(owner.address || `${validCity}, India`)
+    setOnboardPgType(owner.pg_type || 'coliving')
+    setOnboardRooms(owner.approx_rooms ? String(owner.approx_rooms) : '6')
+    setOnboardRent(owner.starting_rent ? String(owner.starting_rent) : '7500')
     setOnboardError('')
     setOnboardSuccess('')
   }
@@ -160,6 +163,7 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
           action: action === 'unlock' ? 'onboard_pg' : action,
           userId: onboardModalOwner.user_id,
           mobile: onboardModalOwner.mobile,
+          full_name: onboardModalOwner.full_name,
           property_name: onboardPropName.trim(),
           city: onboardCity.trim(),
           address: onboardAddress.trim(),
@@ -174,11 +178,10 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
       }
 
       setOnboardSuccess(data.message || 'Owner successfully onboarded and ERP adjusted!')
+      await Promise.all([loadPendingOwners(), loadOrganizations()])
       setTimeout(() => {
         setOnboardModalOwner(null)
-        loadPendingOwners()
-        loadOrganizations()
-      }, 1500)
+      }, 900)
     } catch (err: any) {
       setOnboardError(err.message || 'Failed to complete owner onboarding')
     } finally {
@@ -603,9 +606,9 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
                             {isUnlockedAwaitingPg ? (
                               <button
                                 type="button"
-                                onClick={() => handleNavigateToOnboarding(owner)}
-                                className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-md shadow-emerald-600/20 active:scale-95"
-                                title="Open full Enterprise Onboarding page (/onboarding?returnTo=/admin)"
+                                onClick={() => handleOpenOnboardModal(owner)}
+                                className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-md shadow-emerald-600/20 active:scale-95 cursor-pointer"
+                                title="Onboard PG Property & Rooms"
                               >
                                 <Sparkles className="w-3.5 h-3.5 text-amber-300" />
                                 <span>Onboard PG</span>
@@ -616,7 +619,8 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
                                   type="button"
                                   onClick={() => handleQuickUnlockOwner(owner)}
                                   disabled={unlockingOwnerId === targetId}
-                                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black transition inline-flex items-center gap-1.5 shadow-md shadow-amber-500/20 active:scale-95 disabled:opacity-50"
+                                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black transition inline-flex items-center gap-1.5 shadow-md shadow-amber-500/20 active:scale-95 disabled:opacity-50 cursor-pointer"
+                                  title="Quick Unlock & Initialize ERP"
                                 >
                                   {unlockingOwnerId === targetId ? (
                                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -628,11 +632,12 @@ export default function OwnersTab({ initialSearch = '' }: OwnersTabProps) {
 
                                 <button
                                   type="button"
-                                  onClick={() => handleNavigateToOnboarding(owner)}
-                                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-semibold transition"
-                                  title="Open full Enterprise Onboarding page (/onboarding?returnTo=/admin)"
+                                  onClick={() => handleOpenOnboardModal(owner)}
+                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition inline-flex items-center gap-1 shadow-md shadow-emerald-600/20 active:scale-95 cursor-pointer"
+                                  title="Fill PG details and setup property"
                                 >
-                                  Onboard PG
+                                  <Sparkles className="w-3 h-3 text-amber-300" />
+                                  <span>Onboard PG</span>
                                 </button>
                               </>
                             )}
